@@ -1,0 +1,281 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
+@import "tailwindcss";
+
+:root {
+  /* Material 3 Tonal Color Palette and Slate Baselines */
+  --background: #F8FAFC;
+  --on-background: #0F172A;
+  --primary: #2563EB;
+  --on-primary: #FFFFFF;
+  --primary-container: #EFF6FF;
+  --on-primary-container: #1E3A8A;
+  --secondary: #475569;
+  --on-secondary: #FFFFFF;
+  --secondary-container: #F1F5F9;
+  --on-secondary-container: #1E293B;
+  --tertiary: #7C3AED;
+  --on-tertiary: #FFFFFF;
+  --surface: #FFFFFF;
+  --on-surface: #0F172A;
+  --surface-variant: #F1F5F9;
+  --on-surface-variant: #475569;
+  
+  --surface-container-lowest: #FFFFFF;
+  --surface-container-low: #F8FAFC;
+  --surface-container: #F1F5F9;
+  --surface-container-high: #E2E8F0;
+  --surface-container-highest: #CBD5E1;
+  
+  --outline: #94A3B8;
+  --outline-variant: #E2E8F0;
+  
+  --error: #EF4444;
+  --on-error: #FFFFFF;
+  --error-container: #FEF2FE;
+  --on-error-container: #7F1D1D;
+  
+  --tertiary-fixed: #F5F3FF;
+  --on-tertiary-fixed-variant: #4C1D95;
+  --inverse-surface: #0F172A;
+}
+
+.dark {
+  --background: #0B0F19;
+  --on-background: #F1F5F9;
+  --primary: #60A5FA;
+  --on-primary: #1E3A8A;
+  --primary-container: #1D4ED8;
+  --on-primary-container: #EFF6FF;
+  --secondary: #94A3B8;
+  --on-secondary: #1E293B;
+  --secondary-container: #1E293B;
+  --on-secondary-container: #F1F5F9;
+  --tertiary: #A78BFA;
+  --on-tertiary: #4C1D95;
+  --surface: #131A2A;
+  --on-surface: #F1F5F9;
+  --surface-variant: #1E293B;
+  --on-surface-variant: #94A3B8;
+  
+  --surface-container-lowest: #070A12;
+  --surface-container-low: #1E293B;
+  --surface-container: #334155;
+  --surface-container-high: #475569;
+  --surface-container-highest: #64748B;
+  
+  --outline: #64748B;
+  --outline-variant: #1E293B;
+  
+  --error: #F87171;
+  --on-error: #7F1D1D;
+  --error-container: #7F1D1D;
+  --on-error-container: #FEF2F2;
+  
+  --tertiary-fixed: #4C1D95;
+  --on-tertiary-fixed-variant: #F5F3FF;
+  --inverse-surface: #F1F5F9;
+}
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-outfit: "Outfit", "Inter", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+
+  /* Material 3 Color Maps */
+  --color-background: var(--background);
+  --color-on-background: var(--on-background);
+  --color-primary: var(--primary);
+  --color-on-primary: var(--on-primary);
+  --color-primary-container: var(--primary-container);
+  --color-on-primary-container: var(--on-primary-container);
+  --color-secondary: var(--secondary);
+  --color-on-secondary: var(--on-secondary);
+  --color-secondary-container: var(--secondary-container);
+  --color-on-secondary-container: var(--on-secondary-container);
+  --color-tertiary: var(--tertiary);
+  --color-on-tertiary: var(--on-tertiary);
+  --color-surface: var(--surface);
+  --color-on-surface: var(--on-surface);
+  --color-surface-variant: var(--surface-variant);
+  --color-on-surface-variant: var(--on-surface-variant);
+  
+  --color-surface-container-lowest: var(--surface-container-lowest);
+  --color-surface-container-low: var(--surface-container-low);
+  --color-surface-container: var(--surface-container);
+  --color-surface-container-high: var(--surface-container-high);
+  --color-surface-container-highest: var(--surface-container-highest);
+  
+  --color-outline: var(--outline);
+  --color-outline-variant: var(--outline-variant);
+  
+  --color-error: var(--error);
+  --color-on-error: var(--on-error);
+  --color-error-container: var(--error-container);
+  --color-on-error-container: var(--on-error-container);
+  
+  --color-tertiary-fixed: var(--tertiary-fixed);
+  --color-on-tertiary-fixed-variant: var(--on-tertiary-fixed-variant);
+  --color-inverse-surface: var(--inverse-surface);
+}
+
+@variant dark (&:where(.dark, .dark *));
+
+/* ── Global Smoothness ─────────────────────────────────────────────────────── */
+
+html {
+  scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  font-family: var(--font-sans);
+  background-color: var(--background);
+  color: var(--on-background);
+  /* Smooth theme transitions */
+  transition: background-color 0.3s cubic-bezier(0.2, 0.8, 0.2, 1), color 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+/* Suppress all native tap highlights & selection flashes on mobile */
+*, *::before, *::after {
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+  box-sizing: border-box;
+}
+
+/* Prevent tap delay on interactive elements */
+button, a, [role="button"] {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+/* Smooth scrollbar */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--outline-variant);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--outline);
+}
+
+/* ── Animation Keyframes ───────────────────────────────────────────────────── */
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-in {
+  animation: fadeIn 0.28s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* Staggered list entry — apply to list item wrappers */
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(12px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+.animate-fade-in-up {
+  animation: fadeInUp 0.35s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* Slide up sheet / bottom sheet entry */
+@keyframes slideUp {
+  from { transform: translateY(100%); opacity: 0; }
+  to   { transform: translateY(0); opacity: 1; }
+}
+.animate-slide-up {
+  animation: slideUp 0.38s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+/* Drawer slide-in from left */
+@keyframes slideRight {
+  from { transform: translateX(-100%); opacity: 0; }
+  to   { transform: translateX(0); opacity: 1; }
+}
+.animate-slide-right {
+  animation: slideRight 0.32s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+/* Spin variants */
+@keyframes spin-slow {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+.animate-spin-slow {
+  animation: spin-slow 12s linear infinite;
+}
+
+/* Subtle pop on entry (cards, chips) */
+@keyframes popIn {
+  0%   { opacity: 0; transform: scale(0.94); }
+  60%  { transform: scale(1.02); }
+  100% { opacity: 1; transform: scale(1); }
+}
+.animate-pop-in {
+  animation: popIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+/* ── Recharts — no focus rings or outlines ────────────────────────────────── */
+
+.recharts-default-tooltip,
+.recharts-tooltip-wrapper,
+.recharts-pie-sector,
+.recharts-sector,
+.recharts-curve,
+.recharts-rectangle,
+.recharts-active-dot,
+.recharts-dot,
+.recharts-tooltip-cursor,
+.recharts-cursor,
+path,
+svg {
+  outline: none !important;
+  box-shadow: none !important;
+  border: none !important;
+  -webkit-tap-highlight-color: transparent !important;
+}
+
+.recharts-wrapper,
+.recharts-wrapper *,
+.recharts-surface,
+.recharts-surface * {
+  outline: none !important;
+  box-shadow: none !important;
+  border: none !important;
+  -webkit-tap-highlight-color: transparent !important;
+}
+
+/* Hide tooltips' active guide lines/cursor rectangles */
+.recharts-tooltip-cursor,
+.recharts-cursor {
+  display: none !important;
+  stroke: none !important;
+  stroke-width: 0 !important;
+}
+
+@keyframes indeterminate-bar {
+  0% {
+    left: -50%;
+    width: 30%;
+  }
+  50% {
+    left: 25%;
+    width: 50%;
+  }
+  100% {
+    left: 100%;
+    width: 30%;
+  }
+}
+.animate-indeterminate-bar {
+  animation: indeterminate-bar 1.8s infinite ease-in-out;
+}
+
