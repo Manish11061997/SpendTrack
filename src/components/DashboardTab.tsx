@@ -1,13 +1,20 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, RadialBarChart, RadialBar, PolarAngleAxis } from 'recharts';
 import { Transaction, UserProfile, BudgetConfig, Subscription } from '../types';
+import { formatCurrency as formatCustomCurrency, isSubscriptionDoubleCounted, parseRawAmount } from '../utils/currency';
 import { COLOR_PRESETS } from '../theme';
+import { QuickShortcutsWidget } from './QuickShortcutsWidget';
+import { FinancialHealthRadarCard } from './FinancialHealthRadarCard';
+import { NoSpendHeatmapCard } from './NoSpendHeatmapCard';
+import { ReceiptScannerModal } from './ReceiptScannerModal';
+import { QuickTemplatesWidget } from './QuickTemplatesWidget';
 import { 
   TrendingDown, 
   TrendingUp, 
   ArrowDown, 
-  ArrowUp, 
+  ArrowUp,
+  ArrowRight,
   Coins, 
   ShoppingCart, 
   ChevronRight,
@@ -25,7 +32,11 @@ import {
   X,
   CreditCard,
   PiggyBank,
-  Target
+  Target,
+  Info,
+  ShieldAlert,
+  Sparkles,
+  Award
 } from 'lucide-react';
 
 interface DashboardTabProps {
@@ -48,8 +59,17 @@ interface DashboardTabProps {
   onNavigateToInsights: () => void;
   onAddTransactionClick: () => void;
   onDeleteTransaction: (id: string) => void;
+  onAddTransaction?: (transaction: Omit<Transaction, 'id'>) => void;
+  onOpenVoice?: () => void;
+  onOpenSms?: () => void;
+  onOpenCalendar?: () => void;
+  onOpenExportAudit?: () => void;
+  onNavigateToSettings?: () => void;
+  onUpdateBudget?: (budget: BudgetConfig) => void;
   themePresetId?: string;
   isDark?: boolean;
+  onOpenBadges?: () => void;
+  unlockedBadgesCount?: number;
 }
 
 export default function DashboardTab({ 
@@ -66,9 +86,27 @@ export default function DashboardTab({
   onNavigateToInsights,
   onAddTransactionClick,
   onDeleteTransaction,
+  onAddTransaction = () => {},
+  onOpenVoice,
+  onOpenSms,
+  onOpenCalendar,
+  onOpenExportAudit,
+  onNavigateToSettings,
+  onUpdateBudget,
   themePresetId,
-  isDark
+  isDark,
+  onOpenBadges,
+  unlockedBadgesCount = 0
 }: DashboardTabProps) {
+  const healthRadarRef = React.useRef<HTMLDivElement>(null);
+  const noSpendRef = React.useRef<HTMLDivElement>(null);
+
+  const scrollToHealthRadar = () => {
+    healthRadarRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  };
+  const scrollToNoSpend = () => {
+    noSpendRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  };
   // Dynamically look up active theme/preset hex colors to avoid d3-color oklch parsing errors
   const activeThemePresetId = themePresetId || localStorage.getItem('spendtrack_theme_preset') || 'navy';
   const activeIsDark = isDark !== undefined ? isDark : document.documentElement.classList.contains('dark');
@@ -78,6 +116,11 @@ export default function DashboardTab({
   const themeError = activeIsDark ? '#EC9A97' : '#A3483B';
 
   const [selectedTx, setSelectedTx] = useState<Transaction | null>(null);
+  const [showCalcTooltip, setShowCalcTooltip] = useState<boolean>(false);
+  const [activeCategoryFilter, setActiveCategoryFilter] = useState<string | null>(null);
+  const [isBankSmsOpen, setIsBankSmsOpen] = useState(false);
+  const [isSubsExpanded, setIsSubsExpanded] = useState<boolean>(false);
+  const [isGoalsExpanded, setIsGoalsExpanded] = useState<boolean>(false);
 
   // Subscription inline form states
   const [isAddSubOpen, setIsAddSubOpen] = useState(false);
@@ -86,6 +129,7 @@ export default function DashboardTab({
   const [newSubCategory, setNewSubCategory] = useState<'Food' | 'Transport' | 'Rent' | 'Shopping' | 'Other'>('Other');
   const [newSubDate, setNewSubDate] = useState('1');
   const [subError, setSubError] = useState('');
+  const [isCategoryOpen, setIsCategoryOpen] = useState(false);
 
   const handleAddSubSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -93,7 +137,7 @@ export default function DashboardTab({
       setSubError('Please enter a subscription title.');
       return;
     }
-    const amt = parseFloat(newSubAmount);
+    const amt = parseFloat(parseRawAmount(newSubAmount));
     if (isNaN(amt) || amt <= 0) {
       setSubError('Please enter a valid monthly cost.');
       return;
@@ -134,6 +178,7 @@ export default function DashboardTab({
   const [adjustType, setAdjustType] = useState<'add' | 'withdraw'>('add');
 
   const [goalToDeleteId, setGoalToDeleteId] = useState<string | null>(null);
+  const [subToDeleteId, setSubToDeleteId] = useState<string | null>(null);
   const [txToDelete, setTxToDelete] = useState<Transaction | null>(null);
 
   const handleAddGoalSubmit = (e: React.FormEvent) => {
@@ -142,7 +187,7 @@ export default function DashboardTab({
       setGoalError('Please enter a goal title.');
       return;
     }
-    const tgt = parseFloat(newGoalTarget);
+    const tgt = parseFloat(parseRawAmount(newGoalTarget));
     if (isNaN(tgt) || tgt <= 0) {
       setGoalError('Please enter a valid target amount.');
       return;
@@ -168,7 +213,7 @@ export default function DashboardTab({
   const handleAdjustGoal = (e: React.FormEvent) => {
     e.preventDefault();
     if (!activeAdjustingGoalId) return;
-    const amount = parseFloat(adjustAmount);
+    const amount = parseFloat(parseRawAmount(adjustAmount));
     if (isNaN(amount) || amount <= 0) return;
 
     const updated = savingsGoals.map(g => {
@@ -197,47 +242,47 @@ export default function DashboardTab({
   const today = new Date();
   const currentRealMonth = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
   
-  const availableMonths = Array.from(new Set(transactions.map(t => t.date.substring(0, 7)))).sort((a, b) => b.localeCompare(a));
+  const availableMonths = Array.from(new Set(transactions.filter(t => t && t.date && typeof t.date === 'string').map(t => t.date.substring(0, 7)))).sort((a, b) => b.localeCompare(a));
   const [selectedMonthState, setSelectedMonthState] = useState<string | null>(null);
   const activeMonth = selectedMonthState || availableMonths[0] || currentRealMonth;
   const [summaryMode, setSummaryMode] = useState<'monthly' | 'weekly'>('monthly');
+  const [isMonthSelectOpen, setIsMonthSelectOpen] = useState(false);
 
   // Filter transactions for the current active month
-  const currentMonthTxs = transactions.filter(t => t.date.startsWith(activeMonth));
+  const currentMonthTxs = transactions.filter(t => t && t.date && typeof t.date === 'string' && t.date.startsWith(activeMonth));
   
   // Active subscriptions total recurring monthly expense (guarded against double-counting)
   const activeSubsTotal = subscriptions
-    .filter(s => s.isActive)
+    .filter(s => s.isActive !== false)
     .reduce((sum, s) => {
       const isAlreadyLogged = currentMonthTxs.some(t => 
         t.amount < 0 &&
-        (t.label === 'Subscription' || t.title.toLowerCase().includes(s.title.toLowerCase()) || s.title.toLowerCase().includes(t.title.toLowerCase()))
+        isSubscriptionDoubleCounted(s.title, t.title)
       );
-      return sum + (isAlreadyLogged ? 0 : s.amount);
+      return sum + (isAlreadyLogged ? 0 : (Number(s.amount) || 0));
     }, 0);
 
-  // Totals
-  const totalExpenses = Math.abs(
+  const loggedExpenses = Math.abs(
     currentMonthTxs
-      .filter(t => t.amount < 0)
-      .reduce((sum, t) => sum + t.amount, 0)
-  ) + activeSubsTotal;
+      .filter(t => Number(t.amount) < 0)
+      .reduce((sum, t) => sum + (Number(t.amount) || 0), 0)
+  );
+
+  // Total expenses include logged transactions PLUS un-logged active recurring subscriptions
+  const totalExpenses = loggedExpenses + activeSubsTotal;
 
   // Helper to get weekly transactions from current month's transactions
   const getWeeklyTransactions = (txs: Transaction[]) => {
     if (txs.length === 0) return [];
-    // Find the latest transaction's date in this set
     const dates = txs.map(t => new Date(t.date).getTime());
     const maxTime = Math.max(...dates);
     const maxDate = new Date(maxTime);
     
-    // Create a 7-day window ending at maxDate
     const minDate = new Date(maxDate);
-    minDate.setDate(maxDate.getDate() - 6); // 7 days inclusive
+    minDate.setDate(maxDate.getDate() - 6);
     
     return txs.filter(t => {
       const d = new Date(t.date);
-      // set hours to 0 to compare dates only
       const dZero = new Date(d);
       dZero.setHours(0,0,0,0);
       const minCompare = new Date(minDate);
@@ -249,18 +294,150 @@ export default function DashboardTab({
   };
 
   const weeklyTxs = getWeeklyTransactions(currentMonthTxs);
-  const weeklySubsTotal = activeSubsTotal / 4.33; // mathematically 4.33 weeks per month
 
   const totalWeeklyExpenses = Math.abs(
     weeklyTxs
-      .filter(t => t.amount < 0)
-      .reduce((sum, t) => sum + t.amount, 0)
-  ) + weeklySubsTotal;
+      .filter(t => Number(t.amount) < 0)
+      .reduce((sum, t) => sum + (Number(t.amount) || 0), 0)
+  );
 
   const activeExpenses = summaryMode === 'monthly' ? totalExpenses : totalWeeklyExpenses;
-  const hasBudget = !!(budget && budget.monthlyLimit && budget.monthlyLimit > 0);
-  const activeLimit = hasBudget ? (summaryMode === 'monthly' ? budget.monthlyLimit : (budget.monthlyLimit / 4.33)) : 0;
-  const activeAverage = summaryMode === 'monthly' ? 2950.00 : (2950.00 / 4.33);
+
+  // Income & Net Cashflow calculations
+  const totalIncome = currentMonthTxs
+    .filter(t => Number(t.amount) > 0)
+    .reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
+
+  const totalWeeklyIncome = weeklyTxs
+    .filter(t => Number(t.amount) > 0)
+    .reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
+
+  const activeIncome = summaryMode === 'monthly' ? totalIncome : totalWeeklyIncome;
+  const netBalance = activeIncome - activeExpenses;
+  const hasBudget = !!(budget && budget.monthlyLimit && Number(budget.monthlyLimit) > 0);
+  const activeLimit = hasBudget ? (summaryMode === 'monthly' ? Number(budget.monthlyLimit) : (Number(budget.monthlyLimit) / 4.33)) : 0;
+
+  // Budget Health/Pace calculations
+  const totalDaysInMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
+  const currentDayInMonth = today.getDate();
+  const percentMonthElapsed = (currentDayInMonth / totalDaysInMonth) * 100;
+  const percentBudgetSpent = activeLimit > 0 ? (activeExpenses / activeLimit) * 100 : 0;
+
+  const budgetHealth: { label: string; colorClass: string; bgClass: string; borderClass: string } = (() => {
+    if (activeLimit <= 0) return { label: 'No Limit Set', colorClass: 'text-on-surface-variant', bgClass: 'bg-surface-container', borderClass: 'border-outline-variant/30' };
+    if (activeExpenses > activeLimit) return { label: 'Over Budget', colorClass: 'text-error', bgClass: 'bg-error/10', borderClass: 'border-error/20' };
+    
+    // Pace calculation
+    if (percentBudgetSpent <= percentMonthElapsed) {
+      return { label: 'On Track', colorClass: 'text-emerald-600 dark:text-emerald-400', bgClass: 'bg-emerald-500/10 dark:bg-emerald-500/15', borderClass: 'border-emerald-500/20' };
+    } else if (percentBudgetSpent <= percentMonthElapsed * 1.15) {
+      return { label: 'Caution (Pacing Fast)', colorClass: 'text-amber-600 dark:text-amber-400', bgClass: 'bg-amber-500/10 dark:bg-amber-500/15', borderClass: 'border-amber-500/20' };
+    } else {
+      return { label: 'Over Pace', colorClass: 'text-error', bgClass: 'bg-error/10 dark:bg-error/15', borderClass: 'border-error/20' };
+    }
+  })();
+
+  // EOM Projections for budget warning/risk analysis
+  const daysRemaining = totalDaysInMonth - currentDayInMonth;
+  const dailySpendRate = currentDayInMonth > 0 ? totalExpenses / currentDayInMonth : 0;
+  const projectedRemainingSpend = dailySpendRate * daysRemaining;
+  const projectedTotalEOM = totalExpenses + projectedRemainingSpend;
+  const projectedOverdraft = hasBudget ? projectedTotalEOM - Number(budget.monthlyLimit) : 0;
+  const isHighRisk = hasBudget && (budgetHealth.label === 'Over Pace' || budgetHealth.label === 'Over Budget' || totalExpenses > Number(budget.monthlyLimit));
+
+  // Fetch true historical baseline
+  const pastMonths = availableMonths.filter(m => m !== activeMonth);
+  let historicalAvgTotal = 0;
+  if (pastMonths.length > 0) {
+    const pastExpenses = pastMonths.map(m => {
+      const monthTxs = transactions.filter(t => t && t.date && typeof t.date === 'string' && t.date.startsWith(m) && Number(t.amount) < 0);
+      return Math.abs(monthTxs.reduce((sum, t) => sum + (Number(t.amount) || 0), 0));
+    });
+    historicalAvgTotal = Math.round(pastExpenses.reduce((sum, val) => sum + val, 0) / pastMonths.length);
+  } else {
+    historicalAvgTotal = totalExpenses;
+  }
+
+  const activeAverage = summaryMode === 'monthly' ? historicalAvgTotal : (historicalAvgTotal / 4.33);
+
+  // Calculate previous month total
+  const prevMonth = pastMonths[0];
+  let prevMonthExpenses = 0;
+  if (prevMonth) {
+    const prevMonthTxs = transactions.filter(t => t && t.date && typeof t.date === 'string' && t.date.startsWith(prevMonth) && Number(t.amount) < 0);
+    prevMonthExpenses = Math.abs(prevMonthTxs.reduce((sum, t) => sum + (Number(t.amount) || 0), 0));
+  }
+  const monthlyDiffPercent = prevMonthExpenses > 0 
+    ? ((totalExpenses - prevMonthExpenses) / prevMonthExpenses) * 100 
+    : 0;
+
+  // Find the latest transaction's date in this set
+  const dates = currentMonthTxs.map(t => new Date(t.date).getTime());
+  const maxTime = dates.length > 0 ? Math.max(...dates) : new Date().getTime();
+  const maxDate = new Date(maxTime);
+  
+  // Current week window: [maxDate - 6, maxDate]
+  const minDate = new Date(maxDate);
+  minDate.setDate(maxDate.getDate() - 6);
+  
+  // Previous week window: [maxDate - 13, maxDate - 7]
+  const prevWeekMaxDate = new Date(minDate);
+  prevWeekMaxDate.setDate(minDate.getDate() - 1);
+  const prevWeekMinDate = new Date(prevWeekMaxDate);
+  prevWeekMinDate.setDate(prevWeekMaxDate.getDate() - 6);
+  
+  const prevWeeklyTxs = currentMonthTxs.filter(t => {
+    const d = new Date(t.date);
+    const dZero = new Date(d);
+    dZero.setHours(0,0,0,0);
+    const minCompare = new Date(prevWeekMinDate);
+    minCompare.setHours(0,0,0,0);
+    const maxCompare = new Date(prevWeekMaxDate);
+    maxCompare.setHours(0,0,0,0);
+    return dZero >= minCompare && dZero <= maxCompare;
+  });
+  
+  const prevWeeklyExpenses = Math.abs(
+    prevWeeklyTxs.filter(t => Number(t.amount) < 0).reduce((sum, t) => sum + (Number(t.amount) || 0), 0)
+  );
+  
+  const weeklyDiffPercent = prevWeeklyExpenses > 0 
+    ? ((totalWeeklyExpenses - prevWeeklyExpenses) / prevWeeklyExpenses) * 100 
+    : 0;
+
+  const getComparisonInfo = () => {
+    if (summaryMode === 'monthly') {
+      if (!prevMonth) {
+        if (hasBudget) {
+          const pct = Math.round((totalExpenses / budget.monthlyLimit) * 100);
+          return {
+            label: `${pct}% of monthly budget`,
+            isLess: totalExpenses <= budget.monthlyLimit,
+            showIcon: false
+          };
+        }
+        return { label: 'No comparative data', isLess: true, showIcon: false };
+      }
+      const pct = Math.round(monthlyDiffPercent);
+      if (pct === 0) return { label: 'Same as last month', isLess: true, showIcon: false };
+      return {
+        label: pct < 0 ? `${Math.abs(pct)}% less than last month` : `${Math.abs(pct)}% more than last month`,
+        isLess: pct < 0,
+        showIcon: true
+      };
+    } else {
+      if (prevWeeklyExpenses === 0 || weeklyTxs.length === 0) {
+        return { label: 'No comparative data', isLess: true, showIcon: false };
+      }
+      const pct = Math.round(weeklyDiffPercent);
+      if (pct === 0) return { label: 'Same as last week', isLess: true, showIcon: false };
+      return {
+        label: pct < 0 ? `${Math.abs(pct)}% less than last week` : `${Math.abs(pct)}% more than last week`,
+        isLess: pct < 0,
+        showIcon: true
+      };
+    }
+  };
 
   const getWeeklyPeriodRange = () => {
     if (currentMonthTxs.length === 0) return '';
@@ -294,10 +471,7 @@ export default function DashboardTab({
 
   // Helper to format currency
   const formatCurrency = (val: number) => {
-    return new Intl.NumberFormat('en-IN', {
-      style: 'currency',
-      currency: 'INR'
-    }).format(val);
+    return formatCustomCurrency(val, budget?.currency || 'INR');
   };
 
   // Helper to format date label
@@ -322,10 +496,32 @@ export default function DashboardTab({
     return `${months[parseInt(month) - 1]} ${day}`;
   };
 
-  // Get the latest 5 transactions
-  const recentTransactions = [...transactions]
-    .sort((a, b) => b.date.localeCompare(a.date))
-    .slice(0, 5);
+  // Get the latest 5 transactions (optionally filtered by activeCategoryFilter)
+  const filteredRecentTxs = activeCategoryFilter
+    ? transactions.filter(t => t.category === activeCategoryFilter)
+    : transactions;
+
+  const recentTransactions = [...filteredRecentTxs]
+    .sort((a, b) => {
+      const dateA = (a && a.date ? String(a.date) : '');
+      const dateB = (b && b.date ? String(b.date) : '');
+      return dateB.localeCompare(dateA);
+    })
+    .slice(0, 4);
+
+  const handleQuickAdd = (title: string, amount: number, category: 'Food' | 'Transport' | 'Shopping' | 'Other') => {
+    const todayStr = new Date().toISOString().split('T')[0];
+    const nowTime = new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+    onAddTransaction({
+      title,
+      amount: -amount,
+      category,
+      date: todayStr,
+      time: nowTime,
+      label: 'General',
+      notes: 'Quick logged expense'
+    });
+  };
 
   // Helper to generate the last 12 months ending with the activeMonth
   const getLast12Months = (endMonth: string) => {
@@ -338,53 +534,65 @@ export default function DashboardTab({
       const mLabel = d.toLocaleString('en-IN', { month: 'short' });
       const mKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
       
-      // Calculate dynamic spend for this month from user's transactions
-      const monthTxs = transactions.filter(t => t.date.startsWith(mKey));
-      const monthExpenses = Math.abs(
-        monthTxs
-          .filter(t => t.amount < 0)
-          .reduce((sum, t) => sum + t.amount, 0)
-      );
-      
-      list.push({
-        month: mLabel,
-        spend: mKey === endMonth ? totalExpenses : monthExpenses,
-        isCurrent: mKey === endMonth
-      });
+      if (mKey === endMonth) {
+        // Current month: use the already-computed totalExpenses (includes subs)
+        list.push({ month: mLabel, spend: totalExpenses, isCurrent: true });
+      } else {
+        // Past months: count transactions + un-logged subscription costs
+        const monthTxs = transactions.filter(t => t && t.date && typeof t.date === 'string' && t.date.startsWith(mKey));
+        const txExpenses = Math.abs(
+          monthTxs.filter(t => Number(t.amount) < 0).reduce((sum, t) => sum + (Number(t.amount) || 0), 0)
+        );
+        const monthSubsTotal = subscriptions
+          .filter(s => s && s.isActive !== false)
+          .reduce((sum, s) => {
+            const isAlreadyLogged = monthTxs.some(t =>
+              Number(t.amount) < 0 &&
+              isSubscriptionDoubleCounted(s.title, t.title)
+            );
+            return sum + (isAlreadyLogged ? 0 : (Number(s.amount) || 0));
+          }, 0);
+        list.push({ month: mLabel, spend: txExpenses + monthSubsTotal, isCurrent: false });
+      }
     }
     return list;
   };
 
-  const trendsData = getLast12Months(activeMonth);
+  const trendsData = useMemo(() => {
+    return getLast12Months(activeMonth);
+  }, [activeMonth, transactions, subscriptions]);
 
   // Maximum value for scaling the bar heights in trends chart (approx 3000 as base minimum)
   const maxSpend = Math.max(...trendsData.map(d => d.spend), 3000);
 
-  // Group transactions of current active period by category (for expense transactions only)
-  const categoryDataMap: Record<string, number> = {};
-  const activePeriodTxs = summaryMode === 'monthly' ? currentMonthTxs : weeklyTxs;
-  activePeriodTxs.forEach(t => {
-    if (t.amount < 0) {
-      const cat = t.category || 'Other';
-      const absAmount = Math.abs(t.amount);
-      categoryDataMap[cat] = (categoryDataMap[cat] || 0) + absAmount;
-    }
-  });
-
-  // Factor active recurring subscriptions into category analysis
-  subscriptions.forEach(s => {
-    if (s.isActive) {
-      const isAlreadyLogged = currentMonthTxs.some(t => 
-        t.amount < 0 &&
-        (t.label === 'Subscription' || t.title.toLowerCase().includes(s.title.toLowerCase()) || s.title.toLowerCase().includes(t.title.toLowerCase()))
-      );
-      if (!isAlreadyLogged) {
-        const cat = s.category || 'Other';
-        const subCost = summaryMode === 'monthly' ? s.amount : s.amount / 4.33;
-        categoryDataMap[cat] = (categoryDataMap[cat] || 0) + subCost;
+  // Group transactions of current active period by category (for expense transactions only) with memoization
+  const categoryDataMap: Record<string, number> = useMemo(() => {
+    const map: Record<string, number> = {};
+    const activePeriodTxs = summaryMode === 'monthly' ? currentMonthTxs : weeklyTxs;
+    activePeriodTxs.forEach(t => {
+      if (Number(t.amount) < 0) {
+        const cat = t.category || 'Other';
+        const absAmount = Math.abs(Number(t.amount) || 0);
+        map[cat] = (map[cat] || 0) + absAmount;
       }
-    }
-  });
+    });
+
+    // Factor active recurring subscriptions into category analysis
+    subscriptions.forEach(s => {
+      if (s.isActive !== false) {
+        const isAlreadyLogged = currentMonthTxs.some(t => 
+          Number(t.amount) < 0 &&
+          isSubscriptionDoubleCounted(s.title, t.title)
+        );
+        if (!isAlreadyLogged) {
+          const cat = s.category || 'Other';
+          const subCost = summaryMode === 'monthly' ? (Number(s.amount) || 0) : (Number(s.amount) || 0) / 4.33;
+          map[cat] = (map[cat] || 0) + subCost;
+        }
+      }
+    });
+    return map;
+  }, [summaryMode, currentMonthTxs, weeklyTxs, subscriptions]);
 
   const getCategoryColor = (cat: string) => {
     switch (cat) {
@@ -401,11 +609,67 @@ export default function DashboardTab({
     }
   };
 
-  const chartData = Object.entries(categoryDataMap).map(([name, value]) => ({
-    name,
-    value,
-    color: getCategoryColor(name)
-  })).sort((a, b) => b.value - a.value);
+  // AI Spender Nudges — computed after categoryDataMap is available
+  const getSpenderNudges = () => {
+    const nudges: { text: string; type: 'info' | 'warning' | 'success' }[] = [];
+    
+    if (activeLimit > 0 && activeExpenses > activeLimit) {
+      nudges.push({
+        text: `You have exceeded your total limit by ${formatCurrency(activeExpenses - activeLimit)}. Try prioritizing essential needs only.`,
+        type: 'warning'
+      });
+    } else if (activeLimit > 0 && percentBudgetSpent > percentMonthElapsed * 1.15) {
+      nudges.push({
+        text: `Pacing fast: you've spent ${Math.round(percentBudgetSpent)}% of your limit in only ${Math.round(percentMonthElapsed)}% of the month.`,
+        type: 'warning'
+      });
+    }
+
+    // Category limits warning using computed categoryDataMap
+    if (budget?.categoryLimits) {
+      Object.entries(budget.categoryLimits).forEach(([cat, limit]) => {
+        if (!limit) return;
+        const spent = categoryDataMap[cat] || 0;
+        if (spent > limit) {
+          nudges.push({
+            text: `Over budget in ${cat}: spent ${formatCurrency(spent)} vs limit ${formatCurrency(limit)}.`,
+            type: 'warning'
+          });
+        } else if (spent > limit * 0.85) {
+          nudges.push({
+            text: `${cat} limit warning: spent ${Math.round((spent / limit) * 100)}% of your budget.`,
+            type: 'info'
+          });
+        }
+      });
+    }
+
+    // Positive nudge
+    if (netBalance > 0 && activeExpenses < activeLimit * 0.5 && percentMonthElapsed > 50) {
+      nudges.push({
+        text: `Excellent job! You have saved ${formatCurrency(netBalance)} so far, putting you on track for a high savings rate.`,
+        type: 'success'
+      });
+    }
+
+    // Default tip if no alerts
+    if (nudges.length === 0) {
+      nudges.push({
+        text: "Tip: Click donut chart slices below to instantly filter your transactions list by category.",
+        type: 'info'
+      });
+    }
+
+    return nudges;
+  };
+
+  const chartData = useMemo(() => {
+    return Object.entries(categoryDataMap).map(([name, value]) => ({
+      name,
+      value,
+      color: getCategoryColor(name)
+    })).sort((a, b) => b.value - a.value);
+  }, [categoryDataMap, themeColors, themeOutline]);
 
   const totalSpendingForMonth = chartData.reduce((sum, item) => sum + item.value, 0);
 
@@ -455,177 +719,354 @@ export default function DashboardTab({
   };
 
   return (
-    <div className="space-y-6 pb-24 animate-fade-in">
+    <div className="space-y-3.5 sm:space-y-5 pb-20 animate-fade-in">
       
       {/* Hero Section: Total Spending */}
-      <section className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-surface-container-low/40 p-5 rounded-2xl border border-outline-variant/25">
-        <div className="space-y-1">
-          <h2 className="font-label-lg text-label-lg text-on-surface-variant uppercase tracking-wider flex items-center gap-1.5 flex-wrap">
-            <span>{summaryMode === 'monthly' ? 'Total Monthly Spending' : 'Total Weekly Spending'}</span>
+      <section className="bg-surface-container-low/40 p-3 sm:p-4 rounded-2xl border border-outline-variant/25 space-y-2 relative z-20">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className="text-[11px] font-bold text-on-surface-variant uppercase tracking-wider">
+              {summaryMode === 'monthly' ? 'Monthly Spend' : 'Weekly Spend'}
+            </span>
             {summaryMode === 'weekly' && getWeeklyPeriodRange() && (
-              <span className="text-[10px] font-bold normal-case text-primary bg-primary-container/40 px-2 py-0.5 rounded-full border border-primary/10">
+              <span className="text-[9px] font-bold text-primary bg-primary-container/40 px-1.5 py-0.5 rounded-full border border-primary/10">
                 {getWeeklyPeriodRange()}
               </span>
             )}
-          </h2>
-          <div className="flex items-baseline gap-2 flex-wrap">
-            <span className="font-headline-lg text-2xl lg:text-3xl font-extrabold text-primary">
-              {formatCurrency(activeExpenses)}
-            </span>
-            <span className="font-label-md text-label-md text-secondary flex items-center gap-0.5 bg-secondary-container/30 px-2 py-0.5 rounded-full">
-              <TrendingDown className="w-3.5 h-3.5" /> 
-              {summaryMode === 'monthly' ? '12% less than last month' : '5% less than last week'}
-            </span>
+
           </div>
-          <div className="mt-1 flex items-center gap-1.5 text-xs text-on-surface-variant">
-            <span>{summaryMode === 'monthly' ? 'Average:' : 'Weekly Average:'}</span>
-            <span className="font-bold text-on-surface">{formatCurrency(activeAverage)}</span>
+
+          {/* Controls: Badges Icon + Segmented Toggle */}
+          <div className="flex items-center gap-1.5 shrink-0">
+            {onOpenBadges && (
+              <button
+                type="button"
+                onClick={onOpenBadges}
+                aria-label="Financial Discipline Badges"
+                title={`Financial Discipline Badges (${unlockedBadgesCount}/6 Mastered)`}
+                className="w-6 h-6 rounded-md bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/25 text-amber-600 dark:text-amber-400 flex items-center justify-center transition-all active:scale-90 cursor-pointer shrink-0"
+              >
+                <Award className="w-3.5 h-3.5" />
+              </button>
+            )}
+
+            {/* Segmented Toggle Control */}
+            <div className="flex bg-surface-container rounded-lg p-0.5 border border-outline-variant/35 shrink-0">
+              <button
+                id="summary-mode-monthly-btn"
+                type="button"
+                onClick={() => setSummaryMode('monthly')}
+                className={`px-2 py-0.5 rounded-md font-bold text-[9px] sm:text-[10px] uppercase tracking-wider transition-all cursor-pointer ${
+                  summaryMode === 'monthly'
+                    ? 'bg-primary text-on-primary shadow-2xs'
+                    : 'text-on-surface-variant hover:text-on-surface'
+                }`}
+              >
+                Monthly
+              </button>
+              <button
+                id="summary-mode-weekly-btn"
+                type="button"
+                onClick={() => setSummaryMode('weekly')}
+                className={`px-2 py-0.5 rounded-md font-bold text-[9px] sm:text-[10px] uppercase tracking-wider transition-all cursor-pointer ${
+                  summaryMode === 'weekly'
+                    ? 'bg-primary text-on-primary shadow-2xs'
+                    : 'text-on-surface-variant hover:text-on-surface'
+                }`}
+              >
+                Weekly
+              </button>
+            </div>
           </div>
         </div>
 
-        {/* Segmented Toggle Control */}
-        <div className="flex bg-surface-container rounded-xl p-1 border border-outline-variant/35 shrink-0 self-start sm:self-center">
-          <button
-            id="summary-mode-monthly-btn"
-            type="button"
-            onClick={() => setSummaryMode('monthly')}
-            className={`px-3 py-1.5 rounded-lg font-bold text-xs uppercase tracking-wider transition-all duration-200 cursor-pointer flex items-center gap-1 ${
-              summaryMode === 'monthly'
-                ? 'bg-primary text-on-primary shadow-xs'
-                : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high'
-            }`}
-          >
-            Monthly
-          </button>
-          <button
-            id="summary-mode-weekly-btn"
-            type="button"
-            onClick={() => setSummaryMode('weekly')}
-            className={`px-3 py-1.5 rounded-lg font-bold text-xs uppercase tracking-wider transition-all duration-200 cursor-pointer flex items-center gap-1 ${
-              summaryMode === 'weekly'
-                ? 'bg-primary text-on-primary shadow-xs'
-                : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high'
-            }`}
-          >
-            Weekly
-          </button>
+        <div className="flex items-baseline justify-between gap-2">
+          <div className="relative inline-flex items-center">
+            <span className="font-headline-lg text-xl sm:text-2xl lg:text-3xl font-extrabold text-primary tracking-tight">
+              {formatCurrency(activeExpenses)}
+            </span>
+            <button 
+              type="button"
+              onClick={() => setShowCalcTooltip(!showCalcTooltip)}
+              className="p-1 text-on-surface-variant/60 hover:text-primary transition-colors cursor-pointer shrink-0"
+              title="Calculation breakdown"
+            >
+              <Info className="w-3.5 h-3.5 text-primary" />
+            </button>
+
+            {/* MoM Comparison Pill */}
+            {summaryMode === 'monthly' && prevMonthExpenses > 0 && (
+              <span className={`ml-2 inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold border ${
+                monthlyDiffPercent <= 0 
+                  ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30' 
+                  : 'bg-rose-500/15 text-rose-400 border-rose-500/30'
+              }`}>
+                {monthlyDiffPercent <= 0 ? <TrendingDown className="w-3 h-3" /> : <TrendingUp className="w-3 h-3" />}
+                <span>{monthlyDiffPercent <= 0 ? `${Math.abs(Math.round(monthlyDiffPercent))}% vs last mo` : `+${Math.round(monthlyDiffPercent)}% vs last mo`}</span>
+              </span>
+            )}
+            
+            <AnimatePresence>
+              {showCalcTooltip && (
+                <div 
+                  className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fade-in"
+                  onClick={() => setShowCalcTooltip(false)}
+                >
+                  <motion.div 
+                    initial={{ opacity: 0, scale: 0.9, y: 10 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.9, y: 10 }}
+                    onClick={(e) => e.stopPropagation()}
+                    className="w-full max-w-sm bg-surface-container-lowest dark:bg-slate-900 border border-outline-variant/40 dark:border-slate-800 rounded-3xl p-5 shadow-2xl space-y-4"
+                  >
+                    <div className="flex items-center justify-between border-b border-outline-variant/20 dark:border-slate-800 pb-3">
+                      <div className="flex items-center gap-2.5">
+                        <div className="p-2.5 bg-primary/10 rounded-2xl">
+                          <Info className="w-5 h-5 text-primary" />
+                        </div>
+                        <div>
+                          <h3 className="font-outfit font-black text-base text-on-surface dark:text-white">
+                            Calculation Breakdown
+                          </h3>
+                          <p className="text-[11px] text-on-surface-variant dark:text-slate-400 font-medium">
+                            {summaryMode === 'monthly' ? 'Total Monthly Spending Formula' : 'Total Weekly Spending Formula'}
+                          </p>
+                        </div>
+                      </div>
+                      <button 
+                        type="button"
+                        onClick={() => setShowCalcTooltip(false)}
+                        className="w-8 h-8 rounded-full bg-surface-container-high dark:bg-slate-800 text-on-surface-variant dark:text-slate-300 hover:text-on-surface flex items-center justify-center font-bold text-xs cursor-pointer transition-colors"
+                      >
+                        ✕
+                      </button>
+                    </div>
+
+                    <div className="space-y-2.5 text-xs">
+                      <div className="flex justify-between items-center p-3 rounded-2xl bg-surface-container-low dark:bg-slate-800/60 border border-outline-variant/20">
+                        <span className="text-on-surface-variant dark:text-slate-300 font-medium">Logged Purchases</span>
+                        <span className="font-mono font-extrabold text-on-surface dark:text-white text-sm">
+                          {formatCurrency(Math.abs(currentMonthTxs.filter(t => t.amount < 0).reduce((sum, t) => sum + t.amount, 0)))}
+                        </span>
+                      </div>
+
+                      <div className="flex justify-between items-center p-3 rounded-2xl bg-surface-container-low dark:bg-slate-800/60 border border-outline-variant/20">
+                        <span className="text-on-surface-variant dark:text-slate-300 font-medium">Active Subscriptions</span>
+                        <span className="font-mono font-extrabold text-on-surface dark:text-white text-sm">
+                          {formatCurrency(activeSubsTotal)}
+                        </span>
+                      </div>
+
+                      <div className="flex justify-between items-center p-3.5 rounded-2xl bg-primary/10 border border-primary/20">
+                        <span className="font-bold text-primary">Total Calculated Outflow</span>
+                        <span className="font-mono font-black text-primary text-base">
+                          {formatCurrency(totalExpenses)}
+                        </span>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setShowCalcTooltip(false)}
+                      className="w-full py-3 bg-primary hover:bg-primary/90 text-on-primary font-bold text-xs rounded-2xl shadow-xs transition-all cursor-pointer"
+                    >
+                      Got It
+                    </button>
+                  </motion.div>
+                </div>
+              )}
+            </AnimatePresence>
+          </div>
+
+          <div className="flex items-center gap-1 shrink-0">
+            {(() => {
+              const comp = getComparisonInfo();
+              return (
+                <span className={`font-label-md text-[9px] sm:text-[10px] flex items-center gap-0.5 px-2 py-0.5 rounded-full border ${
+                  comp.label === 'No comparative data'
+                    ? 'bg-surface-container text-on-surface-variant border-outline-variant/30'
+                    : comp.isLess
+                    ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20'
+                    : 'bg-error/10 text-error border-error/20'
+                }`}>
+                  {comp.showIcon && (comp.isLess ? <TrendingDown className="w-2.5 h-2.5" /> : <TrendingUp className="w-2.5 h-2.5" />)}
+                  <span>{comp.label}</span>
+                </span>
+              );
+            })()}
+
+            {hasBudget && (
+              <span className={`font-label-md text-[9px] sm:text-[10px] flex items-center gap-1 px-2 py-0.5 rounded-full border ${budgetHealth.bgClass} ${budgetHealth.colorClass} ${budgetHealth.borderClass}`}>
+                <span className={`w-1.5 h-1.5 rounded-full ${
+                  budgetHealth.label === 'On Track' 
+                    ? 'bg-emerald-500' 
+                    : budgetHealth.label.includes('Caution') 
+                    ? 'bg-amber-500 animate-pulse' 
+                    : 'bg-error animate-pulse'
+                }`} />
+                <span>{budgetHealth.label}</span>
+              </span>
+            )}
+          </div>
         </div>
       </section>
 
-      {/* Summary Cards Bento Grid */}
-      <div className={`grid gap-4 ${hasBudget ? 'grid-cols-1 md:grid-cols-2' : 'grid-cols-1'}`}>
-        {/* Remaining Budget Card */}
-        {hasBudget && (
-          <div className={`p-4 rounded-2xl ${
-            activeLimit - activeExpenses >= 0 
-              ? 'bg-primary text-on-primary shadow-md' 
-              : 'bg-error-container text-on-error-container border border-error/20 shadow-sm'
-          } flex flex-col justify-between h-24 relative overflow-hidden group hover:shadow-lg transition-all duration-300`}>
-            <div className={`absolute -right-2 -bottom-2 opacity-10 transition-transform group-hover:scale-110 duration-500 ${
-              activeLimit - activeExpenses >= 0 ? 'text-white' : 'text-error'
-            }`}>
-              <Coins className="w-16 h-16" />
-            </div>
-            <div className="flex items-center gap-1.5">
-              <span className={`p-1 rounded-full ${
-                activeLimit - activeExpenses >= 0 ? 'bg-white/20' : 'bg-error/10'
-              }`}>
-                <Coins className={`w-3.5 h-3.5 ${
-                  activeLimit - activeExpenses >= 0 ? 'text-white' : 'text-error'
-                }`} />
-              </span>
-              <span className="font-title-md text-xs font-semibold">
-                {summaryMode === 'monthly' ? 'Remaining Monthly Budget' : 'Remaining Weekly Budget'}
-              </span>
-            </div>
-            <div className="font-headline-sm text-xl font-bold">
-              {formatCurrency(activeLimit - activeExpenses)}
-            </div>
-          </div>
-        )}
 
-        {/* Monthly/Weekly Expenses Card */}
-        <div className="p-4 rounded-2xl bg-surface-container-high text-on-surface shadow-sm border border-outline-variant/40 flex flex-col justify-between h-24 relative overflow-hidden group hover:shadow-md transition-shadow">
-          <div className="absolute -right-2 -bottom-2 opacity-10 transition-transform group-hover:scale-110 duration-500">
-            <ShoppingCart className="w-16 h-16 text-primary" />
-          </div>
-          <div className="flex items-center gap-1.5 text-primary">
-            <span className="p-1 rounded-full bg-primary/10">
-              <ArrowUp className="w-3.5 h-3.5 text-primary" />
-            </span>
-            <span className="font-title-md text-xs font-semibold text-on-surface">
-              {summaryMode === 'monthly' ? 'Monthly Expenses' : 'Weekly Expenses'}
-            </span>
-          </div>
-          <div className="font-headline-sm text-xl font-bold text-on-surface">
-            {formatCurrency(activeExpenses)}
-          </div>
-        </div>
-      </div>
 
-      {/* Spending Trends Custom Interactive Bar Chart */}
+      {/* 1-Tap Cockpit Quick Shortcuts */}
+      <QuickShortcutsWidget
+        onOpenExportAudit={onOpenExportAudit || (() => {})}
+        onOpenSms={() => setIsBankSmsOpen(true)}
+        onOpenCalendar={onOpenCalendar || (() => {})}
+        onOpenAddTx={onAddTransactionClick}
+        onOpenInsights={onNavigateToInsights}
+        onNavigateToSettings={onNavigateToSettings}
+        onScrollToHealthRadar={scrollToHealthRadar}
+        onScrollToNoSpend={scrollToNoSpend}
+      />
+
+      {/* 1-Tap Quick Presets Micro-Pills */}
+      <QuickTemplatesWidget
+        templates={budget?.quickTemplates}
+        currency={budget?.currency || 'INR'}
+        onLogTemplate={(tpl) => {
+          const now = new Date();
+          const yyyy = now.getFullYear();
+          const mm = String(now.getMonth() + 1).padStart(2, '0');
+          const dd = String(now.getDate()).padStart(2, '0');
+          const localToday = `${yyyy}-${mm}-${dd}`;
+
+          if (onAddTransaction) {
+            onAddTransaction({
+              title: tpl.title,
+              amount: -Math.abs(tpl.amount),
+              category: tpl.category,
+              date: localToday,
+              time: now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }),
+              label: 'Personal'
+            });
+          }
+        }}
+      />
+
+
+
+      {/* High Priority #1: Recent Transactions (Immediate Daily Log Access) */}
       <section className="space-y-3">
         <div className="flex items-center justify-between">
-          <h3 className="font-outfit text-lg text-on-surface font-black tracking-tight">Spending Trends</h3>
+          <div className="flex items-center gap-2">
+            <h3 className="font-outfit text-lg text-on-surface font-black tracking-tight">Recent Transactions</h3>
+            {activeCategoryFilter && (
+              <span className="text-[10px] font-bold bg-primary/10 text-primary border border-primary/20 px-2.5 py-0.5 rounded-full flex items-center gap-1 animate-fade-in">
+                <span>{activeCategoryFilter}</span>
+                <button 
+                  onClick={() => setActiveCategoryFilter(null)}
+                  className="hover:text-error transition-colors font-black cursor-pointer text-[12px] pl-0.5"
+                >
+                  ×
+                </button>
+              </span>
+            )}
+          </div>
           <button 
-            onClick={onNavigateToInsights}
+            onClick={onNavigateToHistory}
             className="font-label-lg text-xs text-primary hover:underline flex items-center gap-0.5"
           >
-            View Details
+            View All
             <ChevronRight className="w-3.5 h-3.5" />
           </button>
         </div>
-        <div className="p-5 rounded-2xl bg-surface-container-low border border-outline-variant/30 shadow-sm">
-          {transactions.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-6 text-center space-y-2">
-              <div className="p-3 bg-surface-container-high rounded-full text-on-surface-variant">
-                <TrendingUp className="w-8 h-8 opacity-40 text-primary" />
-              </div>
-              <p className="text-sm font-bold text-on-surface">No spending trends yet</p>
-              <p className="text-xs text-on-surface-variant max-w-xs leading-relaxed">
-                Your 12-month spending bar chart will appear here once you log your first transaction.
-              </p>
+
+        <div className="space-y-2">
+          {recentTransactions.length === 0 ? (
+            <div className="p-6 text-center bg-surface-container-lowest border border-outline-variant/30 rounded-2xl space-y-2">
+              <p className="text-xs text-on-surface-variant font-medium">No recent transactions logged yet.</p>
               <button
                 onClick={onAddTransactionClick}
-                className="mt-2 px-4 py-1.5 bg-primary hover:bg-primary/90 text-on-primary font-bold text-xs rounded-xl shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer"
+                className="px-3.5 py-1.5 bg-primary text-on-primary text-xs font-bold rounded-xl shadow-xs"
               >
-                <Plus className="w-3.5 h-3.5" />
-                Add Your First Log
+                + Log First Expense
               </button>
             </div>
           ) : (
-            /* SVG / Flex Custom Bar Chart */
-            <div className="flex items-end justify-between h-40 gap-1.5 px-1 pt-4">
-              {trendsData.map((d, idx) => {
-                const pct = (d.spend / maxSpend) * 100;
-                return (
-                  <div key={idx} className="flex-1 flex flex-col items-center gap-1 group relative">
-                    {/* Tooltip on hover */}
-                    <div className="absolute bottom-full mb-1.5 bg-slate-900 text-white text-xs font-bold font-mono px-2.5 py-1.5 rounded-lg shadow-xl border border-slate-800 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-20">
-                      {formatCurrency(d.spend)}
+            recentTransactions.map((tx) => {
+              const config = getCategoryConfig(tx.category);
+              const IconComponent = config.icon;
+              const isExpense = tx.amount < 0;
+
+              return (
+                <div 
+                  id={`transaction-row-${tx.id}`}
+                  key={tx.id}
+                  onClick={() => setSelectedTx(tx)}
+                  className="flex items-center justify-between p-2.5 sm:p-3 bg-surface-container-lowest rounded-xl border border-outline-variant/30 transition-all cursor-pointer group active:scale-[0.98] active:bg-surface-container-high/50"
+                >
+                  <div className="flex items-center gap-2.5">
+                    <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center ${config.bg} shadow-2xs shrink-0`}>
+                      <IconComponent className="w-4 h-4 text-on-surface" />
                     </div>
-                    
-                    {/* Bar */}
-                    <div className="w-full relative rounded-t-md overflow-hidden bg-slate-100 dark:bg-slate-800 h-28 flex items-end">
-                      <div 
-                        style={{ height: `${pct}%` }}
-                        className={`w-full rounded-t-md transition-all duration-1000 ${
-                          d.isCurrent 
-                            ? 'bg-primary shadow-sm hover:opacity-90' 
-                            : 'bg-secondary-container hover:opacity-85'
-                        }`}
-                      ></div>
+                    <div className="flex-1 min-w-0">
+                      <div className="font-title-md text-xs sm:text-sm text-on-surface font-bold truncate group-hover:text-primary transition-colors">
+                        {tx.title}
+                      </div>
+                      <div className="text-[11px] text-on-surface-variant font-medium truncate">
+                        {tx.category} • {formatDateLabel(tx.date)}, {tx.time}
+                      </div>
                     </div>
-                    <span className={`text-[10px] font-label-md text-on-surface-variant ${d.isCurrent ? 'font-bold text-primary' : ''}`}>
-                      {d.month}
+                  </div>
+                  <div className="text-right ml-2 flex flex-col items-end shrink-0">
+                    <div className={`font-mono text-xs sm:text-sm font-bold ${isExpense ? 'text-on-surface' : 'text-emerald-600 dark:text-emerald-400'}`}>
+                      {isExpense ? '' : '+'}{formatCurrency(Math.abs(tx.amount))}
+                    </div>
+                    <span className="inline-block px-1.5 py-0.5 mt-0.5 text-[9px] font-medium bg-surface-variant text-on-surface-variant rounded-md">
+                      {tx.label}
                     </span>
                   </div>
-                );
-              })}
-            </div>
+                </div>
+              );
+            })
           )}
         </div>
       </section>
+
+
+
+      {/* AI Spending Insights (Nudges) */}
+      {(() => {
+        const nudges = getSpenderNudges();
+        if (nudges.length === 0) return null;
+        return (
+          <div className="grid grid-cols-1 gap-2.5">
+            {nudges.map((nudge, idx) => (
+              <div 
+                key={idx}
+                className={`p-3.5 rounded-2xl border text-xs flex items-start gap-2.5 shadow-2xs animate-fade-in ${
+                  nudge.type === 'warning' 
+                    ? 'bg-error/5 text-error border-error/15 dark:bg-error/10 dark:text-error-container' 
+                    : nudge.type === 'success'
+                    ? 'bg-emerald-500/5 text-emerald-700 border-emerald-500/15 dark:bg-emerald-500/10 dark:text-emerald-400'
+                    : 'bg-primary/5 text-primary border-primary/15 dark:bg-primary/10 dark:text-primary-container'
+                }`}
+              >
+                <span className="p-1 rounded-full bg-surface-container-lowest shrink-0">
+                  {nudge.type === 'warning' ? (
+                    <ShieldAlert className="w-3.5 h-3.5 text-error" />
+                  ) : nudge.type === 'success' ? (
+                    <TrendingDown className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                  ) : (
+                    <Sparkles className="w-3.5 h-3.5 text-primary" />
+                  )}
+                </span>
+                <div className="flex-1 leading-normal font-medium">
+                  {nudge.text}
+                </div>
+              </div>
+            ))}
+          </div>
+        );
+      })()}
+
+
 
       {/* Budget Health Radial Progress Section */}
       {hasBudget && (
@@ -681,7 +1122,6 @@ export default function DashboardTab({
                     />
                     <RadialBar
                       background={{ fill: 'rgba(0, 0, 0, 0.05)', stroke: 'none', strokeWidth: 0 }}
-                      clockWise
                       dataKey="value"
                       cornerRadius={6}
                       stroke="none"
@@ -755,20 +1195,44 @@ export default function DashboardTab({
         <div className="flex items-center justify-between">
           <h3 className="font-outfit text-lg text-on-surface font-black tracking-tight">Visual Summary</h3>
           {availableMonths.length > 1 ? (
-            <select
-              id="dashboard-month-select"
-              value={activeMonth}
-              onChange={(e) => setSelectedMonthState(e.target.value)}
-              className="text-xs text-on-surface-variant font-medium bg-surface-container-high px-3 py-1 rounded-full border border-outline-variant/35 hover:border-primary focus:outline-hidden focus:ring-1 focus:ring-primary transition-all cursor-pointer"
-            >
-              {availableMonths.map((m) => (
-                <option key={m} value={m} className="bg-surface text-on-surface">
-                  {formatMonthName(m)}
-                </option>
-              ))}
-            </select>
+            <div className="relative">
+              <button
+                id="dashboard-month-select"
+                type="button"
+                onClick={() => setIsMonthSelectOpen(!isMonthSelectOpen)}
+                className="text-xs text-on-surface-variant font-bold bg-surface-container-high px-3.5 py-1.5 rounded-full border border-outline-variant/35 hover:border-primary focus:outline-hidden focus:ring-1 focus:ring-primary transition-all cursor-pointer flex items-center gap-1.5"
+              >
+                <span>{formatMonthName(activeMonth)}</span>
+                <span className={`text-[8px] text-on-surface-variant transition-transform duration-200 ${isMonthSelectOpen ? 'rotate-180' : ''}`}>▼</span>
+              </button>
+
+              {isMonthSelectOpen && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setIsMonthSelectOpen(false)}></div>
+                  <div className="absolute right-0 mt-1 w-36 bg-surface-container-high border border-outline-variant rounded-xl shadow-xl z-50 overflow-hidden py-1 max-h-48 overflow-y-auto">
+                    {availableMonths.map((m) => (
+                      <button
+                        key={m}
+                        type="button"
+                        onClick={() => {
+                          setSelectedMonthState(m);
+                          setIsMonthSelectOpen(false);
+                        }}
+                        className={`w-full text-left px-3.5 py-2 text-xs font-bold transition-colors ${
+                          activeMonth === m
+                            ? 'bg-primary text-on-primary'
+                            : 'text-on-surface hover:bg-surface-variant/40'
+                        }`}
+                      >
+                        {formatMonthName(m)}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
           ) : (
-            <span className="text-xs text-on-surface-variant font-medium bg-surface-container-high px-2.5 py-1 rounded-full border border-outline-variant/20">
+            <span className="text-xs text-on-surface-variant font-medium bg-surface-container-high px-2.5 py-1.5 rounded-full border border-outline-variant/20">
               {formatMonthName(activeMonth)}
             </span>
           )}
@@ -802,9 +1266,21 @@ export default function DashboardTab({
                       stroke="none"
                       activeShape={false}
                     >
-                      {chartData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.color} stroke="none" />
-                      ))}
+                      {chartData.map((entry, index) => {
+                        const isSelected = activeCategoryFilter === entry.name;
+                        return (
+                          <Cell 
+                            key={`cell-${index}`} 
+                            fill={entry.color} 
+                            stroke={isSelected ? '#ffffff' : 'none'}
+                            strokeWidth={isSelected ? 2 : 0}
+                            className="cursor-pointer transition-opacity hover:opacity-85"
+                            onClick={() => {
+                              setActiveCategoryFilter(activeCategoryFilter === entry.name ? null : entry.name);
+                            }}
+                          />
+                        );
+                      })}
                     </Pie>
                     <Tooltip content={<CustomTooltip />} cursor={false} />
                   </PieChart>
@@ -832,7 +1308,14 @@ export default function DashboardTab({
                   return (
                     <div 
                       key={index} 
-                      className="p-2 rounded-xl hover:bg-surface-container-high/60 transition-colors space-y-1"
+                      onClick={() => {
+                        setActiveCategoryFilter(activeCategoryFilter === item.name ? null : item.name);
+                      }}
+                      className={`p-2 rounded-xl hover:bg-surface-container-high/60 transition-all space-y-1 cursor-pointer border ${
+                        activeCategoryFilter === item.name 
+                          ? 'border-primary bg-primary/5 dark:bg-primary/10' 
+                          : 'border-transparent'
+                      }`}
                     >
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2.5 min-w-0">
@@ -887,33 +1370,46 @@ export default function DashboardTab({
         </div>
       </section>
 
-      {/* Subscriptions Section */}
-      <section className="space-y-3">
-        <div className="flex items-center justify-between">
-          <div className="flex flex-col">
-            <h3 className="font-outfit text-lg text-on-surface font-black tracking-tight">Subscriptions</h3>
-            <span className="text-[11px] text-on-surface-variant font-medium">
-              Recurring monthly outlays factored into budget analysis
+      {/* Subscriptions Section (Collapsible for Clean UX) */}
+      <section className="space-y-3 bg-surface-container-low/60 rounded-3xl p-4 border border-outline-variant/25">
+        <div className="flex items-center justify-between cursor-pointer" onClick={() => setIsSubsExpanded(!isSubsExpanded)}>
+          <div className="flex items-center gap-2.5">
+            <div className="p-2 rounded-2xl bg-primary/10 text-primary">
+              <CreditCard className="w-5 h-5" />
+            </div>
+            <div className="flex flex-col">
+              <h3 className="font-outfit text-base text-on-surface font-black tracking-tight flex items-center gap-2">
+                Subscriptions
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">
+                  {subscriptions.filter(s => s.isActive !== false).length} Active
+                </span>
+              </h3>
+              <span className="text-[11px] text-on-surface-variant font-medium">
+                {formatCurrency(activeSubsTotal)}/month recurring
+              </span>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsSubsExpanded(true);
+                setIsAddSubOpen(!isAddSubOpen);
+              }}
+              className="px-2.5 py-1 bg-primary/10 text-primary text-xs font-bold rounded-xl hover:bg-primary/20 transition-all flex items-center gap-1 cursor-pointer"
+            >
+              {isAddSubOpen ? <X className="w-3.5 h-3.5" /> : <Plus className="w-3.5 h-3.5" />}
+              <span className="hidden sm:inline">{isAddSubOpen ? 'Cancel' : 'Add'}</span>
+            </button>
+            <span className="text-xs font-bold text-on-surface-variant p-1">
+              {isSubsExpanded ? '▲' : '▼'}
             </span>
           </div>
-          <button 
-            id="add-subscription-toggle-btn"
-            onClick={() => setIsAddSubOpen(!isAddSubOpen)}
-            className="px-3 py-1.5 bg-primary/10 text-primary text-xs font-bold rounded-xl hover:bg-primary/20 transition-all flex items-center gap-1 cursor-pointer"
-          >
-            {isAddSubOpen ? (
-              <>
-                <X className="w-3.5 h-3.5" />
-                Cancel
-              </>
-            ) : (
-              <>
-                <Plus className="w-3.5 h-3.5" />
-                Add Recurring
-              </>
-            )}
-          </button>
         </div>
+
+        {isSubsExpanded && (
+          <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} className="space-y-3 pt-2">
 
         {/* Add Subscription Inline Form */}
         {isAddSubOpen && (
@@ -939,7 +1435,7 @@ export default function DashboardTab({
 
                 {/* Amount */}
                 <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-on-surface-variant uppercase">Monthly Cost (INR)</label>
+                  <label className="text-[10px] font-bold text-on-surface-variant uppercase">Monthly Cost ({budget?.currency || 'INR'})</label>
                   <input 
                     type="number"
                     step="0.01"
@@ -955,17 +1451,43 @@ export default function DashboardTab({
                 {/* Category */}
                 <div className="space-y-1">
                   <label className="text-[10px] font-bold text-on-surface-variant uppercase">Budget Category</label>
-                  <select
-                    value={newSubCategory}
-                    onChange={(e) => setNewSubCategory(e.target.value as any)}
-                    className="w-full px-3 py-2 bg-surface-container-lowest border border-outline-variant rounded-xl text-xs text-on-surface focus:outline-hidden focus:ring-1 focus:ring-primary transition-all cursor-pointer"
-                  >
-                    <option value="Food">Food</option>
-                    <option value="Transport">Transport</option>
-                    <option value="Rent">Rent</option>
-                    <option value="Shopping">Shopping</option>
-                    <option value="Other">Other</option>
-                  </select>
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={() => setIsCategoryOpen(!isCategoryOpen)}
+                      className="w-full flex items-center justify-between bg-surface-container-lowest border border-outline-variant rounded-xl px-3 py-2 text-xs text-on-surface focus:border-primary focus:ring-1 focus:ring-primary/20 outline-none transition-all cursor-pointer text-left font-medium"
+                    >
+                      <span>{newSubCategory}</span>
+                      <span className={`text-[8px] text-on-surface-variant transition-transform duration-200 ${isCategoryOpen ? 'rotate-180' : ''}`}>
+                        ▼
+                      </span>
+                    </button>
+
+                    {isCategoryOpen && (
+                      <>
+                        <div className="fixed inset-0 z-40" onClick={() => setIsCategoryOpen(false)}></div>
+                        <div className="absolute left-0 right-0 mt-1 bg-surface-container-high border border-outline-variant rounded-xl shadow-xl z-50 overflow-hidden py-1 max-h-40 overflow-y-auto">
+                          {['Food', 'Transport', 'Rent', 'Shopping', 'Other'].map((cat) => (
+                            <button
+                              key={cat}
+                              type="button"
+                              onClick={() => {
+                                setNewSubCategory(cat as any);
+                                setIsCategoryOpen(false);
+                              }}
+                              className={`w-full text-left px-3 py-1.5 text-xs font-medium transition-colors ${
+                                newSubCategory === cat
+                                  ? 'bg-primary text-on-primary'
+                                  : 'text-on-surface hover:bg-surface-variant/40'
+                              }`}
+                            >
+                              {cat}
+                            </button>
+                          ))}
+                        </div>
+                      </>
+                    )}
+                  </div>
                 </div>
 
                 {/* Billing Day */}
@@ -1019,7 +1541,68 @@ export default function DashboardTab({
               </p>
             </div>
           ) : (
-            <div className="space-y-2">
+            <div className="space-y-4">
+              {(() => {
+                const activeTimelineSubs = subscriptions
+                  .filter(s => s.isActive)
+                  .sort((a, b) => {
+                    const dayA = a.billingDate;
+                    const dayB = b.billingDate;
+                    const currentDay = today.getDate();
+                    const diffA = dayA >= currentDay ? dayA - currentDay : dayA + totalDaysInMonth - currentDay;
+                    const diffB = dayB >= currentDay ? dayB - currentDay : dayB + totalDaysInMonth - currentDay;
+                    return diffA - diffB;
+                  });
+
+                if (activeTimelineSubs.length === 0) return null;
+                return (
+                  <div className="space-y-2 pb-1.5 border-b border-outline-variant/15">
+                    <span className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider block">Upcoming Billing Timeline</span>
+                    <div className="flex gap-2.5 overflow-x-auto pb-2 scrollbar-none snap-x">
+                      {activeTimelineSubs.map((sub) => {
+                        const config = getCategoryConfig(sub.category);
+                        const IconComponent = config.icon;
+                        
+                        const currentDay = today.getDate();
+                        const billDay = sub.billingDate;
+                        const daysUntil = billDay >= currentDay ? billDay - currentDay : billDay + totalDaysInMonth - currentDay;
+                        const isNear = daysUntil <= 3;
+                        
+                        return (
+                          <div 
+                            key={`timeline-${sub.id}`}
+                            className={`flex-none w-28 p-3 rounded-2xl border snap-start flex flex-col justify-between h-20 transition-all ${
+                              isNear 
+                                ? 'bg-error/5 text-error border-error/20 dark:bg-error/10 dark:text-error-container' 
+                                : 'bg-surface-container-lowest border-outline-variant/25 text-on-surface hover:border-primary/30'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between text-[9px] font-bold">
+                              <span className="uppercase font-mono">
+                                {isNear ? 'Due Soon' : `In ${daysUntil} days`}
+                              </span>
+                              <span className={`w-1.5 h-1.5 rounded-full ${isNear ? 'bg-error animate-pulse' : 'bg-primary'}`} />
+                            </div>
+                            
+                            <div className="flex items-center gap-1.5 mt-1 min-w-0">
+                              <div className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 ${config.bg} text-[9px]`}>
+                                <IconComponent className="w-2.5 h-2.5" />
+                              </div>
+                              <span className="text-[10px] font-bold truncate">{sub.title}</span>
+                            </div>
+                            
+                            <div className="text-[10px] font-bold text-right font-mono mt-1">
+                              {formatCurrency(sub.amount)}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })()}
+
+              <div className="space-y-2">
               {subscriptions.map((sub) => {
                 const config = getCategoryConfig(sub.category);
                 const IconComponent = config.icon;
@@ -1045,7 +1628,7 @@ export default function DashboardTab({
                             {sub.title}
                           </span>
                           <span className="inline-block px-1.5 py-0.5 text-[9px] font-semibold bg-surface-variant text-on-surface-variant rounded-md">
-                            {sub.category}
+                            {sub.category || 'Other'}
                           </span>
                         </div>
                         <div className="text-[10px] text-on-surface-variant flex items-center gap-1.5 mt-0.5">
@@ -1081,7 +1664,7 @@ export default function DashboardTab({
                       {/* Delete Action */}
                       <button
                         type="button"
-                        onClick={() => onDeleteSubscription(sub.id)}
+                        onClick={() => setSubToDeleteId(sub.id)}
                         className="p-1.5 text-on-surface-variant/70 hover:text-error hover:bg-error/10 rounded-lg transition-colors cursor-pointer"
                         title="Delete Subscription"
                       >
@@ -1096,47 +1679,60 @@ export default function DashboardTab({
               <div className="p-3 bg-surface-container-highest/40 rounded-2xl border border-outline-variant/20 flex justify-between items-center text-xs">
                 <span className="text-on-surface-variant font-medium flex items-center gap-1.5">
                   <CreditCard className="w-3.5 h-3.5 text-primary" />
-                  Monthly Commitments: <strong className="text-on-surface">{subscriptions.filter(s => s.isActive).length} active</strong>
+                  Monthly Commitments: <strong className="text-on-surface">{subscriptions.filter(s => s.isActive !== false).length} active</strong>
                 </span>
                 <span className="font-mono font-bold text-primary">
                   {formatCurrency(activeSubsTotal)}
                 </span>
               </div>
             </div>
-          )}
-        </div>
-      </section>
+          </div>
+        )}
+      </div>
+    </motion.div>
+  )}
+</section>
 
-      {/* Savings Goals Tracker Section */}
-      <section className="space-y-3">
-        <div className="flex items-center justify-between">
-          <div className="flex flex-col">
-            <h3 className="font-outfit text-lg text-on-surface font-black tracking-tight flex items-center gap-2">
-              <PiggyBank className="w-5 h-5 text-primary" />
-              Savings Goals
-            </h3>
-            <span className="text-[11px] text-on-surface-variant font-medium">
-              Create and manage long-term savings achievements
+      {/* Savings Goals Tracker Section (Collapsible for Clean UX) */}
+      <section className="space-y-3 bg-surface-container-low/60 rounded-3xl p-4 border border-outline-variant/25">
+        <div className="flex items-center justify-between cursor-pointer" onClick={() => setIsGoalsExpanded(!isGoalsExpanded)}>
+          <div className="flex items-center gap-2.5">
+            <div className="p-2 rounded-2xl bg-primary/10 text-primary">
+              <PiggyBank className="w-5 h-5" />
+            </div>
+            <div className="flex flex-col">
+              <h3 className="font-outfit text-base text-on-surface font-black tracking-tight flex items-center gap-2">
+                Savings Goals
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">
+                  {savingsGoals.length} Targets
+                </span>
+              </h3>
+              <span className="text-[11px] text-on-surface-variant font-medium">
+                {formatCurrency(savingsGoals.reduce((s, g) => s + (g.currentAmount || 0), 0))} accumulated
+              </span>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsGoalsExpanded(true);
+                setIsAddGoalOpen(!isAddGoalOpen);
+              }}
+              className="px-2.5 py-1 bg-primary/10 text-primary text-xs font-bold rounded-xl hover:bg-primary/20 transition-all flex items-center gap-1 cursor-pointer"
+            >
+              {isAddGoalOpen ? <X className="w-3.5 h-3.5" /> : <Plus className="w-3.5 h-3.5" />}
+              <span className="hidden sm:inline">{isAddGoalOpen ? 'Cancel' : 'Create'}</span>
+            </button>
+            <span className="text-xs font-bold text-on-surface-variant p-1">
+              {isGoalsExpanded ? '▲' : '▼'}
             </span>
           </div>
-          <button 
-            id="add-goal-toggle-btn"
-            onClick={() => setIsAddGoalOpen(!isAddGoalOpen)}
-            className="px-3 py-1.5 bg-primary/10 text-primary text-xs font-bold rounded-xl hover:bg-primary/20 transition-all flex items-center gap-1 cursor-pointer"
-          >
-            {isAddGoalOpen ? (
-              <>
-                <X className="w-3.5 h-3.5" />
-                Cancel
-              </>
-            ) : (
-              <>
-                <Plus className="w-3.5 h-3.5" />
-                Create Goal
-              </>
-            )}
-          </button>
         </div>
+
+        {isGoalsExpanded && (
+          <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} className="space-y-3 pt-2">
 
         {/* Add Goal Inline Form */}
         {isAddGoalOpen && (
@@ -1221,7 +1817,7 @@ export default function DashboardTab({
           ) : (
             <div className="grid grid-cols-1 gap-3">
               {savingsGoals.map((goal) => {
-                const percent = Math.min(100, Math.round((goal.currentAmount / goal.targetAmount) * 100));
+                const percent = goal.targetAmount > 0 ? Math.min(100, Math.round((goal.currentAmount / goal.targetAmount) * 100)) : 0;
                 const isAdjusting = activeAdjustingGoalId === goal.id;
                 
                 return (
@@ -1229,38 +1825,50 @@ export default function DashboardTab({
                     key={goal.id}
                     className="p-4 bg-surface-container-low border border-outline-variant/30 rounded-2xl flex flex-col gap-3 transition-all hover:border-outline-variant/65 shadow-xs"
                   >
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <h4 className="font-title-md text-sm font-bold text-on-surface flex items-center gap-1.5">
+                     <div className="flex items-center justify-between gap-4">
+                      <div className="flex-1 min-w-0">
+                        <h4 className="font-title-md text-sm font-bold text-on-surface flex items-center gap-1.5 truncate">
                           {goal.title}
                         </h4>
                         {goal.targetDate && (
-                          <p className="text-[10px] text-on-surface-variant/80 flex items-center gap-1 mt-0.5">
-                            <Calendar className="w-3 h-3" /> Target: {new Date(goal.targetDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                          <p className="text-[10px] text-on-surface-variant/85 flex items-center gap-1 mt-0.5">
+                            <Calendar className="w-3 h-3 text-primary" /> Target: {new Date(goal.targetDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
                           </p>
                         )}
+                        <div className="flex items-baseline gap-1.5 mt-1">
+                          <span className="font-mono text-xs font-black text-primary">
+                            {formatCurrency(goal.currentAmount)}
+                          </span>
+                          <span className="text-[9px] text-on-surface-variant/80">
+                            of {formatCurrency(goal.targetAmount)}
+                          </span>
+                        </div>
                       </div>
-                      <div className="text-right">
-                        <span className="font-mono text-xs font-bold text-primary block">
-                          {formatCurrency(goal.currentAmount)}
-                        </span>
-                        <span className="text-[9px] text-on-surface-variant/80 block">
-                          Goal: {formatCurrency(goal.targetAmount)}
-                        </span>
-                      </div>
-                    </div>
 
-                    {/* Progress Bar */}
-                    <div className="space-y-1">
-                      <div className="flex items-center justify-between text-[10px]">
-                        <span className="text-on-surface-variant font-medium">Completion Progress</span>
-                        <span className="font-bold text-primary font-mono">{percent}%</span>
-                      </div>
-                      <div className="w-full h-2 bg-surface-container rounded-full overflow-hidden border border-outline-variant/20">
-                        <div 
-                          className="h-full bg-primary rounded-full transition-all duration-500"
-                          style={{ width: `${percent}%` }}
-                        />
+                      {/* Radial Progress Gauge */}
+                      <div className="relative w-12 h-12 shrink-0 flex items-center justify-center">
+                        <svg className="w-12 h-12 transform -rotate-90">
+                          <circle
+                            cx="24"
+                            cy="24"
+                            r="19"
+                            className="stroke-surface-container/60 dark:stroke-surface-container-high/60"
+                            strokeWidth="3.5"
+                            fill="transparent"
+                          />
+                          <circle
+                            cx="24"
+                            cy="24"
+                            r="19"
+                            className="stroke-primary transition-all duration-700 ease-out"
+                            strokeWidth="3.5"
+                            strokeDasharray={2 * Math.PI * 19}
+                            strokeDashoffset={2 * Math.PI * 19 * (1 - percent / 100)}
+                            strokeLinecap="round"
+                            fill="transparent"
+                          />
+                        </svg>
+                        <span className="absolute text-[9px] font-black text-primary font-mono">{percent}%</span>
                       </div>
                     </div>
 
@@ -1356,60 +1964,13 @@ export default function DashboardTab({
             </div>
           )}
         </div>
-      </section>
+      </motion.div>
+    )}
+  </section>
 
-      {/* Recent Transactions List */}
-      <section className="space-y-3">
-        <div className="flex items-center justify-between">
-          <h3 className="font-outfit text-lg text-on-surface font-black tracking-tight">Recent Transactions</h3>
-          <button 
-            onClick={onNavigateToHistory}
-            className="font-label-lg text-xs text-primary hover:underline flex items-center gap-0.5"
-          >
-            View All
-            <ChevronRight className="w-3.5 h-3.5" />
-          </button>
-        </div>
 
-        <div className="space-y-2">
-          {recentTransactions.map((tx) => {
-            const config = getCategoryConfig(tx.category);
-            const IconComponent = config.icon;
-            const isExpense = tx.amount < 0;
 
-            return (
-              <div 
-                id={`transaction-row-${tx.id}`}
-                key={tx.id}
-                onClick={() => setSelectedTx(tx)}
-                className="flex items-center justify-between p-3 bg-surface-container-low rounded-2xl border border-outline-variant/30 hover:bg-surface-variant/40 transition-all cursor-pointer group active:scale-[0.99]"
-              >
-                <div className="flex items-center gap-3">
-                  <div className={`w-11 h-11 rounded-full flex items-center justify-center ${config.bg} shadow-sm transition-transform group-hover:scale-105`}>
-                    <IconComponent className="w-5 h-5" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="font-title-md text-sm text-on-surface font-semibold truncate group-hover:text-primary transition-colors">
-                      {tx.title}
-                    </div>
-                    <div className="text-xs text-on-surface-variant">
-                      {tx.category} • {formatDateLabel(tx.date)}, {tx.time}
-                    </div>
-                  </div>
-                </div>
-                <div className="text-right ml-2 flex flex-col items-end">
-                  <div className={`font-title-md text-sm font-semibold ${isExpense ? 'text-on-surface' : 'text-emerald-600 dark:text-emerald-400'}`}>
-                    {isExpense ? '' : '+'}{formatCurrency(Math.abs(tx.amount))}
-                  </div>
-                  <span className="inline-block px-2 py-0.5 mt-0.5 text-[10px] font-medium bg-surface-variant text-on-surface-variant rounded-full">
-                    {tx.label}
-                  </span>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </section>
+
 
       {/* Transaction Detail Bottom Sheet Modal */}
       {selectedTx && (
@@ -1604,6 +2165,52 @@ export default function DashboardTab({
             </motion.div>
           </div>
         )}
+      </AnimatePresence>
+
+      {/* Custom Confirmation Dialog for Subscription Deletion */}
+      <AnimatePresence>
+        {subToDeleteId && (() => {
+          const subToDelete = subscriptions.find(s => s.id === subToDeleteId);
+          return (
+            <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+              <motion.div
+                initial={{ scale: 0.95, opacity: 0, y: 10 }}
+                animate={{ scale: 1, opacity: 1, y: 0 }}
+                exit={{ scale: 0.95, opacity: 0, y: 10 }}
+                transition={{ duration: 0.2, ease: "easeOut" }}
+                className="bg-surface-container rounded-3xl p-6 max-w-sm w-full border border-outline-variant/30 shadow-2xl text-center space-y-4"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="w-12 h-12 rounded-full bg-error-container text-on-error-container flex items-center justify-center mx-auto">
+                  <CreditCard className="w-6 h-6 text-error" />
+                </div>
+                <div className="space-y-1.5">
+                  <h4 className="font-bold text-base text-on-surface">Delete Recurring Expense?</h4>
+                  <p className="text-xs text-on-surface-variant leading-relaxed">
+                    Are you sure you want to delete <strong className="font-semibold text-on-surface">"{subToDelete?.title || 'this subscription'}"</strong>? It will be removed from your recurring monthly commitments.
+                  </p>
+                </div>
+                <div className="flex gap-2.5 pt-1">
+                  <button
+                    onClick={() => setSubToDeleteId(null)}
+                    className="flex-1 py-2 rounded-full bg-surface-container-highest hover:bg-surface-variant/40 text-on-surface text-xs font-semibold cursor-pointer transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={() => {
+                      onDeleteSubscription(subToDeleteId);
+                      setSubToDeleteId(null);
+                    }}
+                    className="flex-1 py-2 rounded-full bg-error text-on-error hover:bg-error/90 text-xs font-black cursor-pointer transition-colors"
+                  >
+                    Delete Expense
+                  </button>
+                </div>
+              </motion.div>
+            </div>
+          );
+        })()}
       </AnimatePresence>
 
     </div>

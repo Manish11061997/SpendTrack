@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Transaction, BudgetConfig, UserProfile, Subscription } from '../types';
+import { formatCurrency as formatCustomCurrency, parseRawAmount } from '../utils/currency';
 import { 
   ArrowLeft,
   Calendar, 
@@ -23,7 +24,8 @@ import {
   X,
   PlusCircle,
   Coins,
-  Search
+  Search,
+  Download
 } from 'lucide-react';
 import { 
   OCTOBER_2023_TRANSACTIONS, 
@@ -31,6 +33,7 @@ import {
   INITIAL_HISTORY_SUMMARIES 
 } from '../initialData';
 import ExportPDFButton from './ExportPDFButton';
+import { exportTransactionsToCSV } from '../utils/exportCsv';
 
 interface HistoryTabProps {
   transactions: Transaction[];
@@ -73,41 +76,42 @@ export default function HistoryTab({
 
   // Helper to format currency
   const formatCurrency = (val: number) => {
-    return new Intl.NumberFormat('en-IN', {
-      style: 'currency',
-      currency: 'INR'
-    }).format(val);
+    return formatCustomCurrency(val, budget?.currency || 'INR');
   };
 
-  // Dynamically group all transactions by month
-  const groupedByMonth = transactions.reduce((acc, t) => {
-    const monthKey = t.date.substring(0, 7); // yyyy-mm
-    if (!acc[monthKey]) {
-      acc[monthKey] = [];
-    }
-    acc[monthKey].push(t);
-    return acc;
-  }, {} as Record<string, Transaction[]>);
+  // Dynamically group all transactions by month with memoization
+  const groupedByMonth = useMemo(() => {
+    return transactions.reduce((acc, t) => {
+      const monthKey = t.date.substring(0, 7); // yyyy-mm
+      if (!acc[monthKey]) {
+        acc[monthKey] = [];
+      }
+      acc[monthKey].push(t);
+      return acc;
+    }, {} as Record<string, Transaction[]>);
+  }, [transactions]);
 
-  // Convert to MonthlyHistorySummary objects
-  const recordsList: MonthlyHistorySummary[] = Object.entries(groupedByMonth).map(([monthKey, txs]) => {
-    const [year, month] = monthKey.split('-').map(Number);
-    const dateObj = new Date(year, month - 1, 1);
-    const label = dateObj.toLocaleString('en-IN', { month: 'long', year: 'numeric' });
-    const shortLabel = dateObj.toLocaleString('en-IN', { month: 'short' }).toUpperCase();
-    const totalOutflow = Math.abs(
-      txs
-        .filter(t => t.amount < 0)
-        .reduce((sum, t) => sum + t.amount, 0)
-    );
-    return {
-      monthKey,
-      label,
-      shortLabel,
-      totalOutflow,
-      transactionCount: txs.length
-    };
-  }).sort((a, b) => b.monthKey.localeCompare(a.monthKey));
+  // Convert to MonthlyHistorySummary objects with memoization
+  const recordsList: MonthlyHistorySummary[] = useMemo(() => {
+    return Object.entries(groupedByMonth).map(([monthKey, txs]) => {
+      const [year, month] = monthKey.split('-').map(Number);
+      const dateObj = new Date(year, month - 1, 1);
+      const label = dateObj.toLocaleString('en-IN', { month: 'long', year: 'numeric' });
+      const shortLabel = dateObj.toLocaleString('en-IN', { month: 'short' }).toUpperCase();
+      const totalOutflow = Math.abs(
+        txs
+          .filter(t => t.amount < 0)
+          .reduce((sum, t) => sum + t.amount, 0)
+      );
+      return {
+        monthKey,
+        label,
+        shortLabel,
+        totalOutflow,
+        transactionCount: txs.length
+      };
+    }).sort((a, b) => b.monthKey.localeCompare(a.monthKey));
+  }, [groupedByMonth]);
 
   // Group transactions for a specific month
   const getSelectedMonthTransactions = (key: string): Transaction[] => {
@@ -170,9 +174,20 @@ export default function HistoryTab({
       <div className="space-y-6 pb-24 animate-fade-in">
         
         {/* Header Section */}
-        <section className="space-y-1">
-          <h2 className="font-outfit text-2xl lg:text-3xl font-black text-on-surface tracking-tight">Archive</h2>
-          <p className="font-body-md text-sm text-on-surface-variant">Review your historical spending by month</p>
+        <section className="flex items-center justify-between gap-3">
+          <div>
+            <h2 className="font-outfit text-2xl lg:text-3xl font-black text-on-surface tracking-tight">Archive</h2>
+            <p className="font-body-md text-sm text-on-surface-variant">Review your historical spending by month</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => exportTransactionsToCSV(transactions)}
+            className="px-3.5 py-2 bg-surface-container-high hover:bg-primary/20 border border-outline-variant/40 text-primary rounded-2xl text-xs font-extrabold flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer shadow-2xs shrink-0"
+            title="Export all transactions as CSV / Excel spreadsheet"
+          >
+            <Download className="w-4 h-4" />
+            <span>Export CSV</span>
+          </button>
         </section>
 
         {/* Summary Card */}
@@ -367,10 +382,10 @@ export default function HistoryTab({
   const activeMonthExpenses = monthTransactions.filter(t => t.amount < 0).reduce((sum, t) => sum + t.amount, 0);
   const monthTotalSpent = Math.abs(activeMonthExpenses);
 
-  // Calculate dynamic budget details (only for 2024-10 or uses the $3,000 standard budget)
-  const activeBudgetLimit = selectedMonthKey === '2023-10' ? 3000.00 : budget.monthlyLimit;
-  const usedPercent = Math.min((monthTotalSpent / activeBudgetLimit) * 100, 100);
-  const budgetLeft = activeBudgetLimit - monthTotalSpent;
+  // Calculate dynamic budget details
+  const activeBudgetLimit = Number(budget?.monthlyLimit) || 0;
+  const usedPercent = activeBudgetLimit > 0 ? Math.min((monthTotalSpent / activeBudgetLimit) * 100, 100) : 0;
+  const budgetLeft = activeBudgetLimit > 0 ? activeBudgetLimit - monthTotalSpent : 0;
 
   // Apply real-time search and category filter
   const filteredMonthTransactions = monthTransactions.filter(t => {
@@ -586,199 +601,169 @@ export default function HistoryTab({
                             opacity: { duration: 0.1 }
                           }
                         }}
-                        className="relative overflow-hidden w-full select-none bg-surface-container-lowest"
+                        onClick={() => {
+                          if (!isEditing) {
+                            setSelectedTx(tx);
+                          }
+                        }}
+                        className={`relative z-10 flex flex-col p-4 bg-surface-container-lowest hover:bg-surface-container-high transition-colors cursor-pointer group active:bg-surface-container-highest no-parent-drag ${
+                          isEditing ? 'bg-surface-container/60 ring-2 ring-primary/20 rounded-xl' : ''
+                        }`}
                       >
-                        {/* Swipe Background Delete Action */}
-                        {canSwipe && (
-                          <div className="absolute inset-0 bg-error flex items-center justify-end z-0">
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setTxToDelete(tx);
-                                setSwipedTxId(null);
-                              }}
-                              className="h-full px-6 flex items-center gap-1.5 text-white bg-error active:brightness-90 transition-all font-bold text-xs uppercase tracking-wider cursor-pointer select-none"
-                            >
-                              <Trash2 className="w-4 h-4 shrink-0" />
-                              <span>Delete</span>
-                            </button>
-                          </div>
-                        )}
-
-                        {/* Foreground Draggable Card Content */}
-                        <motion.div
-                          drag={canSwipe ? "x" : false}
-                          dragDirectionLock
-                          dragConstraints={{ left: -90, right: 0 }}
-                          dragElastic={{ left: 0.2, right: 0 }}
-                          onPointerDown={(e) => {
-                            if (canSwipe) {
-                              e.stopPropagation();
-                            }
-                          }}
-                          animate={{ x: isSwiped ? -90 : 0 }}
-                          transition={{ type: "spring", stiffness: 400, damping: 35 }}
-                          onDragEnd={(e, info) => {
-                            if (!canSwipe) return;
-                            // Swipe past -140px triggers delete
-                            if (info.offset.x < -140) {
-                              setTxToDelete(tx);
-                              setSwipedTxId(null);
-                            } else if (info.offset.x < -40) {
-                              setSwipedTxId(tx.id);
-                            } else {
-                              setSwipedTxId(null);
-                            }
-                          }}
-                          onClick={() => {
-                            if (isSwiped) {
-                              setSwipedTxId(null);
-                            } else if (!isEditing) {
-                              setSelectedTx(tx);
-                            }
-                          }}
-                          className={`relative z-10 flex flex-col p-4 bg-surface-container-lowest hover:bg-surface-container-high transition-colors cursor-pointer group active:bg-surface-container-highest no-parent-drag ${
-                            isEditing ? 'bg-surface-container/60 ring-2 ring-primary/20 rounded-xl' : ''
-                          }`}
-                        >
-                          {isEditing ? (
-                            <div className="flex flex-col gap-3 w-full" onClick={(e) => e.stopPropagation()}>
-                              <div className="flex flex-col sm:flex-row gap-2.5">
-                                {/* Title Input */}
-                                <div className="flex-1 flex flex-col gap-1">
-                                  <label className="text-[10px] font-bold text-primary uppercase tracking-wider">Title</label>
-                                  <input
-                                    type="text"
-                                    value={editTitle}
-                                    onChange={(e) => {
-                                      setEditTitle(e.target.value);
-                                      setEditError(null);
-                                    }}
-                                    className="w-full px-3 py-1.5 bg-surface-container border border-outline-variant rounded-xl text-xs font-semibold text-on-surface focus:outline-hidden focus:border-primary transition-colors"
-                                    placeholder="Transaction title"
-                                    autoFocus
-                                  />
-                                </div>
-                                
-                                {/* Amount Input */}
-                                <div className="w-full sm:w-32 flex flex-col gap-1">
-                                  <label className="text-[10px] font-bold text-primary uppercase tracking-wider">Amount (₹)</label>
-                                  <div className="relative flex items-center">
-                                    <span className="absolute left-3 text-xs font-bold text-on-surface-variant">
-                                      {editType === 'expense' ? '' : '+'}
-                                    </span>
-                                    <input
-                                      type="number"
-                                      step="any"
-                                      min="0.01"
-                                      value={editAmount}
-                                      onChange={(e) => {
-                                        setEditAmount(e.target.value);
-                                        setEditError(null);
-                                      }}
-                                      className="w-full pl-6 pr-3 py-1.5 bg-surface-container border border-outline-variant rounded-xl text-xs font-mono font-semibold text-on-surface focus:outline-hidden focus:border-primary transition-colors"
-                                      placeholder="0.00"
-                                    />
-                                  </div>
-                                </div>
-
-                                {/* Type Toggle */}
-                                <div className="w-full sm:w-36 flex flex-col gap-1">
-                                  <label className="text-[10px] font-bold text-primary uppercase tracking-wider">Type</label>
-                                  <div className="grid grid-cols-2 p-0.5 bg-surface-container border border-outline-variant/60 rounded-xl">
-                                    <button
-                                      type="button"
-                                      onClick={() => setEditType('expense')}
-                                      className={`py-1 text-[10px] font-bold rounded-lg transition-all cursor-pointer ${
-                                        editType === 'expense'
-                                          ? 'bg-error text-on-error shadow-xs'
-                                          : 'text-on-surface-variant/80 hover:bg-surface-variant/30'
-                                      }`}
-                                    >
-                                      Expense
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={() => setEditType('income')}
-                                      className={`py-1 text-[10px] font-bold rounded-lg transition-all cursor-pointer ${
-                                        editType === 'income'
-                                          ? 'bg-emerald-600 text-white shadow-xs'
-                                          : 'text-on-surface-variant/80 hover:bg-surface-variant/30'
-                                      }`}
-                                    >
-                                      Income
-                                    </button>
-                                  </div>
-                                </div>
+                        {isEditing ? (
+                          <div className="flex flex-col gap-3 w-full" onClick={(e) => e.stopPropagation()}>
+                            <div className="flex flex-col sm:flex-row gap-2.5">
+                              {/* Title Input */}
+                              <div className="flex-1 flex flex-col gap-1">
+                                <label className="text-[10px] font-bold text-primary uppercase tracking-wider">Title</label>
+                                <input
+                                  type="text"
+                                  value={editTitle}
+                                  onChange={(e) => {
+                                    setEditTitle(e.target.value);
+                                    setEditError(null);
+                                  }}
+                                  className="w-full px-3 py-1.5 bg-surface-container border border-outline-variant rounded-xl text-xs font-semibold text-on-surface focus:outline-hidden focus:border-primary transition-colors"
+                                  placeholder="Transaction title"
+                                  autoFocus
+                                />
                               </div>
                               
-                              {editError && (
-                                <div className="text-[10px] font-semibold text-error bg-error/10 border border-error/20 py-1 px-2.5 rounded-lg animate-fade-in text-left">
-                                  ⚠️ {editError}
+                              {/* Amount Input */}
+                              <div className="w-full sm:w-32 flex flex-col gap-1">
+                                <label className="text-[10px] font-bold text-primary uppercase tracking-wider">Amount (₹)</label>
+                                <div className="relative flex items-center">
+                                  <span className="absolute left-3 text-xs font-bold text-on-surface-variant">
+                                    {editType === 'expense' ? '' : '+'}
+                                  </span>
+                                  <input
+                                    type="number"
+                                    step="any"
+                                    min="0.01"
+                                    value={editAmount}
+                                    onChange={(e) => {
+                                      setEditAmount(e.target.value);
+                                      setEditError(null);
+                                    }}
+                                    className="w-full pl-6 pr-3 py-1.5 bg-surface-container border border-outline-variant rounded-xl text-xs font-mono font-semibold text-on-surface focus:outline-hidden focus:border-primary transition-colors"
+                                    placeholder="0.00"
+                                  />
                                 </div>
-                              )}
+                              </div>
 
-                              {/* Save & Cancel buttons */}
-                              <div className="flex justify-end gap-2 pt-1">
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setEditingTxId(null);
-                                    setEditError(null);
-                                  }}
-                                  className="px-3 py-1.5 rounded-full bg-surface-container-high hover:bg-surface-container-highest text-on-surface text-[11px] font-semibold transition-colors cursor-pointer"
-                                >
-                                  Cancel
-                                </button>
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    const amt = parseFloat(editAmount);
-                                    if (!editTitle.trim()) {
-                                      setEditError('Title cannot be empty.');
-                                      return;
-                                    }
-                                    if (isNaN(amt) || amt <= 0) {
-                                      setEditError('Please enter a valid positive number.');
-                                      return;
-                                    }
-                                    onUpdateTransaction(tx.id, {
-                                      title: editTitle.trim(),
-                                      amount: editType === 'expense' ? -amt : amt
-                                    });
-                                    setEditingTxId(null);
-                                    setEditError(null);
-                                  }}
-                                  className="px-3.5 py-1.5 rounded-full bg-primary hover:bg-primary/90 text-on-primary text-[11px] font-bold shadow-xs transition-colors cursor-pointer"
-                                >
-                                  Save
-                                </button>
+                              {/* Type Toggle */}
+                              <div className="w-full sm:w-36 flex flex-col gap-1">
+                                <label className="text-[10px] font-bold text-primary uppercase tracking-wider">Type</label>
+                                <div className="grid grid-cols-2 p-0.5 bg-surface-container border border-outline-variant/60 rounded-xl">
+                                  <button
+                                    type="button"
+                                    onClick={() => setEditType('expense')}
+                                    className={`py-1 text-[10px] font-bold rounded-lg transition-all cursor-pointer ${
+                                      editType === 'expense'
+                                        ? 'bg-error text-on-error shadow-xs'
+                                        : 'text-on-surface-variant/80 hover:bg-surface-variant/30'
+                                    }`}
+                                  >
+                                    Expense
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => setEditType('income')}
+                                    className={`py-1 text-[10px] font-bold rounded-lg transition-all cursor-pointer ${
+                                      editType === 'income'
+                                        ? 'bg-emerald-600 text-white shadow-xs'
+                                        : 'text-on-surface-variant/80 hover:bg-surface-variant/30'
+                                    }`}
+                                  >
+                                    Income
+                                  </button>
+                                </div>
                               </div>
                             </div>
-                          ) : (
-                            <div className="flex items-center justify-between w-full">
-                              <div className="flex items-center gap-3">
-                                <div className={`w-11 h-11 rounded-full flex items-center justify-center ${cfg.bg} shadow-sm`}>
-                                  <IconComp className="w-5 h-5" />
-                                </div>
-                                <div>
-                                  <p className="font-title-md text-sm font-semibold text-on-surface group-hover:text-primary transition-colors">
-                                    {tx.title}
-                                  </p>
-                                  <p className="text-xs text-on-surface-variant">
+                            
+                            {editError && (
+                              <div className="text-[10px] font-semibold text-error bg-error/10 border border-error/20 py-1 px-2.5 rounded-lg animate-fade-in text-left">
+                                ⚠️ {editError}
+                              </div>
+                            )}
+
+                            {/* Save & Cancel buttons */}
+                            <div className="flex justify-end gap-2 pt-1">
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setEditingTxId(null);
+                                  setEditError(null);
+                                }}
+                                className="px-3 py-1.5 rounded-full bg-surface-container-high hover:bg-surface-container-highest text-on-surface text-[11px] font-semibold transition-colors cursor-pointer"
+                              >
+                                Cancel
+                              </button>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  const amt = parseFloat(parseRawAmount(editAmount));
+                                  if (!editTitle.trim()) {
+                                    setEditError('Title cannot be empty.');
+                                    return;
+                                  }
+                                  if (isNaN(amt) || amt <= 0) {
+                                    setEditError('Please enter a valid positive number.');
+                                    return;
+                                  }
+                                  onUpdateTransaction(tx.id, {
+                                    title: editTitle.trim(),
+                                    amount: editType === 'expense' ? -amt : amt
+                                  });
+                                  setEditingTxId(null);
+                                  setEditError(null);
+                                }}
+                                className="px-3.5 py-1.5 rounded-full bg-primary hover:bg-primary/90 text-on-primary text-[11px] font-bold shadow-xs transition-colors cursor-pointer"
+                              >
+                                Save
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="flex items-center justify-between w-full">
+                            <div className="flex items-center gap-3">
+                              <div className={`w-11 h-11 rounded-full flex items-center justify-center ${cfg.bg} shadow-sm`}>
+                                <IconComp className="w-5 h-5" />
+                              </div>
+                              <div>
+                                <p className="font-title-md text-sm font-semibold text-on-surface group-hover:text-primary transition-colors">
+                                  {tx.title}
+                                </p>
+                                <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
+                                  <span className="text-xs text-on-surface-variant">
                                     {tx.category} • {tx.time}
-                                  </p>
+                                  </span>
+                                  {tx.tags && tx.tags.map((t) => (
+                                    <span key={t} className="text-[9px] px-1.5 py-0.5 bg-purple-500/15 text-purple-400 border border-purple-500/30 rounded-md font-medium">
+                                      {t}
+                                    </span>
+                                  ))}
                                 </div>
                               </div>
-                              <div className="flex items-center gap-2.5">
-                                <div className="text-right flex items-center gap-1">
-                                  <p className="font-title-md text-sm font-semibold text-on-surface">
-                                    {isExpense ? '' : '+'}{formatCurrency(Math.abs(tx.amount))}
+                            </div>
+                            <div className="flex items-center gap-3">
+                              <div className="text-right">
+                                <p className="font-title-md text-sm font-semibold text-on-surface">
+                                  {isExpense ? '' : '+'}{formatCurrency(Math.abs(tx.amount))}
+                                </p>
+                                {tx.originalCurrency && tx.originalAmount && (
+                                  <p className="text-[9px] text-purple-400 font-medium">
+                                    ({tx.originalCurrency} {tx.originalAmount})
                                   </p>
-                                </div>
-                                {/* Inline Edit Trigger Icon */}
-                                {selectedMonthKey !== '2023-10' && (
+                                )}
+                                <p className="text-[10px] text-on-surface-variant font-medium mt-0.5">
+                                  {tx.label}
+                                </p>
+                              </div>
+                              
+                              {/* Inline Actions Group */}
+                              {selectedMonthKey !== '2023-10' && (
+                                <div className="flex items-center gap-1 pl-1.5 border-l border-outline-variant/30 opacity-80 sm:opacity-0 sm:group-hover:opacity-100 focus-within:opacity-100 transition-all duration-200">
                                   <button
                                     onClick={(e) => {
                                       e.stopPropagation();
@@ -788,15 +773,25 @@ export default function HistoryTab({
                                       setEditType(tx.amount < 0 ? 'expense' : 'income');
                                     }}
                                     title="Edit inline"
-                                    className="p-1.5 rounded-lg opacity-80 sm:opacity-0 sm:group-hover:opacity-100 focus:opacity-100 hover:bg-surface-container-high text-primary transition-all duration-200 cursor-pointer"
+                                    className="p-1.5 rounded-lg text-primary hover:bg-primary-container dark:hover:bg-inverse-surface/10 transition-colors cursor-pointer"
                                   >
                                     <Pencil className="w-3.5 h-3.5" />
                                   </button>
-                                )}
-                              </div>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setTxToDelete(tx);
+                                    }}
+                                    title="Delete Transaction"
+                                    className="p-1.5 rounded-lg text-error hover:bg-error/10 transition-colors cursor-pointer"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
+                              )}
                             </div>
-                          )}
-                        </motion.div>
+                          </div>
+                        )}
                       </motion.div>
                     );
                   })}

@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Privacy Policy — SpendTrack</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --card-bg: #1e293b;
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+      --primary: #6366f1;
+      --border: #334155;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background-color: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      margin: 0;
+      padding: 0;
+    }
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 40px 20px;
+    }
+    header {
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 24px;
+      margin-bottom: 32px;
+    }
+    .logo {
+      font-size: 24px;
+      font-weight: 900;
+      color: var(--primary);
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+    h1 {
+      font-size: 32px;
+      font-weight: 800;
+      margin-top: 16px;
+      margin-bottom: 8px;
+    }
+    .date {
+      color: var(--text-muted);
+      font-size: 14px;
+    }
+    .card {
+      background-color: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 24px;
+      margin-bottom: 24px;
+    }
+    h2 {
+      font-size: 20px;
+      color: var(--primary);
+      margin-top: 0;
+    }
+    ul {
+      padding-left: 20px;
+    }
+    li {
+      margin-bottom: 8px;
+    }
+    footer {
+      border-top: 1px solid var(--border);
+      padding-top: 24px;
+      margin-top: 40px;
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 14px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <a href="/" class="logo">🐷 SpendTrack</a>
+      <h1>Privacy Policy</h1>
+      <div class="date">Last updated: July 24, 2026</div>
+    </header>
+
+    <div class="card">
+      <h2>1. Introduction</h2>
+      <p>Welcome to <strong>SpendTrack</strong>. We respect your privacy and are committed to protecting your personal financial data. This Privacy Policy explains how your information is collected, used, and safeguarded when you use our web and mobile applications.</p>
+    </div>
+
+    <div class="card">
+      <h2>2. Information We Collect</h2>
+      <p>SpendTrack collects information solely to provide you with secure personal finance tracking:</p>
+      <ul>
+        <li><strong>Account Data:</strong> Name, email address, and profile avatar collected via Firebase Authentication or Google Sign-In.</li>
+        <li><strong>Financial Records:</strong> Custom expense logs, budget caps, transaction titles, amounts, categories, and subscription rules that you manually or automatically record.</li>
+        <li><strong>Device Preferences:</strong> Theme preference (dark/light), PIN lock state, and display settings saved locally on your device.</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <h2>3. On-Device SMS & Receipt Processing</h2>
+      <p>Features such as <strong>Bank SMS Parsing</strong> and <strong>Receipt Scanner OCR</strong> process text and images <em>strictly on your local device</em>. We do not store, transmit, or share raw SMS contents or physical receipt images on external third-party servers.</p>
+    </div>
+
+    <div class="card">
+      <h2>4. Data Storage & Security</h2>
+      <p>Your financial records are stored securely in Google Cloud Firestore with end-to-end database access rules scoped strictly to your authenticated user account ID (<code>users/{uid}</code>). No unauthorized users or third parties can access your ledger.</p>
+    </div>
+
+    <div class="card">
+      <h2>5. Your Rights & Data Ownership</h2>
+      <p>You own 100% of your data. You have the right to:</p>
+      <ul>
+        <li>Export your financial reports to PDF or JSON at any time.</li>
+        <li>Wipe all stored transactions and reset your budget configurations instantly using the <em>Data Wipe</em> feature in Settings.</li>
+        <li>Delete your account and all associated Cloud Firestore records.</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <h2>6. Contact Us</h2>
+      <p>If you have any questions regarding this Privacy Policy, please contact our support team at <a href="mailto:support@spendtrack.app" style="color: var(--primary);">support@spendtrack.app</a>.</p>
+    </div>
+
+    <footer>
+      &copy; 2026 SpendTrack. All rights reserved.
+    </footer>
+  </div>
+</body>
+</html>

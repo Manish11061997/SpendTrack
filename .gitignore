@@ -8,3 +8,11 @@ coverage/
 !.env.example
 *.apk
 *.aab
+.firebase/
+public/spendtrack.zip
+android/app/build/
+android/.gradle/
+android/build/
+ios/App/Pods/
+ios/App/Podfile.lock
+

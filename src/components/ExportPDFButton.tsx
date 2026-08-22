@@ -1,6 +1,4 @@
 import React, { useState, useRef } from 'react';
-import { jsPDF } from 'jspdf';
-import html2canvas from 'html2canvas';
 import { Capacitor } from '@capacitor/core';
 import { Filesystem, Directory } from '@capacitor/filesystem';
 import { Share } from '@capacitor/share';
@@ -18,6 +16,7 @@ import {
   Hash
 } from 'lucide-react';
 import { Transaction, UserProfile, BudgetConfig, Subscription } from '../types';
+import { formatCurrency } from '../utils/currency';
 
 interface ExportPDFButtonProps {
   transactions: Transaction[];
@@ -62,62 +61,63 @@ export default function ExportPDFButton({
   });
 
   const handlePreset = (preset: 'all' | 'this-month' | 'last-30' | 'last-90') => {
+    if (transactions.length === 0) return;
     const sorted = [...transactions].map(t => t.date).sort();
+    
+    // Base date is either the latest transaction date or today
+    const latestTxStr = sorted[sorted.length - 1];
+    const baseDate = latestTxStr ? new Date(latestTxStr) : new Date();
+
     if (preset === 'all') {
       setStartDate(sorted[0] || '');
       setEndDate(sorted[sorted.length - 1] || '');
     } else if (preset === 'this-month') {
-      const now = new Date();
-      const firstDay = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
-      const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
+      const firstDay = new Date(baseDate.getFullYear(), baseDate.getMonth(), 1).toISOString().split('T')[0];
+      const lastDay = new Date(baseDate.getFullYear(), baseDate.getMonth() + 1, 0).toISOString().split('T')[0];
       setStartDate(firstDay);
       setEndDate(lastDay);
     } else if (preset === 'last-30') {
-      const now = new Date();
-      const past30 = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-      const today = now.toISOString().split('T')[0];
+      const past30 = new Date(baseDate.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+      const endDay = baseDate.toISOString().split('T')[0];
       setStartDate(past30);
-      setEndDate(today);
+      setEndDate(endDay);
     } else if (preset === 'last-90') {
-      const now = new Date();
-      const past90 = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-      const today = now.toISOString().split('T')[0];
+      const past90 = new Date(baseDate.getTime() - 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+      const endDay = baseDate.toISOString().split('T')[0];
       setStartDate(past90);
-      setEndDate(today);
+      setEndDate(endDay);
     }
   };
 
   const isPresetActive = (preset: 'all' | 'this-month' | 'last-30' | 'last-90') => {
+    if (transactions.length === 0) return false;
     const sorted = [...transactions].map(t => t.date).sort();
     if (preset === 'all') {
       return startDate === (sorted[0] || '') && endDate === (sorted[sorted.length - 1] || '');
     }
-    const now = new Date();
+    const latestTxStr = sorted[sorted.length - 1];
+    const baseDate = latestTxStr ? new Date(latestTxStr) : new Date();
     if (preset === 'this-month') {
-      const firstDay = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
-      const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
+      const firstDay = new Date(baseDate.getFullYear(), baseDate.getMonth(), 1).toISOString().split('T')[0];
+      const lastDay = new Date(baseDate.getFullYear(), baseDate.getMonth() + 1, 0).toISOString().split('T')[0];
       return startDate === firstDay && endDate === lastDay;
     }
     if (preset === 'last-30') {
-      const past30 = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-      const today = now.toISOString().split('T')[0];
-      return startDate === past30 && endDate === today;
+      const past30 = new Date(baseDate.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+      const endDay = baseDate.toISOString().split('T')[0];
+      return startDate === past30 && endDate === endDay;
     }
     if (preset === 'last-90') {
-      const past90 = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-      const today = now.toISOString().split('T')[0];
-      return startDate === past90 && endDate === today;
+      const past90 = new Date(baseDate.getTime() - 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+      const endDay = baseDate.toISOString().split('T')[0];
+      return startDate === past90 && endDate === endDay;
     }
     return false;
   };
 
-  // Helper to format currency consistently in INR
+  // Helper to format currency consistently using selected preference
   const formatINR = (val: number) => {
-    return new Intl.NumberFormat('en-IN', {
-      style: 'currency',
-      currency: 'INR',
-      maximumFractionDigits: 0
-    }).format(val);
+    return formatCurrency(val, budget?.currency || 'INR', 0);
   };
 
   // Calculations
@@ -133,16 +133,23 @@ export default function ExportPDFButton({
 
   const activeSubsCost = subscriptions
     .filter(s => s.isActive)
-    .reduce((sum, s) => sum + s.amount, 0);
+    .reduce((sum, s) => {
+      const isAlreadyLogged = filteredTransactions.some(t => 
+        t.amount < 0 &&
+        (t.label === 'Subscription' || t.title.toLowerCase().includes(s.title.toLowerCase()) || s.title.toLowerCase().includes(t.title.toLowerCase()))
+      );
+      return sum + (isAlreadyLogged ? 0 : s.amount);
+    }, 0);
 
-  // Grand total outflows include active subscription recurring commitments
-  const grandTotalOutflow = totalOutflow + activeSubsCost;
+  // Grand total outflows based on actual logged transactions
+  const grandTotalOutflow = totalOutflow;
   const netBalance = totalInflow - grandTotalOutflow;
 
   // Budget progress
-  const monthlyLimit = budget.monthlyLimit || 50000;
-  const budgetProgressPercent = Math.min(Math.round((grandTotalOutflow / monthlyLimit) * 100), 100);
-  const budgetRemaining = Math.max(monthlyLimit - grandTotalOutflow, 0);
+  const monthlyLimit = Number(budget?.monthlyLimit) || 0;
+  const hasBudgetLimit = monthlyLimit > 0;
+  const budgetProgressPercent = hasBudgetLimit ? Math.min(Math.round((grandTotalOutflow / monthlyLimit) * 100), 100) : 0;
+  const budgetRemaining = hasBudgetLimit ? Math.max(monthlyLimit - grandTotalOutflow, 0) : 0;
 
   // Category sharing
   const categories: ('Food' | 'Transport' | 'Rent' | 'Shopping' | 'Other')[] = [
@@ -161,7 +168,13 @@ export default function ExportPDFButton({
     );
     const subTotal = subscriptions
       .filter(s => s.isActive && s.category === cat)
-      .reduce((sum, s) => sum + s.amount, 0);
+      .reduce((sum, s) => {
+        const isAlreadyLogged = filteredTransactions.some(t => 
+          t.amount < 0 &&
+          (t.label === 'Subscription' || t.title.toLowerCase().includes(s.title.toLowerCase()) || s.title.toLowerCase().includes(t.title.toLowerCase()))
+        );
+        return sum + (isAlreadyLogged ? 0 : s.amount);
+      }, 0);
     
     return {
       name: cat,
@@ -229,6 +242,12 @@ export default function ExportPDFButton({
     setStatusMessage('Preparing statement layout...');
 
     try {
+      // Dynamically load heavy PDF export libraries on-demand
+      const [{ jsPDF }, { default: html2canvas }] = await Promise.all([
+        import('jspdf'),
+        import('html2canvas')
+      ]);
+
       // Create jsPDF instance
       // Standard A4 portrait: 210mm x 297mm
       const pdf = new jsPDF({
@@ -279,7 +298,7 @@ export default function ExportPDFButton({
       // Save PDF file
       setStatusMessage('Saving document...');
       const fileName = `SpendTrack_Statement_${profile.name.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0,10)}.pdf`;
-      
+
       if (Capacitor.isNativePlatform()) {
         const pdfBase64 = pdf.output('datauristring').split(',')[1];
         const result = await Filesystem.writeFile({
@@ -294,7 +313,20 @@ export default function ExportPDFButton({
           dialogTitle: 'Save or Share Statement'
         });
       } else {
-        pdf.save(fileName);
+        // Use Blob + anchor click — works correctly on mobile Chrome & Safari
+        const pdfBlob = pdf.output('blob');
+        const blobUrl = URL.createObjectURL(pdfBlob);
+        const link = document.createElement('a');
+        link.href = blobUrl;
+        link.download = fileName;
+        link.style.display = 'none';
+        document.body.appendChild(link);
+        link.click();
+        // Small delay before cleanup to allow the download to initiate
+        setTimeout(() => {
+          document.body.removeChild(link);
+          URL.revokeObjectURL(blobUrl);
+        }, 1000);
       }
 
       setIsSuccess(true);
@@ -487,7 +519,7 @@ export default function ExportPDFButton({
                 <div>
                   <h4 className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Account Tier</h4>
                   <p className="text-[11px] font-semibold text-teal-600 flex items-center gap-1">
-                    <span>● Verified Sandbox User Ledger</span>
+                    <span>● Verified Account Ledger</span>
                   </p>
                 </div>
               </div>
@@ -571,12 +603,14 @@ export default function ExportPDFButton({
               <div className="flex justify-between items-center text-xs">
                 <div>
                   <span className="font-bold text-slate-700 font-serif">Monthly Spending Limit Indicator</span>
-                  <span className="text-[10px] text-slate-400 ml-2 font-mono">Limit: {formatINR(monthlyLimit)}</span>
+                  <span className="text-[10px] text-slate-400 ml-2 font-mono">
+                    {hasBudgetLimit ? `Limit: ${formatINR(monthlyLimit)}` : 'No Budget Set'}
+                  </span>
                 </div>
                 <span className={`font-bold font-mono ${
-                  budgetProgressPercent >= 90 ? 'text-error' : 'text-primary'
+                  hasBudgetLimit && budgetProgressPercent >= 90 ? 'text-error' : 'text-primary'
                 }`}>
-                  {budgetProgressPercent}% Used
+                  {hasBudgetLimit ? `${budgetProgressPercent}% Used` : 'N/A'}
                 </span>
               </div>
               
@@ -696,7 +730,7 @@ export default function ExportPDFButton({
 
           {/* Page 1 Footer */}
           <div className="border-t border-slate-100 pt-4 flex justify-between items-center text-[9px] font-bold text-slate-400 uppercase tracking-widest">
-            <span>Powered by SpendTrack Sandbox engine</span>
+            <span>Powered by SpendTrack Analytics Engine</span>
             <span>Page 1 of {totalPdfPages}</span>
           </div>
         </div>

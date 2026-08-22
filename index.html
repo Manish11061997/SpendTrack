@@ -2,12 +2,47 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
     <title>SpendTrack</title>
+    <link rel="icon" type="image/jpeg" href="/logo.jpg" />
     <script>
       (function() {
+        // Global error banner to catch & show any startup crashes instead of white screen
+        window.addEventListener('error', function(e) {
+          var msg = e.message || 'Unknown JS Error';
+          var src = e.filename || '';
+          var line = e.lineno || '';
+          var errDiv = document.getElementById('debug-error-banner');
+          if (!errDiv) {
+            errDiv = document.createElement('div');
+            errDiv.id = 'debug-error-banner';
+            errDiv.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;z-index:999999;background:#0f172a;color:#f87171;padding:24px;font-family:monospace;font-size:11px;overflow:auto;white-space:pre-wrap;word-break:break-all;';
+            document.body.appendChild(errDiv);
+          }
+          errDiv.innerHTML = '<h3 style="color:#ef4444;font-size:15px;margin-bottom:12px;font-weight:bold;">⚠️ SpendTrack Startup Error</h3>' +
+            '<b>Message:</b> ' + msg + '<br><b>Source:</b> ' + src + ':' + line + '<br><br>' +
+            '<b>Stack:</b><br>' + (e.error && e.error.stack ? e.error.stack : 'N/A');
+        });
+
+        window.addEventListener('unhandledrejection', function(e) {
+          var reason = e.reason;
+          var msg = reason ? (reason.stack || reason.message || String(reason)) : 'Unhandled Rejection';
+          var errDiv = document.getElementById('debug-error-banner');
+          if (!errDiv) {
+            errDiv = document.createElement('div');
+            errDiv.id = 'debug-error-banner';
+            errDiv.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;z-index:999999;background:#0f172a;color:#f87171;padding:24px;font-family:monospace;font-size:11px;overflow:auto;white-space:pre-wrap;word-break:break-all;';
+            document.body.appendChild(errDiv);
+          }
+          errDiv.innerHTML = '<h3 style="color:#ef4444;font-size:15px;margin-bottom:12px;font-weight:bold;">⚠️ SpendTrack Unhandled Rejection</h3>' +
+            '<b>Reason:</b><br>' + msg;
+        });
+
         try {
-          const theme = localStorage.getItem('theme') || 'light';
+          var theme = localStorage.getItem('theme') || 'light';
           if (theme === 'dark') {
             document.documentElement.classList.add('dark');
           } else {
@@ -22,4 +57,3 @@
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
-

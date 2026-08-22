@@ -1,6 +1,0 @@
-{
-  "name": "SpendTrack",
-  "description": "A Google Material Design 3 spending tracker dashboard with archive history, smart analysis insights, budgeting, and interactive transaction forms.",
-  "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
-}

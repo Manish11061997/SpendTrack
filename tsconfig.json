@@ -20,6 +20,12 @@
         "./*"
       ]
     },
+    "types": [
+      "react",
+      "react-dom",
+      "vite/client",
+      "node"
+    ],
     "allowImportingTsExtensions": true,
     "noEmit": true
   }

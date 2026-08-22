@@ -1,6 +1,11 @@
 import React, { useState, useRef } from 'react';
 import { motion } from 'motion/react';
-import { Transaction } from '../types';
+import { Transaction, BudgetConfig } from '../types';
+import { formatCurrency, getCurrencySymbol, formatInputAmount, parseRawAmount } from '../utils/currency';
+import { parseReceiptWithAI } from '../utils/aiReceiptParser';
+import { parseVoiceTranscript } from '../utils/voiceParser';
+import { SUPPORTED_CURRENCIES, convertCurrency } from '../utils/currencyConverter';
+import { triggerHaptic } from '../utils/haptics';
 import { 
   ArrowLeft, 
   Utensils, 
@@ -12,19 +17,28 @@ import {
   Receipt, 
   Check, 
   PiggyBank,
-  PlusCircle,
-  TrendingUp,
-  X
+  Sparkles,
+  X,
+  Tag,
+  Globe,
+  Scissors,
+  Camera,
+  AlertTriangle,
+  CheckCircle2,
+  Info
 } from 'lucide-react';
 
 interface AddTransactionFormProps {
   onSave: (transaction: Omit<Transaction, 'id'>) => void;
   onCancel: () => void;
+  budget: BudgetConfig;
+  transactions?: Transaction[];
 }
 
-export default function AddTransactionForm({ onSave, onCancel }: AddTransactionFormProps) {
+export default function AddTransactionForm({ onSave, onCancel, budget, transactions = [] }: AddTransactionFormProps) {
   const [txType, setTxType] = useState<'expense' | 'income'>('expense');
   const [amount, setAmount] = useState<string>('');
+  const [selectedCurrency, setSelectedCurrency] = useState<string>(budget?.currency || 'INR');
   const [title, setTitle] = useState<string>('');
   const [category, setCategory] = useState<'Food' | 'Transport' | 'Rent' | 'Shopping' | 'Other'>('Food');
   const [date, setDate] = useState<string>(() => {
@@ -38,17 +52,30 @@ export default function AddTransactionForm({ onSave, onCancel }: AddTransactionF
   const [notes, setNotes] = useState<string>('');
   const [receiptFile, setReceiptFile] = useState<File | null>(null);
   const [receiptPreview, setReceiptPreview] = useState<string | null>(null);
+  const [isScanningReceipt, setIsScanningReceipt] = useState<boolean>(false);
+
+  // Custom Tags
+  const [tags, setTags] = useState<string[]>([]);
+  const [tagInput, setTagInput] = useState<string>('');
+
+  // Split Expense
+  const [isSplit, setIsSplit] = useState<boolean>(false);
+  const [splits, setSplits] = useState<{ category: 'Food' | 'Transport' | 'Rent' | 'Shopping' | 'Other'; amount: number }[]>([
+    { category: 'Food', amount: 0 },
+    { category: 'Shopping', amount: 0 },
+  ]);
+
   const [dragActive, setDragActive] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const val = e.target.value;
+    const rawVal = e.target.value.replace(/,/g, '');
     setError(null);
-    // Allow digits and up to 2 decimal places
-    if (val === '' || /^\d+(\.\d{0,2})?$/.test(val)) {
-      setAmount(val);
+    if (rawVal === '' || /^\d*(\.\d{0,2})?$/.test(rawVal)) {
+      setAmount(rawVal);
     }
   };
 
@@ -62,18 +89,16 @@ export default function AddTransactionForm({ onSave, onCancel }: AddTransactionF
     }
   };
 
-  const processFile = (file: File) => {
+  const processFile = async (file: File) => {
     if (file && file.type.startsWith('image/')) {
       setReceiptFile(file);
       
       const img = new Image();
       img.src = URL.createObjectURL(file);
-      img.onload = () => {
+      img.onload = async () => {
         const canvas = document.createElement('canvas');
         let width = img.width;
         let height = img.height;
-
-        // Maximum size constraint (800px max dimension)
         const MAX_SIZE = 800;
         if (width > height) {
           if (width > MAX_SIZE) {
@@ -92,10 +117,24 @@ export default function AddTransactionForm({ onSave, onCancel }: AddTransactionF
         const ctx = canvas.getContext('2d');
         if (ctx) {
           ctx.drawImage(img, 0, 0, width, height);
-          // Compress as JPEG with 0.6 quality (looks clear, but size is tiny like 30kb-50kb)
           const compressedBase64 = canvas.toDataURL('image/jpeg', 0.6);
           setReceiptPreview(compressedBase64);
           setError(null);
+
+          // AI OCR Scan Trigger
+          setIsScanningReceipt(true);
+          try {
+            const parsed = await parseReceiptWithAI(compressedBase64);
+            if (parsed.merchantName) setTitle(parsed.merchantName);
+            if (parsed.totalAmount) setAmount(parsed.totalAmount.toString());
+            if (parsed.date) setDate(parsed.date);
+            if (parsed.category) setCategory(parsed.category);
+            if (parsed.suggestedNotes) setNotes(parsed.suggestedNotes);
+          } catch (err) {
+            console.error(err);
+          } finally {
+            setIsScanningReceipt(false);
+          }
         } else {
           setError('Failed to process receipt image.');
         }
@@ -134,9 +173,52 @@ export default function AddTransactionForm({ onSave, onCancel }: AddTransactionF
     setReceiptPreview(null);
   };
 
+  const handleReceiptUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      setIsScanningReceipt(true);
+      setError('');
+      const base64Str = await new Promise<string>((resolve) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.readAsDataURL(file);
+      });
+      setReceiptPreview(base64Str);
+
+      const parsed = await parseReceiptWithAI(base64Str);
+      if (parsed.merchantName) setTitle(parsed.merchantName);
+      if (parsed.totalAmount) setAmount(parsed.totalAmount.toString());
+      if (parsed.category) setCategory(parsed.category as any);
+    } catch (err: any) {
+      console.error("Receipt upload scan error:", err);
+    } finally {
+      setIsScanningReceipt(false);
+    }
+  };
+
+  const handleAddTag = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' || e.key === ',') {
+      e.preventDefault();
+      const val = tagInput.trim().replace(/^#/, '');
+      if (val && !tags.includes('#' + val)) {
+        setTags([...tags, '#' + val]);
+        setTagInput('');
+      }
+    }
+  };
+
+  const removeTag = (t: string) => {
+    setTags(tags.filter((item) => item !== t));
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!amount || parseFloat(amount) <= 0) {
+    if (isSubmitting) return;
+
+    const cleanAmtStr = parseRawAmount(amount);
+    if (!cleanAmtStr || parseFloat(cleanAmtStr) <= 0) {
       setError('Please enter a valid amount.');
       return;
     }
@@ -145,39 +227,55 @@ export default function AddTransactionForm({ onSave, onCancel }: AddTransactionF
       return;
     }
 
-    // Determine default labels based on common settings
-    let defaultLabel = label;
+    setIsSubmitting(true);
 
-    // format current time
+    const baseCurrency = budget?.currency || 'INR';
+    const rawNum = parseFloat(cleanAmtStr);
+    const convertedAmount = convertCurrency(rawNum, selectedCurrency, baseCurrency);
+
     const now = new Date();
     let hours = now.getHours();
     const minutes = String(now.getMinutes()).padStart(2, '0');
     const ampm = hours >= 12 ? 'PM' : 'AM';
     hours = hours % 12;
-    hours = hours ? hours : 12; // the hour '0' should be '12'
+    hours = hours ? hours : 12;
     const timeString = `${hours}:${minutes} ${ampm}`;
 
     const txData: any = {
       title: title.trim(),
       category,
-      amount: txType === 'expense' ? -parseFloat(amount) : parseFloat(amount),
+      amount: txType === 'expense' ? -convertedAmount : convertedAmount,
       date,
       time: timeString,
-      label: defaultLabel,
+      label,
       notes: notes.trim(),
+      tags,
     };
+
+    if (isSplit && splits) txData.splits = splits;
+    if (selectedCurrency !== baseCurrency) {
+      txData.originalCurrency = selectedCurrency;
+      txData.originalAmount = rawNum;
+    }
     if (receiptPreview) {
       txData.receiptUrl = receiptPreview;
     }
+
+    // Double-check no undefined values are present
+    Object.keys(txData).forEach(key => {
+      if (txData[key] === undefined) delete txData[key];
+    });
+
+    triggerHaptic('success');
     onSave(txData);
   };
 
   const categories = [
-    { name: 'Food' as const, icon: Utensils, label: 'Food', color: 'bg-primary-container text-on-primary-container border-primary/20' },
-    { name: 'Transport' as const, icon: Car, label: 'Transport', color: 'bg-secondary/10 text-secondary border-secondary/20 dark:bg-secondary/20' },
-    { name: 'Rent' as const, icon: HomeIcon, label: 'Rent', color: 'bg-secondary-container text-on-secondary-container border-secondary/20' },
-    { name: 'Shopping' as const, icon: ShoppingBag, label: 'Shopping', color: 'bg-primary/10 text-primary border-primary/20 dark:bg-primary/20' },
-    { name: 'Other' as const, icon: MoreHorizontal, label: 'Other', color: 'bg-surface-variant text-on-surface-variant border-outline-variant/30' },
+    { name: 'Food' as const, icon: Utensils, label: 'Food' },
+    { name: 'Transport' as const, icon: Car, label: 'Transport' },
+    { name: 'Rent' as const, icon: HomeIcon, label: 'Rent' },
+    { name: 'Shopping' as const, icon: ShoppingBag, label: 'Shopping' },
+    { name: 'Other' as const, icon: MoreHorizontal, label: 'Other' },
   ];
 
   const labels = [
@@ -195,10 +293,11 @@ export default function AddTransactionForm({ onSave, onCancel }: AddTransactionF
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -15 }}
       transition={{ duration: 0.3 }}
-      className="bg-background text-on-surface min-h-screen flex flex-col font-body-md"
+      className="bg-background text-on-surface h-full w-full flex flex-col font-body-md overflow-y-auto"
+      style={{ WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain' } as React.CSSProperties}
     >
-      {/* Top App Bar — M3 frosted glass bar */}
-      <header className="flex items-center gap-3 px-4 w-full h-14 bg-surface/80 backdrop-blur-md border-b border-outline-variant/20 sticky top-0 z-50">
+      {/* Top App Bar */}
+      <header className="sticky-form-header flex items-center gap-3 px-4 w-full h-14 bg-surface/80 backdrop-blur-md border-b border-outline-variant/20 sticky top-0 z-50">
         <button 
           id="back-from-add-form"
           onClick={onCancel}
@@ -229,7 +328,7 @@ export default function AddTransactionForm({ onSave, onCancel }: AddTransactionF
 
         <form onSubmit={handleSubmit} className="space-y-6">
           
-          {/* Expense vs Income Segmented Toggle */}
+          {/* Expense vs Income Toggle */}
           <div className="flex bg-surface-container rounded-2xl p-1 border border-outline-variant/35 max-w-sm mx-auto w-full">
             <button
               id="tx-type-expense-btn"
@@ -257,39 +356,185 @@ export default function AddTransactionForm({ onSave, onCancel }: AddTransactionF
             </button>
           </div>
 
-          {/* Transaction Amount Section */}
-          <section className="flex flex-col items-center justify-center py-6 bg-surface-container-low rounded-2xl border border-outline-variant/30 px-4">
-            <label className="font-label-lg text-label-lg text-on-surface-variant mb-1">
-              {txType === 'expense' ? 'Expense Amount' : 'Income Amount'}
+          {/* Quick Preset Fill Chips */}
+          <div className="space-y-1">
+            <label className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider block px-1">
+              ⚡ 1-Tap Quick Fill Presets
             </label>
-            <div className="relative flex items-center justify-center w-full">
-              <span className={`text-4xl lg:text-5xl font-extrabold mr-1 transition-colors ${
-                txType === 'expense' ? 'text-primary' : 'text-emerald-600 dark:text-emerald-500'
+            <div className="flex gap-2 overflow-x-auto no-scrollbar pb-0.5">
+              {(budget?.quickTemplates !== undefined ? budget.quickTemplates : [
+                { id: 'def-1', title: 'Chai / Coffee', amount: 20, category: 'Food' },
+                { id: 'def-2', title: 'Metro / Cab', amount: 100, category: 'Transport' },
+                { id: 'def-3', title: 'Swiggy Meal', amount: 250, category: 'Food' },
+                { id: 'def-4', title: 'Fuel / Petrol', amount: 500, category: 'Transport' },
+              ]).map((tpl) => (
+                <button
+                  key={tpl.id}
+                  type="button"
+                  onClick={() => {
+                    setTxType('expense');
+                    setTitle(tpl.title);
+                    setAmount(tpl.amount.toString());
+                    setCategory(tpl.category as any);
+                  }}
+                  className="px-2.5 py-1 bg-surface-container hover:bg-surface-container-high border border-outline-variant/30 rounded-full text-xs font-bold text-on-surface whitespace-nowrap transition-all cursor-pointer active:scale-95 flex items-center gap-1.5 shrink-0 shadow-2xs"
+                >
+                  <Sparkles className="w-3 h-3 text-primary" />
+                  <span>{tpl.title}</span>
+                  <span className="text-primary font-extrabold">{formatCurrency(tpl.amount, selectedCurrency)}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Amount & Currency Selection */}
+          <section className="flex flex-col items-center justify-center py-6 bg-surface-container-low rounded-2xl border border-outline-variant/30 px-4 space-y-3">
+            <div className="flex items-center gap-2">
+              <Globe className="w-4 h-4 text-primary" />
+              <select
+                value={selectedCurrency}
+                onChange={(e) => setSelectedCurrency(e.target.value)}
+                className="bg-surface border border-outline-variant rounded-lg px-2 py-1 text-xs font-bold text-on-surface"
+              >
+                {SUPPORTED_CURRENCIES.map((c) => (
+                  <option key={c.code} value={c.code} className="bg-gray-900 text-white">
+                    {c.code} ({c.symbol}) - {c.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="relative flex items-center justify-center w-full max-w-sm px-4">
+              <span className={`font-extrabold mr-1 text-3xl lg:text-4xl ${
+                txType === 'expense' ? 'text-primary' : 'text-emerald-600'
               }`}>
-                {txType === 'expense' ? '' : '+'} ₹
+                {getCurrencySymbol(selectedCurrency)}
               </span>
               <input 
                 id="amountInput"
                 autoFocus
-                type="number" 
-                step="0.01"
+                type="text" 
+                inputMode="decimal"
                 placeholder="0.00"
-                value={amount}
+                value={formatInputAmount(amount, selectedCurrency)}
                 onChange={handleAmountChange}
                 required
-                className="bg-transparent border-none focus:ring-0 focus:outline-none text-4xl lg:text-5xl font-extrabold text-on-surface placeholder:text-outline-variant w-44 text-center"
+                className="bg-transparent border-none focus:ring-0 focus:outline-none font-extrabold text-on-surface placeholder:text-outline-variant text-center text-4xl lg:text-5xl w-64"
               />
             </div>
-            <div className={`h-1 w-24 rounded-full mt-2 transition-colors ${
-              txType === 'expense' ? 'bg-primary-container' : 'bg-emerald-500/20'
-            }`}></div>
+
+            {/* Quick Amount Increment Chips */}
+            <div className="flex items-center justify-center gap-1.5 pt-1 flex-wrap">
+              {[100, 500, 1000, 5000].map((inc) => (
+                <button
+                  key={inc}
+                  type="button"
+                  onClick={() => {
+                    const curr = parseFloat(parseRawAmount(amount)) || 0;
+                    setAmount((curr + inc).toString());
+                  }}
+                  className="px-2.5 py-1 rounded-full bg-surface-container hover:bg-surface-container-high border border-outline-variant/40 text-[10px] font-bold text-on-surface-variant hover:text-primary hover:border-primary/40 transition-all active:scale-95 cursor-pointer font-mono shadow-2xs"
+                >
+                  +{getCurrencySymbol(selectedCurrency)}{inc}
+                </button>
+              ))}
+            </div>
+
+            {selectedCurrency !== (budget?.currency || 'INR') && amount && (
+              <p className="text-xs text-purple-400 font-medium">
+                ≈ {formatCurrency(convertCurrency(parseFloat(parseRawAmount(amount)) || 0, selectedCurrency, budget?.currency || 'INR'), budget?.currency || 'INR')} in base currency
+              </p>
+            )}
           </section>
 
-          {/* Title/Description input — M3 Outlined Text Field */}
+          {/* Description & AI Receipt OCR / Voice Button */}
           <div className="space-y-1.5">
-            <label className="text-xs font-bold text-on-surface-variant px-1 uppercase tracking-wider" htmlFor="tx-title">
-              Description / Payee
-            </label>
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-bold text-on-surface-variant uppercase tracking-wider" htmlFor="tx-title">
+                Description / Payee
+              </label>
+              <div className="flex items-center gap-2">
+                {/* Voice Logger Button */}
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+                    if (!SpeechRecognition) {
+                      const input = window.prompt("Voice Speech Recognition API is disabled in this browser. Please type or speak your entry (e.g. 'Spent 450 for lunch'):");
+                      if (input) {
+                        setIsScanningReceipt(true);
+                        const parsed = await parseVoiceTranscript(input);
+                        if (parsed.title) setTitle(parsed.title);
+                        if (parsed.amount) setAmount(parsed.amount.toString());
+                        if (parsed.category) setCategory(parsed.category);
+                        if (parsed.type) setTxType(parsed.type);
+                        if (parsed.notes) setNotes(parsed.notes);
+                        setIsScanningReceipt(false);
+                      }
+                      return;
+                    }
+
+                    try {
+                      setIsScanningReceipt(true);
+                      setError('');
+                      const recognition = new SpeechRecognition();
+                      recognition.lang = navigator.language || 'en-IN';
+                      recognition.interimResults = false;
+                      recognition.maxAlternatives = 1;
+                      recognition.start();
+
+                      recognition.onresult = async (event: any) => {
+                        const transcript = event.results[0][0].transcript;
+                        console.log("Voice transcript:", transcript);
+                        const parsed = await parseVoiceTranscript(transcript);
+                        if (parsed.title) setTitle(parsed.title);
+                        if (parsed.amount) setAmount(parsed.amount.toString());
+                        if (parsed.category) setCategory(parsed.category);
+                        if (parsed.type) setTxType(parsed.type);
+                        if (parsed.notes) setNotes(parsed.notes);
+                        setIsScanningReceipt(false);
+                      };
+
+                      recognition.onerror = (err: any) => {
+                        console.error("Speech recognition error:", err);
+                        setError("Voice recording failed or permission denied. Click again to retry.");
+                        setIsScanningReceipt(false);
+                      };
+
+                      recognition.onend = () => {
+                        setIsScanningReceipt(false);
+                      };
+                    } catch (e) {
+                      console.error("Voice start error:", e);
+                      setIsScanningReceipt(false);
+                    }
+                  }}
+                  className="px-2.5 py-1 bg-indigo-500/15 text-indigo-400 hover:bg-indigo-500/25 border border-indigo-500/30 rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-colors"
+                >
+                  <Sparkles className="w-3.5 h-3.5" />
+                  <span>Voice Log</span>
+                </button>
+
+                {/* Receipt Scan OCR Upload Button */}
+                <label className="px-2.5 py-1 bg-purple-500/15 text-purple-400 hover:bg-purple-500/25 border border-purple-500/30 rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-colors">
+                  <Camera className="w-3.5 h-3.5" />
+                  <span>Scan Receipt</span>
+                  <input 
+                    type="file"
+                    accept="image/*"
+                    capture="environment"
+                    className="hidden"
+                    onChange={handleReceiptUpload}
+                  />
+                </label>
+
+                {isScanningReceipt && (
+                  <span className="text-xs text-purple-400 font-semibold flex items-center gap-1 animate-pulse">
+                    <Sparkles className="w-3.5 h-3.5" /> AI Parsing...
+                  </span>
+                )}
+              </div>
+            </div>
             <input
               id="tx-title"
               type="text"
@@ -297,27 +542,29 @@ export default function AddTransactionForm({ onSave, onCancel }: AddTransactionF
               placeholder="e.g. Whole Foods, Shell Station, Rent, Netflix"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              className="w-full bg-surface border border-outline/40 focus:border-primary focus:ring-2 focus:ring-primary/10 rounded-2xl px-4 py-3 text-sm text-on-surface placeholder:text-on-surface-variant/50 transition-all duration-150 outline-none"
+              className="w-full bg-surface border border-outline/40 focus:border-primary rounded-2xl px-4 py-3 text-sm text-on-surface outline-none"
             />
           </div>
 
-          {/* Category Selection — M3 Tonal Chips */}
+          {/* Category Chips */}
           <section className="space-y-2.5">
-            <h2 className="font-outfit text-sm font-black text-on-surface px-1 tracking-tight">Category</h2>
+            <h2 className="font-outfit text-sm font-black text-on-surface tracking-tight">Category</h2>
             <div className="flex flex-wrap gap-2">
               {categories.map((cat) => {
                 const IconComp = cat.icon;
                 const isSelected = category === cat.name;
                 return (
                   <button
-                    id={`category-chip-${cat.name.toLowerCase()}`}
                     key={cat.name}
                     type="button"
-                    onClick={() => setCategory(cat.name)}
-                    className={`flex items-center gap-2 px-4 py-2 rounded-full border transition-all duration-150 text-xs font-extrabold cursor-pointer active:scale-95 ${
+                    onClick={() => {
+                      triggerHaptic('light');
+                      setCategory(cat.name);
+                    }}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-full border text-xs font-extrabold ${
                       isSelected 
-                        ? 'bg-primary-container text-on-primary-container border-primary-container/20 shadow-2xs' 
-                        : 'bg-surface-container text-on-surface-variant border-outline-variant hover:bg-surface-container-high hover:text-on-surface'
+                        ? 'bg-primary-container text-on-primary-container border-primary-container/20' 
+                        : 'bg-surface-container text-on-surface-variant border-outline-variant'
                     }`}
                   >
                     <IconComp className="w-4 h-4" />
@@ -326,160 +573,155 @@ export default function AddTransactionForm({ onSave, onCancel }: AddTransactionF
                 );
               })}
             </div>
+
+            {/* Real-time Category Budget Warning Badge */}
+            {(() => {
+              const currentMonthKey = date.substring(0, 7);
+              const currentMonthCategorySpent = transactions
+                .filter(t => t.date?.startsWith(currentMonthKey) && t.category === category && t.amount < 0)
+                .reduce((sum, t) => sum + Math.abs(t.amount), 0);
+
+              const enteredVal = txType === 'expense' 
+                ? convertCurrency(parseFloat(parseRawAmount(amount)) || 0, selectedCurrency, budget?.currency || 'INR') 
+                : 0;
+              const totalProjected = currentMonthCategorySpent + enteredVal;
+              const limit = budget?.categoryLimits?.[category] || Math.round((budget?.monthlyLimit || 10000) / 5);
+              const remaining = limit - totalProjected;
+              const pct = limit > 0 ? Math.round((totalProjected / limit) * 100) : 0;
+
+              if (txType === 'expense' && limit > 0) {
+                if (pct > 100) {
+                  return (
+                    <div className="mt-2 p-2.5 bg-rose-500/15 border border-rose-500/30 rounded-xl flex items-center gap-2 text-xs font-bold text-rose-400">
+                      <AlertTriangle className="w-4 h-4 shrink-0" />
+                      <span>⚠️ Over {category} budget by {formatCurrency(Math.abs(remaining), budget?.currency || 'INR')} ({pct}% used)!</span>
+                    </div>
+                  );
+                } else if (pct >= 80) {
+                  return (
+                    <div className="mt-2 p-2.5 bg-amber-500/15 border border-amber-500/30 rounded-xl flex items-center gap-2 text-xs font-bold text-amber-400">
+                      <Info className="w-4 h-4 shrink-0" />
+                      <span>💡 {pct}% of {category} budget used ({formatCurrency(remaining, budget?.currency || 'INR')} remaining)</span>
+                    </div>
+                  );
+                } else {
+                  return (
+                    <div className="mt-2 p-2 bg-emerald-500/10 border border-emerald-500/20 rounded-xl flex items-center gap-2 text-[11px] font-semibold text-emerald-400">
+                      <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                      <span>{pct}% used • {formatCurrency(remaining, budget?.currency || 'INR')} remaining for {category}</span>
+                    </div>
+                  );
+                }
+              }
+              return null;
+            })()}
           </section>
 
-          {/* Labels Selector — M3 Filter Chips */}
-          <section className="space-y-2.5">
-            <h2 className="font-outfit text-sm font-black text-on-surface px-1 tracking-tight">Classification</h2>
-            <div className="flex flex-wrap gap-2">
-              {labels.map((lbl) => {
-                const isSelected = label === lbl.name;
-                return (
-                  <button
-                    id={`label-chip-${lbl.name.toLowerCase()}`}
-                    key={lbl.name}
-                    type="button"
-                    onClick={() => setLabel(lbl.name)}
-                    className={`flex items-center px-4 py-2 rounded-full text-xs font-extrabold border transition-all duration-150 cursor-pointer active:scale-95 ${
-                      isSelected
-                        ? 'bg-secondary-container text-on-secondary-container border-secondary-container/20 shadow-2xs'
-                        : 'bg-surface-container text-on-surface-variant border-outline-variant hover:bg-surface-container-high hover:text-on-surface'
-                    }`}
-                  >
-                    {lbl.text}
-                  </button>
-                );
-              })}
-            </div>
-          </section>
-
-          {/* Form Fields Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Date Picker — M3 Outlined Field */}
-            <div className="space-y-1.5">
-              <label className="text-xs font-bold text-on-surface-variant px-1 uppercase tracking-wider" htmlFor="date">
-                Transaction Date
-              </label>
-              <div className="relative">
-                <input 
-                  id="date"
-                  type="date"
-                  value={date}
-                  onChange={(e) => setDate(e.target.value)}
-                  className="w-full bg-surface border border-outline/40 focus:border-primary focus:ring-2 focus:ring-primary/10 rounded-2xl px-4 py-3 text-sm text-on-surface transition-all duration-150 outline-none pr-10"
-                />
-                <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none">
-                  <Calendar className="w-4 h-4 text-outline" />
-                </div>
-              </div>
-            </div>
-
-            {/* Receipt Attachment (Flexible drag & drop + manual click upload) */}
-            <div className="space-y-1.5">
-              <label className="font-label-lg text-label-lg text-on-surface-variant px-1">
-                Attach Receipt (Optional)
-              </label>
-              
-              {!receiptPreview ? (
-                <div 
-                  id="drag-drop-zone"
-                  onDragEnter={handleDrag}
-                  onDragOver={handleDrag}
-                  onDragLeave={handleDrag}
-                  onDrop={handleDrop}
-                  onClick={triggerFileSelect}
-                  className={`w-full h-[52px] flex items-center justify-center gap-2 border-2 border-dashed rounded-xl cursor-pointer text-on-surface-variant hover:bg-surface-container-low hover:border-primary transition-all duration-200 group ${
-                    dragActive ? 'bg-primary-container/10 border-primary' : 'border-outline-variant'
-                  }`}
-                >
-                  <Receipt className="w-5 h-5 group-hover:text-primary text-outline transition-colors" />
-                  <span className="font-label-lg text-label-lg text-on-surface-variant group-hover:text-primary transition-colors">
-                    Upload Photo / Drop Here
-                  </span>
-                  <input 
-                    ref={fileInputRef}
-                    type="file" 
-                    accept="image/*"
-                    onChange={handleFileChange}
-                    className="hidden"
-                  />
-                </div>
-              ) : (
-                <div className="relative flex items-center justify-between bg-surface-container-low border border-outline-variant rounded-xl px-4 py-2 h-[52px]">
-                  <div className="flex items-center gap-2 overflow-hidden mr-4">
-                    <img 
-                      src={receiptPreview} 
-                      alt="Receipt preview" 
-                      className="w-8 h-8 rounded object-cover border border-outline-variant"
-                    />
-                    <span className="text-xs truncate max-w-[150px] font-mono text-on-surface-variant">
-                      {receiptFile ? receiptFile.name : 'attached_receipt.png'}
-                    </span>
-                  </div>
-                  <button 
-                    type="button"
-                    onClick={removeReceipt}
-                    className="p-1 rounded-full hover:bg-surface-container-highest transition-colors"
-                  >
-                    <X className="w-4 h-4 text-error" />
-                  </button>
-                </div>
-              )}
+          {/* Custom Tags */}
+          <div className="space-y-1.5">
+            <label className="text-xs font-bold text-on-surface-variant uppercase tracking-wider flex items-center gap-1">
+              <Tag className="w-3.5 h-3.5" /> Custom Tags
+            </label>
+            <div className="flex flex-wrap gap-2 p-2 bg-surface border border-outline/40 rounded-2xl">
+              {tags.map((t) => (
+                <span key={t} className="px-2.5 py-1 bg-purple-500/20 text-purple-300 border border-purple-500/30 rounded-full text-xs font-medium flex items-center gap-1">
+                  {t}
+                  <button type="button" onClick={() => removeTag(t)} className="hover:text-white">✕</button>
+                </span>
+              ))}
+              <input
+                type="text"
+                placeholder="Add #tag and press Enter"
+                value={tagInput}
+                onChange={(e) => setTagInput(e.target.value)}
+                onKeyDown={handleAddTag}
+                className="bg-transparent border-none outline-none text-xs text-on-surface placeholder:text-outline-variant flex-1 min-w-[120px]"
+              />
             </div>
           </div>
 
-          {/* Notes Text Area — M3 Outlined Textarea */}
+          {/* Classifications & Date */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-on-surface-variant uppercase tracking-wider">Classification</label>
+              <select
+                value={label}
+                onChange={(e) => setLabel(e.target.value as any)}
+                className="w-full bg-surface border border-outline/40 rounded-2xl px-4 py-3 text-sm text-on-surface"
+              >
+                {labels.map((l) => (
+                  <option key={l.name} value={l.name} className="bg-gray-900">{l.text}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-on-surface-variant uppercase tracking-wider">Transaction Date</label>
+              <input 
+                type="date"
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+                className="w-full bg-surface border border-outline/40 rounded-2xl px-4 py-3 text-sm text-on-surface"
+              />
+            </div>
+          </div>
+
+          {/* Receipt OCR Upload Zone */}
           <div className="space-y-1.5">
-            <label className="text-xs font-bold text-on-surface-variant px-1 uppercase tracking-wider" htmlFor="notes">
-              Notes
+            <label className="text-xs font-bold text-on-surface-variant uppercase tracking-wider">
+              Attach & AI Scan Receipt (Optional)
             </label>
+            {!receiptPreview ? (
+              <div 
+                onClick={triggerFileSelect}
+                className="w-full h-16 border-2 border-dashed border-purple-500/40 hover:border-purple-500 bg-purple-950/20 rounded-2xl flex items-center justify-center gap-2 cursor-pointer transition-all"
+              >
+                <Sparkles className="w-5 h-5 text-purple-400" />
+                <span className="text-xs font-bold text-purple-300">Upload Receipt for Instant AI Auto-Fill</span>
+                <input ref={fileInputRef} type="file" accept="image/*" onChange={handleFileChange} className="hidden" />
+              </div>
+            ) : (
+              <div className="flex items-center justify-between bg-surface-container-low border border-outline-variant rounded-xl p-3">
+                <div className="flex items-center gap-3">
+                  <img src={receiptPreview} alt="Receipt preview" className="w-10 h-10 rounded-lg object-cover" />
+                  <span className="text-xs text-on-surface-variant">Receipt Attached</span>
+                </div>
+                <button type="button" onClick={removeReceipt} className="p-1 text-rose-400">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Notes */}
+          <div className="space-y-1.5">
+            <label className="text-xs font-bold text-on-surface-variant uppercase tracking-wider">Notes</label>
             <textarea 
-              id="notes"
-              placeholder="Add a description, tags, or extra details..."
-              rows={3}
+              placeholder="Add extra details..."
+              rows={2}
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              className="w-full bg-surface border border-outline/40 focus:border-primary focus:ring-2 focus:ring-primary/10 rounded-2xl px-4 py-3 text-sm text-on-surface placeholder:text-on-surface-variant/50 transition-all duration-150 outline-none resize-none"
-            ></textarea>
+              className="w-full bg-surface border border-outline/40 rounded-2xl px-4 py-3 text-sm text-on-surface outline-none resize-none"
+            />
           </div>
 
-          {/* Visual Decor: Atmospheric Information Card */}
-          <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary to-primary-container h-28 flex items-center px-6 shadow-sm mt-4 text-white">
-            <div className="absolute top-0 right-0 -translate-y-1/4 translate-x-1/4 w-36 h-36 bg-white/10 rounded-full blur-2xl"></div>
-            <div className="absolute bottom-0 left-0 translate-y-1/4 -translate-x-1/4 w-24 h-24 bg-secondary-container/20 rounded-full blur-xl"></div>
-            <div className="flex items-center gap-4 z-10">
-              <div className="w-12 h-12 bg-white/10 rounded-full flex items-center justify-center backdrop-blur-sm shadow-inner">
-                <PiggyBank className="w-6 h-6 text-white" />
-              </div>
-              <div>
-                <p className="font-title-md text-title-md font-bold">Keep track easily</p>
-                <p className="text-white/80 font-body-md text-body-md text-xs">
-                  Your budget updates dynamically across all analytics tabs.
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* Bottom Actions - Fixed to Bottom */}
+          {/* Fixed Save Actions */}
           <div className="fixed bottom-0 left-0 right-0 bg-surface-container-high/95 backdrop-blur-md p-4 border-t border-outline-variant/60 flex gap-3 justify-end z-40">
             <button 
-              id="cancel-add-transaction"
               type="button"
               onClick={onCancel}
-              className="px-6 py-2.5 font-label-lg text-label-lg text-primary hover:bg-primary/5 rounded-full transition-colors active:scale-95 border border-primary/25 cursor-pointer"
+              className="px-6 py-2.5 font-bold text-xs text-primary rounded-full border border-primary/25"
             >
               Cancel
             </button>
             <button 
-              id="save-add-transaction"
               type="submit"
-              className="px-8 py-2.5 font-label-lg text-label-lg bg-primary text-on-primary rounded-full shadow-md hover:shadow-lg hover:bg-primary/95 transition-all active:scale-95 flex items-center gap-2 cursor-pointer"
+              disabled={isSubmitting}
+              className="px-8 py-2.5 font-bold text-xs bg-primary text-on-primary rounded-full shadow-md flex items-center gap-2"
             >
-              <Check className="w-4 h-4" />
-              Save Transaction
+              <Check className="w-4 h-4" /> Save Transaction
             </button>
           </div>
-
         </form>
       </main>
     </motion.div>

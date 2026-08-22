@@ -13,11 +13,22 @@ import {
   AlertCircle
 } from 'lucide-react';
 import { UserAccount } from '../types';
-import { signInWithPopup, signInWithCredential, GoogleAuthProvider, signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfile, sendEmailVerification } from 'firebase/auth';
+import { 
+  signInWithPopup, 
+  signInWithCredential, 
+  GoogleAuthProvider, 
+  signInWithEmailAndPassword, 
+  createUserWithEmailAndPassword, 
+  updateProfile, 
+  sendEmailVerification,
+  sendPasswordResetEmail,
+  signOut
+} from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
 import { auth, googleProvider, db } from '../firebase';
 import { Capacitor } from '@capacitor/core';
 import { FirebaseAuthentication } from '@capacitor-firebase/authentication';
+import { LegalModal } from './LegalModal';
 
 interface AuthScreenProps {
   onLoginSuccess: (email: string, name: string) => void;
@@ -33,6 +44,8 @@ export default function AuthScreen({ onLoginSuccess }: AuthScreenProps) {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [isSigningIn, setIsSigningIn] = useState(false);
+  const [legalModalTab, setLegalModalTab] = useState<'privacy' | 'terms' | null>(null);
 
   // Local helper to fetch all registered users
   const getRegisteredUsers = (): UserAccount[] => {
@@ -142,13 +155,40 @@ export default function AuthScreen({ onLoginSuccess }: AuthScreenProps) {
     }
   };
 
+  const handleForgotPassword = async () => {
+    if (!email.trim()) {
+      setError('Please enter your email address above to reset your password.');
+      return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+      setError('Please enter a valid email address.');
+      return;
+    }
+    setError('');
+    setSuccess('Sending password reset email...');
+    try {
+      await sendPasswordResetEmail(auth, email.trim());
+      setSuccess(`Password reset email sent to ${email.trim()}! Please check your inbox.`);
+    } catch (err: any) {
+      console.error('Password reset error:', err);
+      const code = err?.code || '';
+      if (code === 'auth/user-not-found') {
+        setError('No account found with this email address.');
+      } else if (code === 'auth/invalid-email') {
+        setError('Invalid email address format.');
+      } else {
+        setError(err?.message || 'Failed to send password reset email.');
+      }
+      setSuccess('');
+    }
+  };
+
   const handleGoogleSignIn = async () => {
     setError('');
-    setSuccess('');
+    setSuccess('Connecting to Google...');
+    setIsSigningIn(true);
     try {
       if (Capacitor.isNativePlatform()) {
-        // Sign out first so Google always shows the account picker
-        try { await FirebaseAuthentication.signOut(); } catch (_) {}
         const result = await FirebaseAuthentication.signInWithGoogle({
           customParameters: [{ key: 'prompt', value: 'select_account' }],
         });
@@ -157,29 +197,43 @@ export default function AuthScreen({ onLoginSuccess }: AuthScreenProps) {
           const userCredential = await signInWithCredential(auth, credential);
           const user = userCredential.user;
           if (user && user.email) {
-            setSuccess(`Successfully signed in as ${user.displayName || 'User'}!`);
-            setTimeout(() => {
-              onLoginSuccess(user.email!, user.displayName || 'Google User');
-            }, 800);
+            setSuccess(`Signed in as ${user.displayName || user.email}`);
+            await setDoc(doc(db, 'users', user.uid), {
+              name: user.displayName || user.email.split('@')[0],
+              email: user.email,
+              avatarUrl: user.photoURL || `https://api.dicebear.com/7.x/adventurer/svg?seed=${encodeURIComponent(user.email)}`
+            }, { merge: true });
+            onLoginSuccess(user.email, user.displayName || 'Google User');
           }
         } else {
           throw new Error("No native credential returned.");
         }
       } else {
-        // Web: force account picker via prompt parameter
         googleProvider.setCustomParameters({ prompt: 'select_account' });
         const result = await signInWithPopup(auth, googleProvider);
         const user = result.user;
         if (user && user.email) {
-          setSuccess(`Successfully signed in as ${user.displayName || 'User'}!`);
-          setTimeout(() => {
-            onLoginSuccess(user.email!, user.displayName || 'Google User');
-          }, 800);
+          setSuccess(`Signed in as ${user.displayName || user.email}`);
+          await setDoc(doc(db, 'users', user.uid), {
+            name: user.displayName || user.email.split('@')[0],
+            email: user.email,
+            avatarUrl: user.photoURL || `https://api.dicebear.com/7.x/adventurer/svg?seed=${encodeURIComponent(user.email)}`
+          }, { merge: true });
+          onLoginSuccess(user.email, user.displayName || 'Google User');
         }
       }
     } catch (err: any) {
-      console.error(err);
-      setError(err?.message || 'Failed to authenticate with Google.');
+      console.error('Google Sign In error:', err);
+      const code = err?.code || '';
+      if (code === 'auth/popup-closed-by-user') {
+        setError('Sign in window was closed before completing.');
+      } else if (code === 'auth/popup-blocked') {
+        setError('Sign in popup was blocked by your browser. Please allow popups for SpendTrack.');
+      } else {
+        setError(err?.message || 'Failed to authenticate with Google.');
+      }
+      setSuccess('');
+      setIsSigningIn(false);
     }
   };
 
@@ -306,9 +360,20 @@ export default function AuthScreen({ onLoginSuccess }: AuthScreenProps) {
 
             {/* Password field */}
             <div className="space-y-1.5">
-              <label className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wide">
-                Password
-              </label>
+              <div className="flex justify-between items-center">
+                <label className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wide">
+                  Password
+                </label>
+                {isLogin && (
+                  <button
+                    type="button"
+                    onClick={handleForgotPassword}
+                    className="text-[10px] font-bold text-primary hover:underline transition-colors cursor-pointer"
+                  >
+                    Forgot password?
+                  </button>
+                )}
+              </div>
               <div className="relative">
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant/70">
                   <Lock className="w-4 h-4" />
@@ -402,47 +467,108 @@ export default function AuthScreen({ onLoginSuccess }: AuthScreenProps) {
           <button
             id="auth-google-btn"
             type="button"
+            disabled={isSigningIn}
             onClick={handleGoogleSignIn}
-            className="w-full py-2.5 bg-surface-container-high hover:bg-surface-container-highest text-on-surface rounded-xl text-xs font-bold transition-all border border-outline-variant/45 flex items-center justify-center gap-2 cursor-pointer"
+            className={`w-full py-2.5 bg-surface-container-high hover:bg-surface-container-highest text-on-surface rounded-xl text-xs font-bold transition-all border border-outline-variant/45 flex items-center justify-center gap-2 cursor-pointer ${
+              isSigningIn ? 'opacity-70 cursor-not-allowed' : ''
+            }`}
           >
-            <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24" width="100%" height="100%">
-              <path
-                d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-                fill="#4285F4"
-              />
-              <path
-                d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-                fill="#34A853"
-              />
-              <path
-                d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
-                fill="#FBBC05"
-              />
-              <path
-                d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 12-5.38z"
-                fill="#EA4335"
-              />
-            </svg>
-            <span>Continue with Google</span>
+            {isSigningIn ? (
+              <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin shrink-0" />
+            ) : (
+              <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24" width="100%" height="100%">
+                <path
+                  d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                  fill="#4285F4"
+                />
+                <path
+                  d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                  fill="#34A853"
+                />
+                <path
+                  d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
+                  fill="#FBBC05"
+                />
+                <path
+                  d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 12-5.38z"
+                  fill="#EA4335"
+                />
+              </svg>
+            )}
+            <span>{isSigningIn ? 'Signing in with Google...' : 'Continue with Google'}</span>
           </button>
 
         </motion.div>
 
-        {/* Feature Highlights Footer */}
-        <div className="grid grid-cols-3 gap-2 text-center text-[10px] text-on-surface-variant font-medium max-w-sm mx-auto">
-          <div className="p-2 space-y-1">
-            <span className="block text-primary font-bold">📂 Isolated Data</span>
-            Separate ledgers for every email
-          </div>
-          <div className="p-2 space-y-1 border-x border-outline-variant/30">
-            <span className="block text-primary font-bold">🔮 EOM Forecasts</span>
-            Predictive cashflow analysis
-          </div>
-          <div className="p-2 space-y-1">
-            <span className="block text-primary font-bold">💳 Auto-Recurring</span>
-            Factored commitments
-          </div>
+
+        {/* Legal Disclaimer Footnote */}
+        <div className="text-center text-[10px] text-on-surface-variant/70 leading-normal px-2">
+          By signing in or creating an account, you agree to SpendTrack's{' '}
+          <button 
+            type="button"
+            onClick={() => setLegalModalTab('terms')}
+            className="text-primary hover:underline font-bold cursor-pointer inline"
+          >
+            Terms of Service
+          </button>{' '}
+          and{' '}
+          <button 
+            type="button"
+            onClick={() => setLegalModalTab('privacy')}
+            className="text-primary hover:underline font-bold cursor-pointer inline"
+          >
+            Privacy Policy
+          </button>.
         </div>
+
+        {/* Mobile App Download Promo — hide when inside native app */}
+        {!(typeof window !== 'undefined' && (window as any).Capacitor?.isNativePlatform?.()) && (() => {
+          const isIos = /iphone|ipad|ipod/i.test(navigator.userAgent || '');
+          const isAndroid = /android/i.test(navigator.userAgent || '');
+
+          if (isIos) {
+            return (
+              <div className="mt-4 pt-3.5 border-t border-outline-variant/25 text-center flex flex-col items-center gap-1">
+                <span className="text-[10px] text-on-surface-variant font-medium">Install SpendTrack on your iPhone</span>
+                <span className="text-[9px] font-extrabold text-primary uppercase tracking-wider bg-primary/10 px-3 py-1 rounded-full border border-primary/20">
+                   Tap Share → "Add to Home Screen" in Safari
+                </span>
+              </div>
+            );
+          }
+
+          return (
+            <div className="mt-4 pt-3.5 border-t border-outline-variant/25 text-center flex flex-col items-center gap-1.5">
+              <span className="text-[10px] text-on-surface-variant font-medium">Want SpendTrack on your phone?</span>
+              <div className="flex items-center gap-2 flex-wrap justify-center">
+                <a
+                  href="/spendtrack.zip"
+                  download="SpendTrack.apk"
+                  className="inline-flex items-center gap-1.5 px-3 py-1 bg-primary/10 text-primary hover:bg-primary/20 active:scale-95 rounded-full text-[9px] font-extrabold tracking-wider uppercase transition-all cursor-pointer"
+                >
+                  <span>🤖</span>
+                  <span>Android APK</span>
+                </a>
+                {!isAndroid && (
+                  <>
+                    <span className="text-[10px] text-outline">•</span>
+                    <span className="text-[9px] font-extrabold text-on-surface-variant uppercase tracking-wider">
+                       iOS: Add to Home Screen via Safari
+                    </span>
+                  </>
+                )}
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* Render Legal Modal if active */}
+        {legalModalTab && (
+          <LegalModal
+            initialTab={legalModalTab}
+            onClose={() => setLegalModalTab(null)}
+          />
+        )}
 
       </div>
     </div>

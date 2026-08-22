@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { Mail, CheckCircle, AlertCircle, RefreshCw, LogOut } from 'lucide-react';
+import { Mail, CheckCircle, AlertCircle, RefreshCw, LogOut, Info, ShieldAlert } from 'lucide-react';
 import { auth } from '../firebase';
 import { sendEmailVerification, signOut } from 'firebase/auth';
 
@@ -86,19 +86,20 @@ export default function EmailVerificationScreen({ onVerified, onLogout }: EmailV
       </div>
 
       <motion.div 
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
+        initial={{ opacity: 0, scale: 0.95, y: 10 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        transition={{ duration: 0.4 }}
         className="w-full max-w-md bg-surface-container-low border border-outline-variant/35 rounded-3xl p-6 md:p-8 shadow-xl space-y-6 text-center z-10"
       >
         <div className="inline-flex p-4 bg-primary/10 text-primary rounded-full relative">
-          <Mail className="w-10 h-10 animate-pulse" />
+          <Mail className="w-10 h-10 animate-pulse text-primary" />
           <span className="absolute top-2 right-2 w-3.5 h-3.5 bg-amber-500 rounded-full border-2 border-surface-container-low" />
         </div>
 
         <div className="space-y-2">
-          <h2 className="text-2xl font-bold tracking-tight text-primary">Verify your email</h2>
+          <h2 className="text-2xl font-outfit font-black tracking-tight text-on-surface">Confirm Email</h2>
           <p className="text-xs text-on-surface-variant max-w-xs mx-auto leading-relaxed">
-            We sent a verification link to <span className="font-semibold text-on-surface break-all">{user?.email}</span>. Please verify your email to access the SpendTrack dashboard.
+            We sent a verification link to <span className="font-bold text-primary break-all">{user?.email}</span>. Please verify your email to unlock your SpendTrack dashboard.
           </p>
         </div>
 
@@ -117,17 +118,30 @@ export default function EmailVerificationScreen({ onVerified, onLogout }: EmailV
           </div>
         )}
 
+        {/* Helpful Tips Card */}
+        <div className="p-3 bg-surface-container-high/60 border border-outline-variant/25 rounded-2xl text-left space-y-2">
+          <div className="flex items-center gap-1.5 text-[11px] font-bold text-on-surface uppercase tracking-wider">
+            <Info className="w-3.5 h-3.5 text-primary" />
+            <span>Tips for verification</span>
+          </div>
+          <ul className="text-[10px] text-on-surface-variant space-y-1 pl-5 list-disc leading-relaxed">
+            <li>Check your <span className="font-bold">Spam</span> or <span className="font-bold">Promotions</span> tab.</li>
+            <li>Verification emails usually arrive in less than a minute.</li>
+            <li>Once you tap the link in the email, this screen will auto-refresh.</li>
+          </ul>
+        </div>
+
         <div className="flex flex-col gap-3">
           <button
             type="button"
             onClick={handleCheckVerification}
             disabled={isChecking}
-            className="w-full py-3.5 px-4 bg-primary text-on-primary font-bold rounded-2xl shadow-md hover:bg-primary-hover active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+            className="w-full py-3.5 px-4 bg-primary text-on-primary font-bold rounded-2xl shadow-md hover:bg-primary/95 active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
           >
             {isChecking ? (
               <RefreshCw className="w-4 h-4 animate-spin" />
             ) : (
-              <span>I have verified my email</span>
+              <span>I've Verified My Email</span>
             )}
           </button>
 
@@ -135,19 +149,19 @@ export default function EmailVerificationScreen({ onVerified, onLogout }: EmailV
             type="button"
             onClick={handleResendEmail}
             disabled={isResending}
-            className="w-full py-3 px-4 bg-surface-container-high border border-outline-variant/30 text-on-surface font-semibold rounded-2xl hover:bg-surface-container-highest transition-colors active:scale-[0.98] flex items-center justify-center gap-2 disabled:opacity-50"
+            className="w-full py-3 px-4 bg-surface-container-high border border-outline-variant/30 text-on-surface font-bold rounded-2xl hover:bg-surface-container-highest transition-colors active:scale-[0.98] flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
           >
             {isResending ? (
               <RefreshCw className="w-4 h-4 animate-spin" />
             ) : (
-              <span>Resend Verification Email</span>
+              <span>Resend Verification Link</span>
             )}
           </button>
 
           <button
             type="button"
             onClick={handleSignOut}
-            className="w-full py-3 px-4 bg-transparent text-on-surface-variant hover:text-on-surface font-medium rounded-2xl transition-colors flex items-center justify-center gap-2"
+            className="w-full py-3 px-4 bg-transparent text-on-surface-variant hover:text-on-surface font-bold rounded-2xl transition-colors flex items-center justify-center gap-2 cursor-pointer"
           >
             <LogOut className="w-4 h-4" />
             <span>Sign Out</span>

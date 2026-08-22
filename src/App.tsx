@@ -24,7 +24,11 @@ import {
   Sun,
   Moon,
   RefreshCw,
-  AlertCircle
+  AlertCircle,
+  Smartphone,
+  Eye,
+  EyeOff,
+  Users
 } from 'lucide-react';
 import { Transaction, UserProfile, BudgetConfig, Subscription } from './types';
 import { COLOR_PRESETS } from './theme';
@@ -33,6 +37,7 @@ import {
   DEFAULT_PROFILE, 
   DEFAULT_BUDGET 
 } from './initialData';
+import { formatCurrency, isSubscriptionDoubleCounted } from './utils/currency';
 
 // Modular Tab Views
 import DashboardTab from './components/DashboardTab';
@@ -44,6 +49,20 @@ import SuccessConfetti from './components/SuccessConfetti';
 import AuthScreen from './components/AuthScreen';
 import ExportPDFButton from './components/ExportPDFButton';
 import EmailVerificationScreen from './components/EmailVerificationScreen';
+import { AiCoachWidget } from './components/AiCoachWidget';
+import { PinLockModal } from './components/PinLockModal';
+import { INITIAL_ACHIEVEMENT_BADGES, evaluateBadges, calculateBudgetRollover } from './utils/budgetRollover';
+import { fetchLiveExchangeRates } from './utils/currencyConverter';
+import { checkAlertRulesOnSave } from './utils/alertRulesEngine';
+
+import { VoiceInputModal } from './components/VoiceInputModal';
+
+// Modals (Static imports to ensure zero dynamic chunk loading failures on Android)
+import { CalendarViewModal } from './components/CalendarViewModal';
+import { PdfExportModal } from './components/PdfExportModal';
+import { AlertRulesModal } from './components/AlertRulesModal';
+import { CsvImportModal } from './components/CsvImportModal';
+import { AchievementBadgesModal } from './components/AchievementBadgesModal';
 
 // Firebase Imports
 import { onAuthStateChanged, signOut } from 'firebase/auth';
@@ -52,8 +71,8 @@ import { auth, db } from './firebase';
 
 // Capacitor & Native Plugins
 import { Capacitor } from '@capacitor/core';
-import { LocalNotifications } from '@capacitor/local-notifications';
 import { App as CapApp } from '@capacitor/app';
+import { LocalNotifications } from '@capacitor/local-notifications';
 
 type TabType = 'dashboard' | 'history' | 'insights' | 'settings';
 
@@ -75,13 +94,24 @@ const slideVariants = {
 
 export default function App() {
   // ── Auth ──────────────────────────────────────────────────────────────────
-  const [currentUser, setCurrentUser] = useState<string | null>(null);
+  // Seed currentUser from localStorage so there's ZERO login flash on refresh.
+  // Firebase onAuthStateChanged will validate / clear this on first callback.
+  const [currentUser, setCurrentUser] = useState<string | null>(() =>
+    localStorage.getItem('spendtrack_active_user_uid')
+  );
   const [isAuthLoading, setIsAuthLoading] = useState(true);
   const [emailVerified, setEmailVerified] = useState<boolean>(true);
 
   // ── User Data (all loaded from Firestore, never from localStorage) ────────
   const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [profile, setProfile]           = useState<UserProfile>(DEFAULT_PROFILE);
+  // Seed profile from cache so avatar/name renders instantly on reload.
+  const [profile, setProfile]           = useState<UserProfile>(() => {
+    try {
+      const cached = localStorage.getItem('spendtrack_cached_profile');
+      if (cached) return JSON.parse(cached) as UserProfile;
+    } catch (_) {}
+    return DEFAULT_PROFILE;
+  });
   const [budget, setBudget]             = useState<BudgetConfig>(DEFAULT_BUDGET);
   
   // Theme state
@@ -96,6 +126,24 @@ export default function App() {
   const [themePresetId, setThemePresetId] = useState<string>(() => {
     return localStorage.getItem('spendtrack_theme_preset') || 'navy';
   });
+
+  // Commercial Feature States
+  const [isPrivacyMode, setIsPrivacyMode] = useState<boolean>(() => {
+    return localStorage.getItem('spendtrack_privacy_mode') === 'true';
+  });
+
+  const [pinConfig, setPinConfig] = useState<{ isEnabled: boolean; pin: string }>(() => {
+    const saved = localStorage.getItem('spendtrack_pin_config');
+    if (saved) {
+      try { return JSON.parse(saved); } catch (e) {}
+    }
+    return { isEnabled: false, pin: '' };
+  });
+
+  const [isPinUnlocked, setIsPinUnlocked] = useState<boolean>(true);
+  const [isCalendarOpen, setIsCalendarOpen] = useState<boolean>(false);
+  const [isAlertRulesOpen, setIsAlertRulesOpen] = useState<boolean>(false);
+  const [isPdfExportOpen, setIsPdfExportOpen] = useState<boolean>(false);
 
   const [sliderLimit, setSliderLimit] = useState<number>(0);
   const budgetUpdateTimeoutRef = useRef<any>(null);
@@ -164,81 +212,144 @@ export default function App() {
     let unsubBudget: (() => void) | null = null;
 
     const unsubAuth = onAuthStateChanged(auth, async (firebaseUser) => {
+      console.log("[DEBUG] onAuthStateChanged triggered. User:", firebaseUser ? firebaseUser.uid : "Logged Out");
+      
       // Tear down any previous listeners before setting up new ones
       unsubTxs?.(); unsubSubs?.(); unsubGoals?.(); unsubProfile?.(); unsubBudget?.();
+      unsubTxs = null; unsubSubs = null; unsubGoals = null; unsubProfile = null; unsubBudget = null;
 
       if (firebaseUser) {
         const uid = firebaseUser.uid;
+        localStorage.setItem('spendtrack_active_user_uid', uid);
         setCurrentUser(uid);
         setEmailVerified(firebaseUser.emailVerified);
 
-        // --- Ensure user profile document exists and is populated ---
-        const profileRef = doc(db, 'users', uid);
-        const profileSnap = await getDoc(profileRef);
-        const existingData = profileSnap.exists() ? (profileSnap.data() as UserProfile) : null;
-        const isSarahJenkins = existingData && (existingData.name === 'Sarah Jenkins' || existingData.email === 'sarah.j@example.com');
+        // --- Background non-blocking check to ensure user profile & budget exist ---
+        (async () => {
+          try {
+            const profileRef = doc(db, 'users', uid);
+            const profileSnap = await getDoc(profileRef);
+            const existingData = profileSnap.exists() ? (profileSnap.data() as UserProfile) : null;
+            const isSarahJenkins = existingData && (existingData.name === 'Sarah Jenkins' || existingData.email === 'sarah.j@example.com');
 
-        if (!existingData || !existingData.name || !existingData.email || isSarahJenkins) {
-          const newProfile: UserProfile = {
-            name: (isSarahJenkins ? '' : existingData?.name) || firebaseUser.displayName || 'User',
-            email: (isSarahJenkins ? '' : existingData?.email) || firebaseUser.email || '',
-            avatarUrl: (isSarahJenkins ? '' : existingData?.avatarUrl) || firebaseUser.photoURL || `https://api.dicebear.com/7.x/adventurer/svg?seed=${encodeURIComponent(firebaseUser.email || 'user')}`
-          };
-          await setDoc(profileRef, newProfile, { merge: true });
-        } else if (firebaseUser.photoURL && (!existingData?.avatarUrl || existingData.avatarUrl.includes('dicebear'))) {
-          // Always sync Google photo when available and local avatar is missing/placeholder
-          await setDoc(profileRef, { avatarUrl: firebaseUser.photoURL }, { merge: true });
-        }
+            if (!existingData || !existingData.name || !existingData.email || isSarahJenkins) {
+              const newProfile: UserProfile = {
+                name: (isSarahJenkins ? '' : existingData?.name) || firebaseUser.displayName || 'User',
+                email: (isSarahJenkins ? '' : existingData?.email) || firebaseUser.email || '',
+                avatarUrl: firebaseUser.photoURL || existingData?.avatarUrl || `https://api.dicebear.com/7.x/adventurer/svg?seed=${encodeURIComponent(firebaseUser.email || 'user')}`
+              };
+              await setDoc(profileRef, newProfile, { merge: true });
+            } else if (firebaseUser.photoURL && firebaseUser.photoURL !== existingData?.avatarUrl) {
+              await setDoc(profileRef, { avatarUrl: firebaseUser.photoURL }, { merge: true });
+            }
 
-        // --- Ensure budget config document exists ---
-        const budgetRef = doc(db, 'users', uid, 'config', 'budget');
-        const budgetSnap = await getDoc(budgetRef);
-        if (!budgetSnap.exists()) {
-          await setDoc(budgetRef, DEFAULT_BUDGET);
-        }
+            const budgetRef = doc(db, 'users', uid, 'config', 'budget');
+            const budgetSnap = await getDoc(budgetRef);
+            if (!budgetSnap.exists()) {
+              await setDoc(budgetRef, DEFAULT_BUDGET);
+            }
+          } catch (err) {
+            console.error("Async document check error:", err);
+          }
+        })();
 
         // --- Real-time listener: Profile ---
         unsubProfile = onSnapshot(doc(db, 'users', uid), (snap) => {
-          if (snap.exists()) setProfile(snap.data() as UserProfile);
+          if (snap.exists()) {
+            const profileData = snap.data() as UserProfile;
+            setProfile(profileData);
+            try { localStorage.setItem('spendtrack_cached_profile', JSON.stringify(profileData)); } catch (_) {}
+          }
         }, (err) => console.error('Profile listener error:', err));
 
         // --- Real-time listener: Budget ---
         unsubBudget = onSnapshot(doc(db, 'users', uid, 'config', 'budget'), (snap) => {
-          if (snap.exists()) setBudget(snap.data() as BudgetConfig);
+          if (snap.exists()) {
+            const data = snap.data() || {};
+            const sanitizedCategoryLimits: Record<string, number> = {};
+            if (data.categoryLimits) {
+              Object.entries(data.categoryLimits).forEach(([cat, val]) => {
+                sanitizedCategoryLimits[cat] = typeof val === 'string' ? parseFloat(val) : (val as number || 0);
+              });
+            }
+            setBudget({
+              ...data,
+              monthlyLimit: typeof data.monthlyLimit === 'string' ? parseFloat(data.monthlyLimit) : (data.monthlyLimit || 0),
+              categoryLimits: sanitizedCategoryLimits,
+              currency: data.currency || 'INR'
+            } as BudgetConfig);
+          }
         }, (err) => console.error('Budget listener error:', err));
 
         // --- Real-time listener: Transactions ---
         unsubTxs = onSnapshot(collection(db, 'users', uid, 'transactions'), (snap) => {
           const list: Transaction[] = [];
-          snap.forEach(d => list.push({ id: d.id, ...d.data() } as Transaction));
-          list.sort((a, b) => b.date.localeCompare(a.date));
+          snap.forEach(d => {
+            const data = d.data();
+            list.push({
+              id: d.id,
+              ...data,
+              amount: typeof data.amount === 'string' ? parseFloat(data.amount) : (data.amount || 0)
+            } as Transaction);
+          });
+          list.sort((a, b) => {
+            const dateA = (a && a.date ? String(a.date) : '');
+            const dateB = (b && b.date ? String(b.date) : '');
+            return dateB.localeCompare(dateA);
+          });
           setTransactions(list);
         }, (err) => console.error('Transactions listener error:', err));
 
         // --- Real-time listener: Subscriptions ---
         unsubSubs = onSnapshot(collection(db, 'users', uid, 'subscriptions'), (snap) => {
           const list: Subscription[] = [];
-          snap.forEach(d => list.push({ id: d.id, ...d.data() } as Subscription));
+          snap.forEach(d => {
+            const data = d.data();
+            list.push({
+              id: d.id,
+              ...data,
+              amount: typeof data.amount === 'string' ? parseFloat(data.amount) : (data.amount || 0)
+            } as Subscription);
+          });
           setSubscriptions(list);
         }, (err) => console.error('Subscriptions listener error:', err));
 
         // --- Real-time listener: Savings Goals ---
         unsubGoals = onSnapshot(collection(db, 'users', uid, 'savingsGoals'), (snap) => {
           const list: any[] = [];
-          snap.forEach(d => list.push({ id: d.id, ...d.data() }));
+          snap.forEach(d => {
+            const data = d.data();
+            list.push({
+              id: d.id,
+              ...data,
+              targetAmount: typeof data.targetAmount === 'string' ? parseFloat(data.targetAmount) : (data.targetAmount || 0),
+              currentAmount: typeof data.currentAmount === 'string' ? parseFloat(data.currentAmount) : (data.currentAmount || 0)
+            });
+          });
           setSavingsGoals(list);
         }, (err) => console.error('Goals listener error:', err));
 
       } else {
-        // Logged out — clear all state
+        localStorage.removeItem('spendtrack_active_user_uid');
+        localStorage.removeItem('spendtrack_cached_profile');
         setCurrentUser(null);
         setEmailVerified(true);
-        setTransactions([]);
-        setProfile(DEFAULT_PROFILE);
-        setBudget(DEFAULT_BUDGET);
+        const storedGuestTxs = localStorage.getItem('spendtrack_guest_transactions');
+        if (storedGuestTxs) {
+          try { setTransactions(JSON.parse(storedGuestTxs)); } catch (e) {}
+        } else {
+          setTransactions([]);
+        }
+        const storedGuestBudget = localStorage.getItem('spendtrack_guest_budget');
+        if (storedGuestBudget) {
+          try { setBudget(JSON.parse(storedGuestBudget)); } catch (e) {}
+        } else {
+          setBudget(DEFAULT_BUDGET);
+        }
         setSubscriptions([]);
         setSavingsGoals([]);
       }
+
       setIsAuthLoading(false);
     });
 
@@ -265,6 +376,9 @@ export default function App() {
     if (currentUser) {
       try {
         const { id: _, ...fieldsToUpdate } = updatedSub;
+        if (fieldsToUpdate.amount !== undefined) {
+          fieldsToUpdate.amount = typeof fieldsToUpdate.amount === 'string' ? parseFloat(fieldsToUpdate.amount) : (fieldsToUpdate.amount || 0);
+        }
         await updateDoc(doc(db, 'users', currentUser, 'subscriptions', id), fieldsToUpdate);
       } catch (err: any) {
         console.error('Firestore subscription update error:', err);
@@ -289,37 +403,66 @@ export default function App() {
     return stored === null ? true : stored === 'true';
   });
 
+  // APK Download Progress state
+
+
+  // Detect if running on an Android mobile device safely
+  const isAndroidMobile = typeof navigator !== 'undefined' && /android/i.test(navigator.userAgent || '');
+
+  // Detect if running in an Android browser tab (not PWA standalone, not Capacitor native) safely
+  const isAndroidBrowserTab = Boolean(
+    isAndroidMobile &&
+    typeof window !== 'undefined' &&
+    !Capacitor?.isNativePlatform?.() &&
+    !(window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) &&
+    !(window.navigator as any)?.standalone
+  );
+
+  // "Get the App" banner dismissed state (persists for 7 days)
+  const [appBannerDismissed, setAppBannerDismissed] = useState<boolean>(() => {
+    try {
+      const ts = localStorage.getItem('spendtrack_app_banner_dismissed_ts');
+      if (!ts) return false;
+      return Date.now() - Number(ts) < 7 * 24 * 60 * 60 * 1000;
+    } catch (e) {
+      return false;
+    }
+  });
+
+  const handleDismissAppBanner = () => {
+    setAppBannerDismissed(true);
+    localStorage.setItem('spendtrack_app_banner_dismissed_ts', String(Date.now()));
+  };
+
+  const handleStartApkDownload = () => {
+    // Immediately trigger browser file download without fake progress delay
+    const a = document.createElement('a');
+    a.href = '/spendtrack.zip';
+    a.download = 'SpendTrack.apk';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+
+    showToast("SpendTrack.apk download started!", "success");
+    setIsDownloadModalOpen(false);
+  };
+
+  const [reminderTime, setReminderTime] = useState<string>(() => {
+    return localStorage.getItem('spendtrack_reminder_time') || '20:00';
+  });
+
+  const handleUpdateReminderTime = (time: string) => {
+    setReminderTime(time);
+    localStorage.setItem('spendtrack_reminder_time', time);
+  };
+
   const [lastRemindedDate, setLastRemindedDate] = useState<string>(() => {
     return localStorage.getItem('spendtrack_last_reminded_date') || '';
   });
 
-  interface InAppNotification {
-    id: string;
-    title: string;
-    body: string;
-    tab: TabType;
-  }
-  const [inAppNotifications, setInAppNotifications] = useState<InAppNotification[]>([]);
   const [inAppBannerDismissed, setInAppBannerDismissed] = useState<boolean>(
     localStorage.getItem('spendtrack_banner_dismissed_date') === new Date().toDateString()
   );
-  const [dismissedNotifIds, setDismissedNotifIds] = useState<number[]>(() => {
-    try {
-      const key = `spendtrack_dismissed_notifs_${new Date().toDateString()}`;
-      const stored = localStorage.getItem(key);
-      return stored ? JSON.parse(stored) : [];
-    } catch { return []; }
-  });
-
-  const dismissAllNotifications = (ids: number[]) => {
-    const key = `spendtrack_dismissed_notifs_${new Date().toDateString()}`;
-    localStorage.setItem(key, JSON.stringify(ids));
-    setDismissedNotifIds(ids);
-    // Also mark the in-app banner dismissed for today
-    setInAppBannerDismissed(true);
-    localStorage.setItem('spendtrack_banner_dismissed_date', new Date().toDateString());
-  };
-  const [isBrandingMenuOpen, setIsBrandingMenuOpen] = useState<boolean>(false);
 
   const getTodayDateStr = () => {
     const today = new Date();
@@ -338,17 +481,9 @@ export default function App() {
     localStorage.setItem('spendtrack_daily_reminder_enabled', String(enabled));
   };
 
-  // Helper to trigger a notification (system banner + foreground in-app snackbar)
+
+  // Trigger a native system notification (push only — no in-app toast)
   const triggerNotification = async (title: string, body: string, tab: TabType) => {
-    const id = Math.random().toString(36).substring(2, 9);
-    
-    // Add to in-app banners stack
-    setInAppNotifications(prev => [...prev, { id, title, body, tab }]);
-    
-    // Auto dismiss in-app after 7 seconds
-    setTimeout(() => {
-      setInAppNotifications(prev => prev.filter(n => n.id !== id));
-    }, 7000);
 
     // Also fire a native system notification if Capacitor is native
     if (Capacitor.isNativePlatform()) {
@@ -360,6 +495,9 @@ export default function App() {
               title,
               body,
               channelId: 'spendtrack-reminders',
+              smallIcon: 'ic_stat_icon',
+              largeIcon: 'ic_launcher',
+              iconColor: '#6366F1',
               extra: { tab }
             }
           ]
@@ -370,14 +508,14 @@ export default function App() {
     } else if ('Notification' in window) {
       if (Notification.permission === 'granted') {
         try {
-          new Notification(title, { body, icon: '/favicon.ico' });
+          new Notification(title, { body, icon: '/logo.jpg' });
         } catch (err) {
           console.error("Browser notification failed:", err);
         }
       } else if (Notification.permission !== 'denied') {
         Notification.requestPermission().then(perm => {
           if (perm === 'granted') {
-            new Notification(title, { body, icon: '/favicon.ico' });
+            new Notification(title, { body, icon: '/logo.jpg' });
           }
         });
       }
@@ -389,16 +527,18 @@ export default function App() {
     const setupNativeNotifications = async () => {
       if (Capacitor.isNativePlatform()) {
         try {
-          // Create Android channel
-          await LocalNotifications.createChannel({
-            id: 'spendtrack-reminders',
-            name: 'SpendTrack Reminders',
-            description: 'Notifications for daily transaction tracking reminders',
-            importance: 4, // high
-            visibility: 1, // public
-            sound: 'default',
-            vibration: true,
-          });
+          // Create Android channel (only on Android)
+          if (Capacitor.getPlatform() === 'android') {
+            await LocalNotifications.createChannel({
+              id: 'spendtrack-reminders',
+              name: 'SpendTrack Reminders',
+              description: 'Notifications for daily transaction tracking reminders',
+              importance: 4, // high
+              visibility: 1, // public
+              sound: 'default',
+              vibration: true
+            });
+          }
 
           // Request permission
           let perm = await LocalNotifications.checkPermissions();
@@ -423,30 +563,156 @@ export default function App() {
     setupNativeNotifications();
   }, []);
 
-  // Native daily reminder — scheduled ONCE on app open, independent of transactions
+  // Native daily reminder — scheduled ONCE on app open or setting change
   useEffect(() => {
-    if (!dailyReminderEnabled || !Capacitor.isNativePlatform()) return;
+    const scheduleDailyReminder = async () => {
+      if (!Capacitor.isNativePlatform()) return;
 
-    LocalNotifications.cancel({ notifications: [{ id: 101 }] }).catch(() => {});
-    const scheduleDate = new Date();
-    scheduleDate.setHours(20, 0, 0, 0);
-    if (scheduleDate.getTime() <= Date.now()) {
-      scheduleDate.setDate(scheduleDate.getDate() + 1);
+      try {
+        // ALWAYS await cancel to ensure no duplicate alarms accumulate
+        await LocalNotifications.cancel({ notifications: [{ id: 101 }] }).catch(() => {});
+
+        if (!dailyReminderEnabled) return;
+
+        const [hStr, mStr] = (reminderTime || '20:00').split(':');
+        const hour = parseInt(hStr, 10) || 20;
+        const minute = parseInt(mStr, 10) || 0;
+
+        await LocalNotifications.schedule({
+          notifications: [{
+            id: 101,
+            title: '💰 Daily SpendTrack Reminder',
+            body: "You haven't logged any expenses today. Tap to track your transactions!",
+            schedule: {
+              on: {
+                hour,
+                minute
+              },
+              repeats: true,
+              allowWhileIdle: true
+            },
+            channelId: 'spendtrack-reminders',
+            smallIcon: 'ic_stat_icon',
+            largeIcon: 'ic_launcher',
+            iconColor: '#6366F1',
+            extra: { tab: 'dashboard' }
+          }]
+        });
+      } catch (err) {
+        console.error('Failed to schedule daily reminders:', err);
+      }
+    };
+
+    scheduleDailyReminder();
+  }, [dailyReminderEnabled, reminderTime]);
+
+
+
+  // Native subscription renewal reminders — schedules monthly alerts for all active subscriptions
+  useEffect(() => {
+    const scheduleSubReminders = async () => {
+      if (!Capacitor.isNativePlatform()) return;
+      try {
+        // Request/verify permissions
+        const perm = await LocalNotifications.checkPermissions();
+        if (perm.display !== 'granted') {
+          await LocalNotifications.requestPermissions();
+        }
+
+        // Cancel previous subscription notifications (IDs 1000+)
+        const pending = await LocalNotifications.getPending();
+        const subIdsToCancel = pending.notifications
+          .filter(n => n.id >= 1000 && n.id < 2000)
+          .map(n => ({ id: n.id }));
+        if (subIdsToCancel.length > 0) {
+          await LocalNotifications.cancel({ notifications: subIdsToCancel });
+        }
+
+        // Filter active subscriptions that have NOT been manually logged as transactions in the current month
+        const today = new Date();
+        const currentMonthStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
+        const currentMonthTxs = transactions.filter(t => t.date?.startsWith(currentMonthStr));
+
+        const activeSubs = subscriptions.filter(s => {
+          if (s.isActive === false) return false;
+          // Check if there is already a manual transaction logged for this subscription in the current month
+          const isAlreadyLogged = currentMonthTxs.some(t => 
+            t.amount < 0 && isSubscriptionDoubleCounted(s.title, t.title)
+          );
+          return !isAlreadyLogged;
+        });
+
+        if (activeSubs.length === 0) return;
+
+        const notificationsToSchedule = activeSubs.map((s, idx) => {
+          const billingDay = Number(s.billingDate) || 1;
+          const targetDay = billingDay > 1 ? billingDay - 1 : 28;
+          return {
+            id: 1000 + idx,
+            title: '🔔 Subscription Due Tomorrow',
+            body: `Your ${s.title} subscription of ${formatCurrency(Number(s.amount) || 0, budget?.currency || 'INR')} is renewing tomorrow.`,
+            schedule: {
+              on: {
+                day: targetDay,
+                hour: 9,
+                minute: 0
+              },
+              repeats: true
+            },
+            channelId: 'spendtrack-reminders',
+            smallIcon: 'ic_stat_icon',
+            largeIcon: 'ic_launcher',
+            iconColor: '#6366F1',
+            extra: { tab: 'dashboard' }
+          };
+        });
+
+        await LocalNotifications.schedule({ notifications: notificationsToSchedule });
+      } catch (err) {
+        console.error('Error scheduling subscription notifications:', err);
+      }
+    };
+
+    scheduleSubReminders();
+  }, [subscriptions, transactions, budget?.currency]);
+
+  // Auto-log recurring income if active and date reached
+  useEffect(() => {
+    if (!budget?.recurringIncome || !budget.recurringIncome.isActive || budget.recurringIncome.amount <= 0) return;
+
+    const today = new Date();
+    const currentMonthKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
+    const todayDate = today.getDate();
+
+    if (todayDate >= (budget.recurringIncome.dayOfMonth || 1) && budget.recurringIncome.lastProcessedMonth !== currentMonthKey) {
+      const isAlreadyLogged = transactions.some(t =>
+        t.date.startsWith(currentMonthKey) &&
+        t.amount > 0 &&
+        t.title === budget.recurringIncome!.title
+      );
+
+      if (!isAlreadyLogged) {
+        handleSaveTransaction({
+          title: budget.recurringIncome.title,
+          amount: Math.abs(budget.recurringIncome.amount),
+          category: 'Other',
+          date: `${currentMonthKey}-${String(budget.recurringIncome.dayOfMonth || 1).padStart(2, '0')}`,
+          time: '12:00 PM',
+          label: 'Personal'
+        });
+
+        handleUpdateBudget({
+          ...budget,
+          recurringIncome: {
+            ...budget.recurringIncome,
+            lastProcessedMonth: currentMonthKey
+          }
+        });
+      }
     }
-    LocalNotifications.schedule({
-      notifications: [{
-        id: 101,
-        title: '💰 Daily SpendTrack Reminder',
-        body: "You haven't logged any expenses today. Tap to track your transactions!",
-        schedule: { at: scheduleDate, repeats: true, every: 'day', allowWhileIdle: true },
-        channelId: 'spendtrack-reminders',
-        smallIcon: 'ic_stat_icon_config_sample',
-        extra: { tab: 'dashboard' }
-      }]
-    }).catch(err => console.error('Failed to schedule daily reminders:', err));
-  }, [dailyReminderEnabled]); // only re-schedule if toggle changes
+  }, [budget, transactions]);
 
-  // In-app floating snackbar — fires once per day only
+  // In-app floating snackbar — fires ONLY when at/past reminder time AND no logs today
   useEffect(() => {
     if (!dailyReminderEnabled) return;
 
@@ -455,17 +721,22 @@ export default function App() {
     const alreadyRemindedToday = localStorage.getItem('spendtrack_last_reminded_date') === currentTodayStr;
     const bannerDismissedToday = localStorage.getItem('spendtrack_banner_dismissed_date') === new Date().toDateString();
 
-    // Only show floating snackbar if: no logs today AND not already reminded AND banner not dismissed
-    if (!hasLogsToday && !alreadyRemindedToday && !bannerDismissedToday) {
-      triggerNotification(
-        "Daily SpendTrack Reminder",
+    const [hStr, mStr] = (reminderTime || '20:00').split(':');
+    const reminderHour = parseInt(hStr, 10) || 20;
+    const reminderMinute = parseInt(mStr, 10) || 0;
+    const now = new Date();
+    const isPastReminderTime = now.getHours() > reminderHour || (now.getHours() === reminderHour && now.getMinutes() >= reminderMinute);
+
+    // Only show in-app banner if: past reminder time AND no logs today AND not already reminded AND banner not dismissed
+    if (isPastReminderTime && !hasLogsToday && !alreadyRemindedToday && !bannerDismissedToday) {
+      showToast(
         "You haven't logged any expenses today. Track your transactions to stay on top of your budget!",
-        "dashboard"
+        "info"
       );
       localStorage.setItem('spendtrack_last_reminded_date', currentTodayStr);
       setLastRemindedDate(currentTodayStr);
     }
-  }, [dailyReminderEnabled, transactions]);
+  }, [dailyReminderEnabled, reminderTime, transactions]);
 
   // Direct manual test — fires real native system notification immediately
   const handleTestNotification = async () => {
@@ -481,7 +752,9 @@ export default function App() {
               body: 'Notifications are working! You will get daily reminders at 8:00 PM.',
               schedule: { at: fireAt, allowWhileIdle: true },
               channelId: 'spendtrack-reminders',
-              smallIcon: 'ic_stat_icon_config_sample',
+              smallIcon: 'ic_stat_icon',
+              largeIcon: 'ic_launcher',
+              iconColor: '#6366F1',
               extra: { tab: 'dashboard' }
             }
           ]
@@ -525,14 +798,19 @@ export default function App() {
 
   // Side Drawer & Notification States
   const [isDrawerOpen, setIsDrawerOpen] = useState<boolean>(false);
-  const [isNotificationsOpen, setIsNotificationsOpen] = useState<boolean>(false);
-  
-  // Search state inside Left Drawer
-  const [drawerSearch, setDrawerSearch] = useState<string>('');
+  const [isCsvImportOpen, setIsCsvImportOpen] = useState<boolean>(false);
+  const [isBadgesModalOpen, setIsBadgesModalOpen] = useState<boolean>(false);
+  const [isVoiceModalOpen, setIsVoiceModalOpen] = useState<boolean>(false);
+  const [achievementBadges, setAchievementBadges] = useState(INITIAL_ACHIEVEMENT_BADGES);
 
-  const [expandedDrawerTxId, setExpandedDrawerTxId] = useState<string | null>(null);
+  // Fetch live exchange rates on mount
+  useEffect(() => {
+    fetchLiveExchangeRates();
+  }, []);
+
   const [drawerResetConfirm, setDrawerResetConfirm] = useState<boolean>(false);
   const [brandingResetConfirm, setBrandingResetConfirm] = useState<boolean>(false);
+  const [isDownloadModalOpen, setIsDownloadModalOpen] = useState<boolean>(false);
 
   // Toast notifications state
   interface ToastItem {
@@ -551,6 +829,27 @@ export default function App() {
   };
 
 
+  // Re-evaluate achievement badges on transactions/budget change
+  useEffect(() => {
+    const evaluated = evaluateBadges(transactions, budget, achievementBadges);
+    setAchievementBadges(evaluated);
+  }, [transactions, budget]);
+
+  // Global Keyboard Shortcuts (Cmd+K / Ctrl+K or 'N' to open Add Expense form)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement;
+      const isInput = target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable);
+      
+      if ((e.key.toLowerCase() === 'k' && (e.metaKey || e.ctrlKey)) || (!isInput && e.key.toLowerCase() === 'n' && !e.metaKey && !e.ctrlKey)) {
+        e.preventDefault();
+        setIsAddFormVisible(prev => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
   const handleUpdateProfile = async (updatedProfile: UserProfile) => {
     if (currentUser) {
       try {
@@ -564,6 +863,9 @@ export default function App() {
   const handleUpdateBudget = async (updatedBudget: BudgetConfig) => {
     // Optimistically update local budget state so the UI updates instantly
     setBudget(updatedBudget);
+    try {
+      localStorage.setItem('spendtrack_guest_budget', JSON.stringify(updatedBudget));
+    } catch (e) {}
 
     if (budgetUpdateTimeoutRef.current) {
       clearTimeout(budgetUpdateTimeoutRef.current);
@@ -575,42 +877,83 @@ export default function App() {
           await setDoc(doc(db, 'users', currentUser, 'config', 'budget'), updatedBudget);
         } catch (err) { console.error('Firestore budget update error:', err); }
       }
-      showToast('Monthly budget limit saved successfully!', 'success');
+      showToast('Budget settings saved successfully!', 'success');
     }, 500);
   };
 
 
-  // Callback to add new transaction — writes directly to Firestore; onSnapshot auto-updates UI
-  const handleSaveTransaction = async (newTxData: Omit<Transaction, 'id'>) => {
-    if (!currentUser) { setIsAddFormVisible(false); return; }
-
+  // Callback to add new transaction — writes directly to Firestore or local state; updates UI instantly
+  const handleSaveTransaction = (newTxData: Omit<Transaction, 'id'>) => {
     const txId = Math.random().toString(36).substring(2, 11);
-    // Budget animation
+
+    // Sanitize object to remove any undefined fields before Firestore setDoc
+    const cleanData: any = {};
+    Object.entries(newTxData).forEach(([k, v]) => {
+      if (v !== undefined) cleanData[k] = v;
+    });
+
     const activeMonthKey = getActiveMonth();
-    const isNewTxExpense = newTxData.amount < 0;
+    const isNewTxExpense = (cleanData.amount || 0) < 0;
     const existingMonthExpenses = Math.abs(
-      transactions.filter(t => t.date.startsWith(activeMonthKey) && t.amount < 0).reduce((s, t) => s + t.amount, 0)
+      transactions.filter(t => t && t.date && typeof t.date === 'string' && t.date.startsWith(activeMonthKey) && Number(t.amount) < 0).reduce((s, t) => s + (Number(t.amount) || 0), 0)
     );
-    const activeSubsTotal = subscriptions.filter(s => s.isActive).reduce((s, sub) => s + sub.amount, 0);
-    const totalMonthExpensesWithNew = existingMonthExpenses + (isNewTxExpense ? Math.abs(newTxData.amount) : 0) + activeSubsTotal;
-    if (totalMonthExpensesWithNew <= budget.monthlyLimit) {
+    const activeSubsTotal = subscriptions.filter(s => s.isActive !== false).reduce((s, sub) => s + sub.amount, 0);
+    const totalMonthExpensesWithNew = existingMonthExpenses + (isNewTxExpense ? Math.abs(cleanData.amount) : 0) + activeSubsTotal;
+    const withinBudget = budget.monthlyLimit > 0 && totalMonthExpensesWithNew <= budget.monthlyLimit;
+
+    // 1. Optimistic UI update — add transaction to local state immediately
+    const createdTx: Transaction = { id: txId, ...cleanData } as Transaction;
+    setTransactions(prev => [createdTx, ...prev.filter(t => t.id !== txId)]);
+
+    // Check custom alert rules in real-time
+    checkAlertRulesOnSave(createdTx, transactions, budget, showToast);
+
+    // 2. Close the form instantly
+    setIsAddFormVisible(false);
+
+    // 3. Show success popup immediately
+    if (isNewTxExpense) {
       setSuccessAnimation({
         isVisible: true,
-        title: isNewTxExpense ? 'Budget Safe! 🎉' : 'Income Boost! 💰',
-        message: isNewTxExpense
-          ? `"${newTxData.title}" logged. Spending stays within budget!`
-          : `"${newTxData.title}" recorded. Extra financial breathing room!`,
-        amount: newTxData.amount
+        title: withinBudget ? 'Expense Saved! 🎉' : 'Expense Logged! ✅',
+        message: withinBudget
+          ? `"${cleanData.title}" saved. Your spending is within budget!`
+          : `"${cleanData.title}" has been saved successfully.`,
+        amount: cleanData.amount
+      });
+    } else {
+      setSuccessAnimation({
+        isVisible: true,
+        title: 'Income Recorded! 💰',
+        message: `"${cleanData.title}" has been saved successfully.`,
+        amount: cleanData.amount
       });
     }
-    try {
-      await setDoc(doc(db, 'users', currentUser, 'transactions', txId), newTxData);
-      showToast(`Transaction "${newTxData.title}" logged!`, 'success');
-    } catch (err: any) {
-      console.error('Firestore transaction save error:', err);
-      showToast(`Cloud sync failed: ${err?.code || err?.message || 'unknown'}`, 'warning');
+
+    // 4. Save to Firestore if authenticated, or localStorage if guest mode
+    if (currentUser) {
+      const OFFLINE_QUEUE_KEY = 'spendtrack_offline_queue';
+      setDoc(doc(db, 'users', currentUser, 'transactions', txId), cleanData).catch((err: any) => {
+        console.error('Firestore transaction write error:', err);
+        try {
+          const existingQueue = JSON.parse(localStorage.getItem(OFFLINE_QUEUE_KEY) || '[]');
+          existingQueue.push({ txId, userId: currentUser, data: cleanData, timestamp: Date.now() });
+          localStorage.setItem(OFFLINE_QUEUE_KEY, JSON.stringify(existingQueue));
+          showToast('Saved offline — will sync when online.', 'warning');
+        } catch (qErr) {
+          console.error('Offline queue write failed:', qErr);
+          showToast(`Cloud sync failed: ${err?.code || err?.message || 'unknown'}`, 'warning');
+        }
+      });
+    } else {
+      // Guest mode storage
+      try {
+        const guestTxs = JSON.parse(localStorage.getItem('spendtrack_guest_transactions') || '[]');
+        localStorage.setItem('spendtrack_guest_transactions', JSON.stringify([createdTx, ...guestTxs]));
+      } catch (err) {
+        console.error('Guest tx save error:', err);
+      }
     }
-    setIsAddFormVisible(false);
   };
 
 
@@ -624,6 +967,43 @@ export default function App() {
     showToast(`Transaction "${deletedTx?.title || 'Item'}" deleted.`, 'info');
   };
 
+
+  // Auto-sync offline queued transactions when connectivity restores
+  useEffect(() => {
+    const OFFLINE_QUEUE_KEY = 'spendtrack_offline_queue';
+    const syncOfflineQueue = async () => {
+      if (!currentUser) return;
+      const rawQueue = localStorage.getItem(OFFLINE_QUEUE_KEY);
+      if (!rawQueue) return;
+      let queue: { txId: string; userId: string; data: any; timestamp: number }[] = [];
+      try { queue = JSON.parse(rawQueue); } catch { return; }
+      const myQueue = queue.filter(item => item.userId === currentUser);
+      if (myQueue.length === 0) return;
+
+      showToast(`Syncing ${myQueue.length} offline transaction(s)…`, 'info');
+      const failed: typeof myQueue = [];
+      await Promise.all(myQueue.map(async (item) => {
+        try {
+          await setDoc(doc(db, 'users', item.userId, 'transactions', item.txId), item.data);
+        } catch {
+          failed.push(item);
+        }
+      }));
+
+      const remaining = [...queue.filter(i => i.userId !== currentUser), ...failed];
+      if (remaining.length === 0) {
+        localStorage.removeItem(OFFLINE_QUEUE_KEY);
+      } else {
+        localStorage.setItem(OFFLINE_QUEUE_KEY, JSON.stringify(remaining));
+      }
+      const synced = myQueue.length - failed.length;
+      if (synced > 0) showToast(`${synced} transaction(s) synced to cloud!`, 'success');
+    };
+
+    window.addEventListener('online', syncOfflineQueue);
+    if (navigator.onLine) syncOfflineQueue();
+    return () => window.removeEventListener('online', syncOfflineQueue);
+  }, [currentUser]);
 
   // Callback to update transaction
   const handleUpdateTransaction = async (id: string, updatedTx: Partial<Transaction>) => {
@@ -640,6 +1020,14 @@ export default function App() {
   const handleUpdateSavingsGoals = async (updatedGoals: any[]) => {
     if (!currentUser) return;
     try {
+      const currentIds = savingsGoals.map(g => g.id);
+      const newIds = updatedGoals.map(g => g.id);
+      const deletedIds = currentIds.filter(id => !newIds.includes(id));
+
+      await Promise.all(deletedIds.map(id => 
+        deleteDoc(doc(db, 'users', currentUser, 'savingsGoals', id))
+      ));
+
       await Promise.all(updatedGoals.map(goal => {
         const { id, ...fields } = goal;
         return setDoc(doc(db, 'users', currentUser, 'savingsGoals', id), fields);
@@ -702,11 +1090,25 @@ export default function App() {
     setActiveTab('dashboard');
   };
 
+  // Reset all transactions (and optionally clear local queue)
+  const handleResetData = async () => {
+    if (!currentUser) return;
+    try {
+      const txCol = collection(db, 'users', currentUser, 'transactions');
+      const snap = await getDocs(txCol);
+      await Promise.all(snap.docs.map(d => deleteDoc(doc(db, 'users', currentUser, 'transactions', d.id))));
+      localStorage.removeItem('spendtrack_offline_queue');
+      showToast('All transactions cleared.', 'info');
+    } catch (err) {
+      console.error('Reset error:', err);
+      showToast('Reset failed. Please try again.', 'warning');
+    }
+  };
+
   // Keep track of the latest states inside a ref to prevent stale closures in the Capacitor backButton event handler
   const backStateRef = useRef({
     isAddFormVisible,
     isDrawerOpen,
-    isNotificationsOpen,
     showLogoutConfirm,
     activeTab
   });
@@ -715,11 +1117,10 @@ export default function App() {
     backStateRef.current = {
       isAddFormVisible,
       isDrawerOpen,
-      isNotificationsOpen,
       showLogoutConfirm,
       activeTab
     };
-  }, [isAddFormVisible, isDrawerOpen, isNotificationsOpen, showLogoutConfirm, activeTab]);
+  }, [isAddFormVisible, isDrawerOpen, showLogoutConfirm, activeTab]);
 
   useEffect(() => {
     if (!Capacitor.isNativePlatform()) return;
@@ -732,8 +1133,6 @@ export default function App() {
         setIsAddFormVisible(false);
       } else if (state.isDrawerOpen) {
         setIsDrawerOpen(false);
-      } else if (state.isNotificationsOpen) {
-        setIsNotificationsOpen(false);
       } else if (state.showLogoutConfirm) {
         setShowLogoutConfirm(false);
       } else if (state.activeTab !== 'dashboard') {
@@ -772,57 +1171,27 @@ export default function App() {
 
   // Sum active subscriptions only if they haven't already been manually logged in the current month's transactions
   const activeSubsTotal = subscriptions
-    .filter(s => s.isActive)
+    .filter(s => s.isActive !== false)
     .reduce((sum, s) => {
       const isAlreadyLogged = transactions.some(t => 
+        t && t.date && typeof t.date === 'string' &&
         t.date.startsWith(activeMonthKey) &&
-        t.amount < 0 &&
-        (t.label === 'Subscription' || t.title.toLowerCase().includes(s.title.toLowerCase()) || s.title.toLowerCase().includes(t.title.toLowerCase()))
+        Number(t.amount) < 0 &&
+        isSubscriptionDoubleCounted(s.title, t.title)
       );
-      return sum + (isAlreadyLogged ? 0 : s.amount);
+      return sum + (isAlreadyLogged ? 0 : (Number(s.amount) || 0));
     }, 0);
 
   const currentMonthExpenses = Math.abs(
     transactions
-      .filter(t => t.date.startsWith(activeMonthKey) && t.amount < 0)
-      .reduce((sum, t) => sum + t.amount, 0)
+      .filter(t => t && t.date && typeof t.date === 'string' && t.date.startsWith(activeMonthKey) && Number(t.amount) < 0)
+      .reduce((sum, t) => sum + (Number(t.amount) || 0), 0)
   ) + activeSubsTotal;
   const budgetAlert = budget.monthlyLimit > 0 && currentMonthExpenses > budget.monthlyLimit * 0.8;
+  const unlockedBadgesCount = achievementBadges.filter(b => b.unlocked).length;
 
-  // Only real alerts — no static always-on notifications
-  const allActiveNotifications: { id: number; title: string; message: string; isUrgent: boolean; time: string }[] = [];
+  // Intelligent Multi-Trigger Notifications Engine
 
-  if (dailyReminderEnabled && !hasTransactionsToday && !inAppBannerDismissed) {
-    allActiveNotifications.push({
-      id: 99,
-      title: 'Daily Tracker Alert',
-      message: "You haven't logged any transactions yet today. Track your daily expenses now!",
-      isUrgent: true,
-      time: 'Today'
-    });
-  }
-
-  if (budgetAlert) {
-    allActiveNotifications.push({
-      id: 1,
-      title: 'Budget Warning',
-      message: `${activeMonthName} spending has reached ${Math.round((currentMonthExpenses / budget.monthlyLimit) * 100)}% of your monthly limit.`,
-      isUrgent: true,
-      time: 'Just Now'
-    });
-  }
-
-  // Filter out dismissed ones (persisted in sessionStorage)
-  const activeNotifications = allActiveNotifications.filter(n => !dismissedNotifIds.includes(n.id));
-
-  // Drawer Search transactions
-  const filteredDrawerTxs = drawerSearch.trim() === ''
-    ? []
-    : transactions.filter(t => 
-        t.title.toLowerCase().includes(drawerSearch.toLowerCase()) ||
-        t.category.toLowerCase().includes(drawerSearch.toLowerCase()) ||
-        t.label.toLowerCase().includes(drawerSearch.toLowerCase())
-      ).slice(0, 4);
 
   if (isAuthLoading) {
     return (
@@ -909,164 +1278,43 @@ export default function App() {
           transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
           className="h-screen w-screen overflow-hidden"
         >
-          <div className="h-screen overflow-hidden bg-background text-on-background flex flex-col md:flex-row font-sans relative antialiased selection:bg-primary-container selection:text-on-primary-container">
+          <div className={`h-screen overflow-hidden bg-background text-on-background flex flex-col md:flex-row font-sans relative antialiased selection:bg-primary-container selection:text-on-primary-container ${isPrivacyMode ? 'privacy-blur-mode' : ''}`}>
       
       {/* If Add Form is active, render it exclusively in full viewport view */}
       {isAddFormVisible ? (
         <AddTransactionForm 
           onSave={handleSaveTransaction} 
-          onCancel={() => setIsAddFormVisible(false)} 
+          onCancel={() => setIsAddFormVisible(false)}
+          budget={budget}
+          transactions={transactions}
         />
       ) : (
         <>
           {/* Side Navigation Sidebar for wider screens */}
           <nav className="hidden md:flex w-64 bg-surface-container border-r border-outline-variant/30 flex-col py-6 px-4 shrink-0 h-screen sticky top-0 justify-between z-40 overflow-y-auto">
             <div className="flex flex-col gap-5 w-full">
-              {/* App branding with interactive dropdown triggers */}
-              <div className="relative">
-                <button
-                  onClick={() => setIsBrandingMenuOpen(!isBrandingMenuOpen)}
-                  className="flex items-center justify-between w-full p-2 rounded-xl hover:bg-surface-variant/20 transition-all text-left focus:outline-hidden group cursor-pointer"
-                  title="Open SpendTrack Quick Menu"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-primary rounded-xl flex items-center justify-center shadow-xs group-hover:scale-105 transition-transform">
-                      <PiggyBank className="w-5.5 h-5.5 text-on-primary" />
-                    </div>
-                    <div>
-                      <h1 className="font-outfit text-base font-black text-on-surface leading-none tracking-tight flex items-center gap-1.5">
-                        SpendTrack
-                        <ChevronDown className={`w-3.5 h-3.5 text-on-surface-variant transition-transform ${isBrandingMenuOpen ? 'rotate-180 text-primary' : 'group-hover:translate-y-0.5'}`} />
-                      </h1>
-                      <span className="text-[9px] text-on-surface-variant font-mono font-medium tracking-wider uppercase">Secure Ledger</span>
-                    </div>
-                  </div>
-                </button>
-
-                {/* Dropdown Menu Card */}
-                {isBrandingMenuOpen && (
-                  <div className="absolute top-14 left-0 right-0 z-50 bg-surface-container-high border border-outline-variant/40 rounded-2xl p-3.5 shadow-lg space-y-4 animate-in fade-in slide-in-from-top-2 duration-200">
-                    {/* Header */}
-                    <div className="flex items-center justify-between">
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-on-surface-variant">SpendTrack Quick Menu</span>
-                      <button 
-                        onClick={() => setIsBrandingMenuOpen(false)} 
-                        className="text-on-surface-variant hover:text-on-surface p-1 hover:bg-surface-variant/40 rounded-lg cursor-pointer transition-colors"
-                      >
-                        <X className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-
-                    {/* Quick Set Budget */}
-                    <div className="space-y-1.5">
-                      <label className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider flex items-center gap-1">
-                        <Sliders className="w-3 h-3 text-primary" />
-                        Quick Monthly Cap
-                      </label>
-                      <div className="flex gap-2">
-                        <input 
-                          type="number"
-                          value={budget.monthlyLimit || ''}
-                          onChange={(e) => {
-                            const val = parseFloat(e.target.value) || 0;
-                            handleUpdateBudget({ ...budget, monthlyLimit: val });
-                          }}
-                          className="flex-1 bg-surface-container-low border border-outline-variant/50 rounded-lg px-2 py-1 text-xs font-mono font-bold text-on-surface focus:outline-hidden focus:border-primary"
-                          placeholder="e.g. 50000"
-                        />
-                        <span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded-lg font-mono font-bold flex items-center">
-                          INR
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Theme Preset Colors */}
-                    <div className="space-y-1.5">
-                      <label className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider flex items-center gap-1">
-                        <Palette className="w-3 h-3 text-secondary" />
-                        Palette Preset
-                      </label>
-                      <div className="grid grid-cols-3 gap-1.5">
-                        {COLOR_PRESETS.map((preset) => (
-                          <button
-                            key={preset.id}
-                            onClick={() => setThemePresetId(preset.id)}
-                            className={`flex items-center justify-center p-1.5 rounded-lg border text-[10px] font-bold transition-all truncate cursor-pointer ${
-                              themePresetId === preset.id 
-                                ? 'bg-primary-container text-on-primary-container border-primary shadow-xs' 
-                                : 'bg-surface-container-low text-on-surface-variant border-outline-variant/30 hover:bg-surface-variant/30'
-                            }`}
-                            title={preset.name}
-                          >
-                            <span 
-                              className="w-2.5 h-2.5 rounded-full mr-1.5 shrink-0" 
-                              style={{ backgroundColor: preset.colorHex }}
-                            />
-                            <span className="truncate">{preset.id}</span>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Mode switcher & simulation buttons */}
-                    <div className="pt-2.5 border-t border-outline-variant/20 flex items-center justify-between gap-2">
-                      {/* Dark/Light Toggle */}
-                      <button
-                        onClick={() => setDarkMode(!darkMode)}
-                        className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg bg-surface-container-low border border-outline-variant/30 hover:bg-surface-variant/30 text-[10px] font-bold text-on-surface-variant cursor-pointer transition-colors"
-                      >
-                        {darkMode ? (
-                          <>
-                            <Sun className="w-3 h-3 text-amber-500" />
-                            <span>Light Mode</span>
-                          </>
-                        ) : (
-                          <>
-                            <Moon className="w-3 h-3 text-indigo-500" />
-                            <span>Dark Mode</span>
-                          </>
-                        )}
-                      </button>
-
-                      {/* Reset Seeder Button */}
-                      {brandingResetConfirm ? (
-                        <div className="flex items-center gap-1 animate-fade-in shrink-0">
-                          <button
-                            onClick={() => {
-                              handleResetData();
-                              setBrandingResetConfirm(false);
-                              setIsBrandingMenuOpen(false);
-                            }}
-                            className="flex items-center gap-1 px-2 py-1.5 rounded-lg bg-error text-on-error hover:bg-error/90 text-[10px] font-black cursor-pointer transition-all active:scale-95"
-                            title="Confirm reseed values"
-                          >
-                            <span>Confirm?</span>
-                          </button>
-                          <button
-                            onClick={() => setBrandingResetConfirm(false)}
-                            className="px-2 py-1.5 rounded-lg bg-surface-container-low hover:bg-surface-container-highest text-on-surface-variant text-[9px] font-bold cursor-pointer transition-colors"
-                          >
-                            Cancel
-                          </button>
-                        </div>
-                      ) : (
-                        <button
-                          onClick={() => setBrandingResetConfirm(true)}
-                          className="flex items-center justify-center gap-1 p-1.5 rounded-lg hover:bg-error/10 text-error hover:text-error transition-colors cursor-pointer text-[10px] font-bold shrink-0"
-                          title="Reseed default budget data"
-                        >
-                          <RefreshCw className="w-3 h-3 animate-spin-slow" />
-                          <span>Reseed</span>
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                )}
+              {/* App branding */}
+              <div className="flex items-center gap-3 p-2">
+                <div className="w-10 h-10 bg-primary rounded-xl flex items-center justify-center shadow-xs shrink-0">
+                  <PiggyBank className="w-5.5 h-5.5 text-on-primary" />
+                </div>
+                <div>
+                  <h1 className="font-outfit text-base font-black text-on-surface leading-none tracking-tight">SpendTrack</h1>
+                  <span className="text-[9px] text-on-surface-variant font-mono font-medium tracking-wider uppercase">Secure Ledger</span>
+                </div>
               </div>
 
               {/* Logged-in User Profile Widget */}
               <div className="p-3 bg-surface-container-low border border-outline-variant/20 rounded-xl flex items-center gap-2.5">
-                <img src={profile.avatarUrl} alt="Profile" className="w-8 h-8 rounded-full border border-primary/40 object-cover" />
+                <img 
+                  src={profile.avatarUrl || `https://api.dicebear.com/7.x/adventurer/svg?seed=${encodeURIComponent(profile.name || 'User')}`} 
+                  alt="Profile" 
+                  className="w-8 h-8 rounded-full border border-primary/40 object-cover"
+                  referrerPolicy="no-referrer"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).src = `https://api.dicebear.com/7.x/adventurer/svg?seed=${encodeURIComponent(profile.name || 'User')}`;
+                  }}
+                />
                 <div className="min-w-0 flex-1">
                   <p className="font-bold text-xs text-on-surface truncate leading-tight">{profile.name}</p>
                   <p className="text-[9px] text-on-surface-variant truncate font-medium">{profile.email}</p>
@@ -1125,7 +1373,7 @@ export default function App() {
                     activeTab === 'insights' ? 'text-primary' : 'text-on-surface-variant/80'
                   }`} />
                   <span className="text-xs font-semibold tracking-tight select-none">
-                    Insights & Sandbox
+                    Insights
                   </span>
                 </button>
 
@@ -1164,14 +1412,13 @@ export default function App() {
               <div className="pt-4 border-t border-outline-variant/15 space-y-3">
                 <span className="text-[9px] font-bold text-on-surface-variant uppercase tracking-wider block px-1">Ledger Summary</span>
                 
-                {/* 1. Remaining Safe-to-Spend Widget */}
-                {(() => {
+                {/* 1. Remaining Safe-to-Spend Widget (only if budget set) */}
+                {budget && Number(budget.monthlyLimit) > 0 && (() => {
                   const today = new Date();
                   const currentMonthKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
-                  const activeMonthTxs = transactions.filter(t => t.date.startsWith(currentMonthKey));
-                  const subsTotal = subscriptions.filter(s => s.isActive).reduce((sum, s) => sum + s.amount, 0);
-                  const monthSpent = Math.abs(activeMonthTxs.filter(t => t.amount < 0).reduce((sum, t) => sum + t.amount, 0)) + subsTotal;
-                  const limit = budget.monthlyLimit || 3000;
+                  const activeMonthTxs = transactions.filter(t => t && t.date && typeof t.date === 'string' && t.date.startsWith(currentMonthKey));
+                  const monthSpent = Math.abs(activeMonthTxs.filter(t => t && Number(t.amount) < 0).reduce((sum, t) => sum + (Number(t.amount) || 0), 0));
+                  const limit = Number(budget.monthlyLimit);
                   const remaining = limit - monthSpent;
                   const usagePct = Math.round((monthSpent / limit) * 100);
 
@@ -1180,7 +1427,7 @@ export default function App() {
                       <div className="flex justify-between items-center text-[10px] font-bold text-on-surface-variant">
                         <span>Safe Left:</span>
                         <span className={remaining < 0 ? "text-error" : "text-primary font-mono"}>
-                          {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(remaining)}
+                          {formatCurrency(remaining, budget?.currency || 'INR')}
                         </span>
                       </div>
                       
@@ -1192,7 +1439,7 @@ export default function App() {
                       </div>
                       <div className="flex justify-between text-[8px] font-mono font-bold text-on-surface-variant/75">
                         <span>{usagePct}% spent</span>
-                        <span>Cap: {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(limit)}</span>
+                        <span>Cap: {formatCurrency(limit, budget?.currency || 'INR')}</span>
                       </div>
                     </div>
                   );
@@ -1202,7 +1449,7 @@ export default function App() {
                 <div className="grid grid-cols-2 gap-2">
                   <div className="p-2 bg-surface-container-low border border-outline-variant/20 rounded-xl text-center">
                     <span className="text-[8px] font-bold uppercase tracking-wider text-on-surface-variant">Active Bills</span>
-                    <p className="text-xs font-black font-mono text-primary mt-0.5">{subscriptions.filter(s => s.isActive).length}</p>
+                    <p className="text-xs font-black font-mono text-primary mt-0.5">{subscriptions.filter(s => s.isActive !== false).length}</p>
                   </div>
                   <div className="p-2 bg-surface-container-low border border-outline-variant/20 rounded-xl text-center">
                     <span className="text-[8px] font-bold uppercase tracking-wider text-on-surface-variant">Savings Goals</span>
@@ -1229,8 +1476,8 @@ export default function App() {
                         />
                       </div>
                       <div className="flex justify-between text-[8px] font-mono font-bold text-on-surface-variant/75">
-                        <span>{new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(firstGoal.currentAmount)}</span>
-                        <span>Goal: {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(firstGoal.targetAmount)}</span>
+                        <span>{formatCurrency(firstGoal.currentAmount, budget?.currency || 'INR')}</span>
+                        <span>Goal: {formatCurrency(firstGoal.targetAmount, budget?.currency || 'INR')}</span>
                       </div>
                     </div>
                   );
@@ -1252,66 +1499,107 @@ export default function App() {
 
           {/* Main Layout Area */}
           <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
-            {/* Main Layout Header App Bar */}
-            <header className="fixed top-0 md:left-24 left-0 right-0 h-16 bg-surface/80 dark:bg-surface-container-low/80 backdrop-blur-md border-b border-outline-variant/20 flex items-center justify-between px-4 z-30 transition-all duration-200">
-              <div className="flex items-center gap-3">
-                <button 
+            {/* Main Layout Header App Bar — Original Glassmorphic Design */}
+            <header className="fixed top-0 md:left-64 left-0 right-0 h-16 bg-surface/80 dark:bg-surface-container-low/80 backdrop-blur-xl border-b border-outline-variant/20 flex items-center justify-between px-3.5 sm:px-5 z-30 transition-all duration-200">
+              <div className="flex items-center gap-2.5">
+                {/* Drawer Hamburger Button */}
+                <button
                   id="hamburger-menu-button"
                   onClick={() => setIsDrawerOpen(true)}
                   aria-label="Open sidebar"
-                  className="p-2 rounded-full hover:bg-primary-container hover:text-on-primary-container dark:hover:bg-inverse-surface/10 transition-colors active:scale-95 duration-100 text-primary cursor-pointer"
+                  className="md:hidden p-2 rounded-xl hover:bg-surface-container-high text-primary transition-colors active:scale-95 duration-100 cursor-pointer"
                 >
                   <Menu className="w-5.5 h-5.5" />
                 </button>
-                <h1 className="text-xl font-black tracking-tight text-primary font-outfit select-none flex items-center gap-1.5">
-                  SpendTrack
-                </h1>
+
+                {/* Brand Logo & Name (Mobile) */}
+                <div className="flex items-center gap-2 md:hidden">
+                  <div className="w-7 h-7 rounded-xl bg-gradient-to-br from-primary to-primary-container flex items-center justify-center shadow-xs">
+                    <PiggyBank className="w-4 h-4 text-on-primary" />
+                  </div>
+                  <h1 className="text-lg font-black tracking-tight text-primary font-outfit select-none">
+                    SpendTrack
+                  </h1>
+                </div>
+
+                {/* Breadcrumb Context Badge (Desktop) */}
+                <div className="hidden md:flex items-center gap-2 px-3 py-1.5 bg-surface-container-low/70 border border-outline-variant/30 rounded-xl">
+                  {activeTab === 'dashboard' && (
+                    <>
+                      <LayoutDashboard className="w-4 h-4 text-primary" />
+                      <span className="text-xs font-bold text-on-surface font-outfit">Dashboard Overview</span>
+                    </>
+                  )}
+                  {activeTab === 'history' && (
+                    <>
+                      <HistoryIcon className="w-4 h-4 text-primary" />
+                      <span className="text-xs font-bold text-on-surface font-outfit">Transaction Archive</span>
+                    </>
+                  )}
+                  {activeTab === 'insights' && (
+                    <>
+                      <TrendingUp className="w-4 h-4 text-primary" />
+                      <span className="text-xs font-bold text-on-surface font-outfit">Analytics & Intelligence</span>
+                    </>
+                  )}
+                  {activeTab === 'settings' && (
+                    <>
+                      <SettingsIcon className="w-4 h-4 text-primary" />
+                      <span className="text-xs font-bold text-on-surface font-outfit">Settings & Preferences</span>
+                    </>
+                  )}
+                </div>
               </div>
 
               <div className="flex items-center gap-2">
-                {/* Dynamic Quick Color Dots */}
-                <div className="hidden sm:flex items-center gap-2 mr-1 border-r border-outline-variant/30 pr-3">
-                  {COLOR_PRESETS.map((preset) => {
-                    const isSelected = preset.id === themePresetId;
-                    return (
-                      <button
-                        key={preset.id}
-                        id={`header-preset-${preset.id}`}
-                        onClick={() => setThemePresetId(preset.id)}
-                        className={`w-4.5 h-4.5 rounded-full border border-black/10 transition-all cursor-pointer relative hover:scale-115 flex items-center justify-center ${
-                          isSelected ? 'ring-1.5 ring-primary ring-offset-1 scale-110' : 'opacity-65 hover:opacity-100'
-                        }`}
-                        style={{ backgroundColor: preset.colorHex }}
-                        title={`Switch to ${preset.name}`}
-                      />
-                    );
-                  })}
-                </div>
 
-                {/* Notification Bell with Badge */}
-                <button 
-                  id="notification-bell-button"
-                  onClick={() => setIsNotificationsOpen(true)}
-                  aria-label="View notifications"
-                  className="p-2.5 rounded-full hover:bg-surface-container-highest dark:hover:bg-inverse-surface transition-colors active:scale-95 duration-100 text-primary relative cursor-pointer"
+                {/* Privacy Blur Mode Toggle */}
+                <button
+                  id="privacy-mode-toggle"
+                  onClick={() => {
+                    const next = !isPrivacyMode;
+                    setIsPrivacyMode(next);
+                    localStorage.setItem('spendtrack_privacy_mode', String(next));
+                  }}
+                  aria-label="Toggle Privacy Blur"
+                  title={isPrivacyMode ? 'Show Amounts' : 'Blur Amounts'}
+                  className={`p-2 rounded-xl transition-all active:scale-95 duration-100 cursor-pointer border ${
+                    isPrivacyMode
+                      ? 'bg-purple-500/15 border-purple-500/30 text-purple-600 dark:text-purple-400'
+                      : 'bg-surface-container-high/60 border-outline-variant/30 text-on-surface-variant hover:text-primary'
+                  }`}
                 >
-                  <Bell className="w-5 h-5" />
-                  {activeNotifications.length > 0 && (
-                    <span className="absolute top-2 right-2 w-2.5 h-2.5 bg-error rounded-full ring-2 ring-surface-container animate-pulse"></span>
-                  )}
+                  {isPrivacyMode ? <EyeOff className="w-4.5 h-4.5" /> : <Eye className="w-4.5 h-4.5" />}
                 </button>
 
-                {/* Profile Avatar (Mobile header fallback) */}
-                <div 
-                  id="avatar-trigger"
-                  onClick={() => setActiveTab('settings')}
-                  className="w-8 h-8 rounded-full bg-primary-container overflow-hidden border border-outline-variant cursor-pointer active:scale-95 transition-transform md:hidden"
-                  title="Go to Settings"
+                {/* Mobile App Download Button — hide when inside native app */}
+                {!Capacitor?.isNativePlatform?.() && (
+                <button
+                  id="mobile-download-button"
+                  onClick={() => setIsDownloadModalOpen(true)}
+                  aria-label="Download Mobile App"
+                  title="Download Mobile App (APK)"
+                  className="p-2 rounded-xl bg-surface-container-high/60 border border-outline-variant/30 text-on-surface-variant hover:text-primary transition-all active:scale-95 duration-100 cursor-pointer flex items-center justify-center"
                 >
-                  <img 
-                    src={profile.avatarUrl} 
-                    alt="User Profile Studio Headshot" 
+                  <Smartphone className="w-4.5 h-4.5" />
+                </button>
+                )}
+
+
+
+                {/* Profile Avatar (Mobile) */}
+                <div
+                  id="avatar-trigger"
+                  className="md:hidden w-8 h-8 rounded-full bg-primary-container overflow-hidden border border-primary/40 shadow-xs"
+                >
+                  <img
+                    src={profile.avatarUrl || `https://api.dicebear.com/7.x/adventurer/svg?seed=${encodeURIComponent(profile.name || 'User')}`}
+                    alt="Profile"
                     className="w-full h-full object-cover"
+                    referrerPolicy="no-referrer"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).src = `https://api.dicebear.com/7.x/adventurer/svg?seed=${encodeURIComponent(profile.name || 'User')}`;
+                    }}
                   />
                 </div>
               </div>
@@ -1320,13 +1608,56 @@ export default function App() {
             {/* Core Content Layout Area — only this area scrolls, like a native app */}
             <main
               ref={mainScrollRef}
-              className="flex-1 overflow-y-auto overflow-x-hidden px-4 pt-20 pb-28 md:pb-12"
+              className="flex-1 overflow-y-auto overflow-x-hidden px-3 sm:px-4 pt-20 pb-36 md:pb-12"
               style={{ WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain' } as React.CSSProperties}
             >
-              
+
+              {/* "Get the App" Smart Banner — shows on Android mobile browsers only, once per 7 days */}
+              {isAndroidBrowserTab && !appBannerDismissed && (
+                <div
+                  id="get-app-banner"
+                  className="mb-3 flex items-center gap-3 p-3 pr-2 bg-gradient-to-r from-primary/90 to-primary/70 text-on-primary rounded-2xl shadow-lg border border-primary/20 animate-fade-in md:hidden"
+                >
+                  {/* App icon */}
+                  <div className="shrink-0 w-10 h-10 rounded-xl bg-on-primary/15 flex items-center justify-center">
+                    <Smartphone className="w-5 h-5 text-on-primary" />
+                  </div>
+
+                  {/* Text */}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[11px] font-black leading-tight">Get the SpendTrack App</p>
+                    <p className="text-[10px] font-medium opacity-85 leading-tight mt-0.5">
+                      Download the Android APK for a native experience
+                    </p>
+                  </div>
+
+                  {/* Actions */}
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <button
+                      id="get-app-banner-download-btn"
+                      onClick={() => {
+                        handleDismissAppBanner();
+                        setIsDownloadModalOpen(true);
+                      }}
+                      className="px-3 py-1.5 bg-on-primary text-primary rounded-xl text-[10px] font-black hover:bg-on-primary/90 active:scale-95 transition-all cursor-pointer shadow-sm"
+                    >
+                      Install
+                    </button>
+                    <button
+                      id="get-app-banner-dismiss-btn"
+                      onClick={handleDismissAppBanner}
+                      aria-label="Dismiss app banner"
+                      className="p-1.5 rounded-xl hover:bg-on-primary/10 active:scale-95 transition-all cursor-pointer opacity-80 hover:opacity-100"
+                    >
+                      <X className="w-3.5 h-3.5 text-on-primary" />
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {/* Daily Reminder In-App Banner */}
               {dailyReminderEnabled && !hasTransactionsToday && !inAppBannerDismissed && activeTab !== 'settings' && (
-                <div id="daily-reminder-banner" className="mb-3 p-1.5 px-3 bg-primary-container/85 text-on-primary-container rounded-xl border border-outline-variant/30 flex items-center justify-between gap-3 shadow-xs animate-fade-in">
+                <div id="daily-reminder-banner" className="mt-1 mb-4 p-2 px-3 bg-primary-container/90 text-on-primary-container rounded-xl border border-outline-variant/30 flex items-center justify-between gap-3 shadow-sm animate-fade-in relative z-10">
                   <div className="flex items-center gap-2">
                     <div className="p-1 bg-primary/15 rounded-md text-primary shrink-0">
                       <Bell className="w-3.5 h-3.5 animate-bounce text-primary" />
@@ -1406,8 +1737,16 @@ export default function App() {
                         onNavigateToInsights={() => setActiveTab('insights')}
                         onAddTransactionClick={() => setIsAddFormVisible(true)}
                         onDeleteTransaction={handleDeleteTransaction}
+                        onAddTransaction={handleSaveTransaction}
+                        onOpenVoice={() => setIsVoiceModalOpen(true)}
+                        onOpenCalendar={() => setIsCalendarOpen(true)}
+                        onOpenExportAudit={() => setIsPdfExportOpen(true)}
+                        onNavigateToSettings={() => setActiveTab('settings')}
+                        onUpdateBudget={handleUpdateBudget}
                         themePresetId={themePresetId}
                         isDark={darkMode}
+                        onOpenBadges={() => setIsBadgesModalOpen(true)}
+                        unlockedBadgesCount={achievementBadges.filter(b => b.unlocked).length}
                       />
                     )}
                     {activeTab === 'history' && (
@@ -1436,6 +1775,7 @@ export default function App() {
                       <SettingsTab 
                         profile={profile}
                         budget={budget}
+                        transactions={transactions}
                         onUpdateProfile={handleUpdateProfile}
                         onUpdateBudget={handleUpdateBudget}
                         onClearData={handleClearData}
@@ -1443,10 +1783,14 @@ export default function App() {
                         onToggleDarkMode={setDarkMode}
                         dailyReminderEnabled={dailyReminderEnabled}
                         onToggleDailyReminder={handleToggleDailyReminder}
+                        reminderTime={reminderTime}
+                        onUpdateReminderTime={handleUpdateReminderTime}
                         onTestNotification={handleTestNotification}
                         onLogout={handleLogoutRequest}
                         themePresetId={themePresetId}
                         onSelectThemePreset={setThemePresetId}
+                        onOpenCsvImport={() => setIsCsvImportOpen(true)}
+                        onOpenBadges={() => setIsBadgesModalOpen(true)}
                       />
                     )}
                   </motion.div>
@@ -1457,7 +1801,7 @@ export default function App() {
             </main>
 
             {/* Bottom Navigation Bar — M3 with animated spring indicator */}
-            <nav className="fixed bottom-0 left-0 right-0 h-20 bg-surface/85 dark:bg-surface-container-low/85 backdrop-blur-xl border-t border-outline-variant/20 flex items-center justify-around px-2 z-40 pb-safe md:hidden">
+            <nav className="fixed bottom-0 left-0 right-0 h-20 bg-surface/85 dark:bg-surface-container-low/85 backdrop-blur-xl border-t border-outline-variant/20 flex items-center justify-around px-2 z-40 pb-safe pb-[env(safe-area-inset-bottom)] md:hidden">
               
               {([
                 { id: 'dashboard', label: 'Dashboard', Icon: LayoutDashboard },
@@ -1535,7 +1879,15 @@ export default function App() {
               {/* Profile Card Summary */}
               <div className="flex items-center gap-3 p-3 bg-surface-container-low rounded-2xl border border-outline-variant/20 relative group">
                 <div className="w-10 h-10 rounded-full overflow-hidden border border-primary shrink-0">
-                  <img src={profile.avatarUrl} alt="User Avatar" className="w-full h-full object-cover" />
+                  <img 
+                    src={profile.avatarUrl || `https://api.dicebear.com/7.x/adventurer/svg?seed=${encodeURIComponent(profile.name || 'User')}`} 
+                    alt="User Avatar" 
+                    className="w-full h-full object-cover"
+                    referrerPolicy="no-referrer"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).src = `https://api.dicebear.com/7.x/adventurer/svg?seed=${encodeURIComponent(profile.name || 'User')}`;
+                    }}
+                  />
                 </div>
                 <div className="min-w-0">
                   <p className="font-bold text-xs text-on-surface truncate">{profile.name}</p>
@@ -1554,7 +1906,7 @@ export default function App() {
                 {[
                   { tab: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
                   { tab: 'history', label: 'Transaction Ledger', icon: HistoryIcon },
-                  { tab: 'insights', label: 'Insights & Sandbox', icon: TrendingUp },
+                  { tab: 'insights', label: 'Insights', icon: TrendingUp },
                   { tab: 'settings', label: 'Control Settings', icon: SettingsIcon },
                 ].map((item) => {
                   const isActive = activeTab === item.tab;
@@ -1582,40 +1934,42 @@ export default function App() {
               </div>
 
               {/* Safe to Spend Miniature Progress Gauge */}
-              <div className="p-3.5 bg-surface-container-low border border-outline-variant/20 rounded-2xl space-y-2">
-                {(() => {
-                  const limit = budget.monthlyLimit || 3000;
-                  const monthSpent = currentMonthExpenses;
-                  const remaining = limit - monthSpent;
-                  const spentPct = Math.round((monthSpent / limit) * 100);
-                  const isOver = remaining < 0;
+              {budget && Number(budget.monthlyLimit) > 0 && (
+                <div className="p-3.5 bg-surface-container-low border border-outline-variant/20 rounded-2xl space-y-2">
+                  {(() => {
+                    const limit = Number(budget.monthlyLimit);
+                    const monthSpent = currentMonthExpenses;
+                    const remaining = limit - monthSpent;
+                    const spentPct = Math.round((monthSpent / limit) * 100);
+                    const isOver = remaining < 0;
 
-                  return (
-                    <>
-                      <div className="flex justify-between items-center text-[10px] font-bold">
-                        <span className="text-on-surface-variant uppercase tracking-wider">Monthly Budget Span</span>
-                        <span className={`font-mono ${isOver ? 'text-error' : 'text-primary'}`}>
-                          {spentPct}%
-                        </span>
-                      </div>
-                      <div className="w-full h-2 bg-surface-container-highest rounded-full overflow-hidden">
-                        <div 
-                          className={`h-full rounded-full transition-all duration-300 ${isOver ? 'bg-error animate-pulse' : 'bg-primary'}`} 
-                          style={{ width: `${Math.min(100, spentPct)}%` }}
-                        />
-                      </div>
-                      <div className="flex justify-between items-center text-[10px] font-mono font-semibold">
-                        <div className="text-on-surface-variant/80">
-                          Spent: <span className="font-bold text-on-surface">{new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(monthSpent)}</span>
+                    return (
+                      <>
+                        <div className="flex justify-between items-center text-[10px] font-bold">
+                          <span className="text-on-surface-variant uppercase tracking-wider">Monthly Budget Span</span>
+                          <span className={`font-mono ${isOver ? 'text-error' : 'text-primary'}`}>
+                            {spentPct}%
+                          </span>
                         </div>
-                        <div className="text-right">
-                          Remaining: <span className={`font-bold ${isOver ? 'text-error' : 'text-emerald-600'}`}>{new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(remaining)}</span>
+                        <div className="w-full h-2 bg-surface-container-highest rounded-full overflow-hidden">
+                          <div 
+                            className={`h-full rounded-full transition-all duration-300 ${isOver ? 'bg-error animate-pulse' : 'bg-primary'}`} 
+                            style={{ width: `${Math.min(100, spentPct)}%` }}
+                          />
                         </div>
-                      </div>
-                    </>
-                  );
-                })()}
-              </div>
+                        <div className="flex justify-between items-center text-[10px] font-mono font-semibold">
+                          <div className="text-on-surface-variant/80">
+                            Spent: <span className="font-bold text-on-surface">{formatCurrency(monthSpent, budget?.currency || 'INR')}</span>
+                          </div>
+                          <div className="text-right">
+                            Remaining: <span className={`font-bold ${isOver ? 'text-error' : 'text-emerald-600'}`}>{formatCurrency(remaining, budget?.currency || 'INR')}</span>
+                          </div>
+                        </div>
+                      </>
+                    );
+                  })()}
+                </div>
+              )}
 
               {/* Interactive Preference Widgets */}
               <div className="p-3.5 bg-surface-container-low border border-outline-variant/20 rounded-2xl space-y-3">
@@ -1729,95 +2083,7 @@ export default function App() {
                 </div>
               </div>
 
-              {/* Interactive Universal Search Tool */}
-              <div className="space-y-2">
-                <label className="text-xs font-bold text-on-surface-variant px-0.5 flex items-center gap-1.5">
-                  <Search className="w-3.5 h-3.5" />
-                  Universal Quick-Ledger Search
-                </label>
-                <div className="relative">
-                  <input 
-                    type="text"
-                    placeholder="Search titles, categories..."
-                    value={drawerSearch}
-                    onChange={(e) => setDrawerSearch(e.target.value)}
-                    className="w-full text-xs bg-surface-container-low border border-outline-variant rounded-xl pl-8 pr-3 py-2 outline-none focus:border-primary placeholder:text-on-surface-variant/40"
-                  />
-                  <Search className="w-3.5 h-3.5 absolute left-3 top-3 text-on-surface-variant/40" />
-                </div>
 
-                {/* Searched Results Panel with Interactive Expandable Detail and Direct Delete */}
-                {drawerSearch.trim() !== '' && (
-                  <div className="bg-surface-container-low p-2 rounded-xl border border-outline-variant/25 space-y-1.5 max-h-48 overflow-y-auto">
-                    <p className="text-[9px] uppercase font-bold text-outline px-1 flex justify-between">
-                      <span>Matches ({filteredDrawerTxs.length})</span>
-                      <button onClick={() => setDrawerSearch('')} className="text-primary hover:underline lowercase font-normal cursor-pointer">clear</button>
-                    </p>
-                    {filteredDrawerTxs.length === 0 ? (
-                      <p className="text-[10px] text-on-surface-variant p-1">No matching logs.</p>
-                    ) : (
-                      filteredDrawerTxs.map((t) => {
-                        const isExpanded = expandedDrawerTxId === t.id;
-                        return (
-                          <div 
-                            key={t.id}
-                            className="p-2 bg-surface-container-lowest rounded-lg border border-outline-variant/20 hover:border-outline-variant/50 transition-all text-[11px] space-y-1.5"
-                          >
-                            <div 
-                              onClick={() => setExpandedDrawerTxId(isExpanded ? null : t.id)}
-                              className="flex justify-between items-center cursor-pointer font-medium text-on-surface"
-                            >
-                              <span className="font-semibold truncate max-w-[150px]">{t.title}</span>
-                              <span className={`font-mono font-bold ${t.amount < 0 ? 'text-error' : 'text-emerald-600'}`}>
-                                {t.amount < 0 ? '' : '+'}{new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(Math.abs(t.amount))}
-                              </span>
-                            </div>
-                            
-                            {isExpanded && (
-                              <div className="pt-1.5 border-t border-outline-variant/10 text-[10px] text-on-surface-variant space-y-1 bg-surface-container-low/40 p-1.5 rounded-md animate-fade-in">
-                                <div className="flex justify-between">
-                                  <span>Date:</span>
-                                  <span className="font-mono text-on-surface font-semibold">{t.date}</span>
-                                </div>
-                                <div className="flex justify-between">
-                                  <span>Category:</span>
-                                  <span className="capitalize text-on-surface font-semibold">{t.category}</span>
-                                </div>
-                                {t.label && (
-                                  <div className="flex justify-between">
-                                    <span>Notes:</span>
-                                    <span className="italic text-on-surface font-semibold">{t.label}</span>
-                                  </div>
-                                )}
-                                <div className="flex gap-2 pt-1.5 justify-end">
-                                  <button
-                                    onClick={() => {
-                                      handleDeleteTransaction(t.id);
-                                      setExpandedDrawerTxId(null);
-                                    }}
-                                    className="px-2 py-1 bg-error/10 text-error rounded hover:bg-error/20 transition-colors cursor-pointer text-[9px] font-bold"
-                                  >
-                                    Delete Log
-                                  </button>
-                                  <button
-                                    onClick={() => {
-                                      setIsDrawerOpen(false);
-                                      setActiveTab('history');
-                                    }}
-                                    className="px-2 py-1 bg-primary/10 text-primary rounded hover:bg-primary/20 transition-colors cursor-pointer text-[9px] font-bold"
-                                  >
-                                    Full Ledger
-                                  </button>
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })
-                    )}
-                  </div>
-                )}
-              </div>
 
 
             </div>
@@ -1851,85 +2117,8 @@ export default function App() {
         </div>
       )}
 
-      {/* Notifications Modal Box (Screenshot click notifications) */}
-      {isNotificationsOpen && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center z-50 p-4">
-          <div 
-            onClick={() => setIsNotificationsOpen(false)}
-            className="absolute inset-0 cursor-pointer"
-          ></div>
-          <div className="relative w-full max-w-sm bg-surface-container-lowest border border-outline-variant rounded-2xl shadow-2xl p-5 space-y-4 z-10 animate-fade-in">
-            <div className="flex items-center justify-between border-b border-outline-variant/20 pb-3">
-              <h4 className="font-bold text-sm text-primary flex items-center gap-1.5">
-                <Bell className="w-4.5 h-4.5 text-primary" />
-                SpendTrack System Alerts
-              </h4>
-              <button 
-                id="close-notifications"
-                onClick={() => setIsNotificationsOpen(false)}
-                className="p-1 rounded-full hover:bg-surface-container-high transition-colors"
-              >
-                <X className="w-4 h-4 text-outline" />
-              </button>
-            </div>
 
-            <div className="space-y-3 min-h-[60px]">
-              {activeNotifications.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-6 gap-2 text-center">
-                  <div className="w-10 h-10 rounded-full bg-surface-container flex items-center justify-center">
-                    <Bell className="w-5 h-5 text-on-surface-variant/40" />
-                  </div>
-                  <p className="text-xs text-on-surface-variant/60 font-medium">All clear! No alerts right now.</p>
-                </div>
-              ) : (
-                activeNotifications.map((notif) => (
-                  <div 
-                    key={notif.id}
-                    className={`p-3 rounded-xl border flex gap-2.5 ${
-                      notif.isUrgent 
-                        ? 'bg-error/5 border-error/20' 
-                        : 'bg-surface-container-low border-outline-variant/15'
-                    }`}
-                  >
-                    <div className={`w-2.5 h-2.5 rounded-full mt-1.5 shrink-0 ${notif.isUrgent ? 'bg-error' : 'bg-secondary'}`}></div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex justify-between items-center gap-1">
-                        <span className="font-bold text-xs text-on-surface">{notif.title}</span>
-                        <span className="text-[9px] text-on-surface-variant font-mono">{notif.time}</span>
-                      </div>
-                      <p className="text-[11px] text-on-surface-variant leading-normal mt-0.5">
-                        {notif.message}
-                      </p>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
 
-            <div className="flex justify-end border-t border-outline-variant/10 pt-2">
-              {activeNotifications.length > 0 ? (
-                <button 
-                  id="clear-notifications"
-                  onClick={() => {
-                    dismissAllNotifications(allActiveNotifications.map(n => n.id));
-                    setIsNotificationsOpen(false);
-                  }}
-                  className="px-4 py-1.5 text-xs font-bold text-error hover:bg-error/5 rounded-full transition-colors cursor-pointer"
-                >
-                  Dismiss All
-                </button>
-              ) : (
-                <button
-                  onClick={() => setIsNotificationsOpen(false)}
-                  className="px-4 py-1.5 text-xs font-bold text-primary hover:bg-primary/5 rounded-full transition-colors cursor-pointer"
-                >
-                  Close
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Global Fixed FAB (Floating Action Button) - Constantly Available */}
       {!isAddFormVisible && (
@@ -1955,7 +2144,7 @@ export default function App() {
       )}
 
       {/* Custom Toast Notifications Stack */}
-      <div className="fixed top-6 right-6 z-[120] max-w-sm w-full pointer-events-none flex flex-col gap-2.5">
+      <div className="fixed top-4 left-4 right-4 sm:left-auto sm:right-6 z-[120] max-w-sm w-auto pointer-events-none flex flex-col gap-2.5">
         <AnimatePresence>
           {toasts.map((t) => (
             <motion.div
@@ -1986,42 +2175,7 @@ export default function App() {
         </AnimatePresence>
       </div>
 
-      {/* Floating In-App Notifications Stack */}
-      <div className="fixed top-6 right-6 z-[120] max-w-sm w-full pointer-events-none flex flex-col gap-2.5 mt-16">
-        <AnimatePresence>
-          {inAppNotifications.map((notif) => (
-            <motion.div
-              key={notif.id}
-              initial={{ opacity: 0, y: -20, scale: 0.95 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.9, transition: { duration: 0.15 } }}
-              onClick={() => {
-                setActiveTab(notif.tab);
-                setInAppNotifications(prev => prev.filter(n => n.id !== notif.id));
-              }}
-              className="bg-surface-container-high border border-outline-variant/45 rounded-2xl p-4 shadow-xl flex items-start gap-3 pointer-events-auto cursor-pointer hover:bg-surface-container-highest active:scale-98 transition-all"
-            >
-              <div className="p-2 bg-primary/10 text-primary rounded-xl shrink-0">
-                <Bell className="w-5 h-5" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <h4 className="font-bold text-xs text-on-surface truncate">{notif.title}</h4>
-                <p className="text-[11px] text-on-surface-variant leading-normal mt-0.5">{notif.body}</p>
-                <span className="text-[9px] text-primary font-semibold uppercase tracking-wider block mt-1.5">Tap to view</span>
-              </div>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setInAppNotifications(prev => prev.filter(n => n.id !== notif.id));
-                }}
-                className="p-1 rounded-lg text-on-surface-variant/70 hover:bg-surface-container-high hover:text-on-surface transition-colors cursor-pointer shrink-0"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </motion.div>
-          ))}
-        </AnimatePresence>
-      </div>
+
 
       {/* Logout Confirmation Dialog */}
       {showLogoutConfirm && (
@@ -2065,6 +2219,149 @@ export default function App() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Mobile App Download Dialog */}
+      {isDownloadModalOpen && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[100] p-6 animate-fade-in">
+          <div
+            className="absolute inset-0 cursor-pointer"
+            onClick={() => setIsDownloadModalOpen(false)}
+          />
+          <div className="relative w-full max-w-sm bg-surface-container-lowest border border-outline-variant/30 rounded-3xl shadow-2xl p-6 space-y-5 animate-fade-in z-10">
+            
+                {/* Icon */}
+                <div className="flex justify-center">
+                  <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center">
+                    <Smartphone className="w-7 h-7 text-primary" />
+                  </div>
+                </div>
+
+                {/* Text */}
+                <div className="text-center space-y-1.5">
+                  <h3 className="font-black text-base text-on-surface font-outfit">Download SpendTrack</h3>
+                  <p className="text-xs text-on-surface-variant leading-relaxed">
+                    Take your personal budget manager with you on the go! Choose your platform below:
+                  </p>
+                </div>
+
+                {/* Platform Options */}
+                <div className="space-y-3">
+                  {/* Android option */}
+                  <button
+                    onClick={handleStartApkDownload}
+                    className="w-full flex items-center justify-between p-3.5 bg-surface-container hover:bg-surface-container-high border border-outline-variant/40 rounded-2xl transition-all cursor-pointer group"
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className="text-xl">🤖</span>
+                      <div className="text-left">
+                        <span className="block font-bold text-xs text-on-surface">Android Installer (APK)</span>
+                        <span className="block text-[10px] text-on-surface-variant">Direct installer file (.apk)</span>
+                      </div>
+                    </div>
+                    <ArrowRight className="w-4 h-4 text-primary group-hover:translate-x-0.5 transition-transform" />
+                  </button>
+
+                  {/* iOS option */}
+                  <div className="p-3.5 bg-surface-container border border-outline-variant/40 rounded-2xl text-left">
+                    <div className="flex items-center gap-3 mb-1.5">
+                      <span className="text-xl"></span>
+                      <span className="font-bold text-xs text-on-surface">iPhone / iOS Installation</span>
+                    </div>
+                    <p className="text-[10px] text-on-surface-variant leading-normal">
+                      Open this website in <strong className="text-on-surface">Safari</strong> on your iPhone, tap the <strong className="text-on-surface">Share</strong> button, and select <strong className="text-on-surface">"Add to Home Screen"</strong>.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Close action */}
+                <div className="pt-2">
+                  <button
+                    onClick={() => setIsDownloadModalOpen(false)}
+                    className="w-full py-2.5 rounded-2xl bg-surface-container-high hover:bg-surface-container-highest text-sm font-bold text-on-surface transition-colors cursor-pointer"
+                  >
+                    Close
+                  </button>
+                </div>
+          </div>
+        </div>
+      )}
+
+
+      {/* Commercial Feature Modals & AI Coach Widget */}
+        <CalendarViewModal
+          isOpen={isCalendarOpen}
+          onClose={() => setIsCalendarOpen(false)}
+          transactions={transactions}
+          subscriptions={subscriptions}
+          currency={budget?.currency || 'INR'}
+        />
+
+        <AlertRulesModal
+          isOpen={isAlertRulesOpen}
+          onClose={() => setIsAlertRulesOpen(false)}
+          currency={budget?.currency || 'INR'}
+        />
+
+        <PdfExportModal
+          isOpen={isPdfExportOpen}
+          onClose={() => setIsPdfExportOpen(false)}
+          transactions={transactions}
+          budget={budget}
+          profile={profile}
+          subscriptions={subscriptions}
+          savingsGoals={savingsGoals}
+        />
+
+        <CsvImportModal
+          isOpen={isCsvImportOpen}
+          onClose={() => setIsCsvImportOpen(false)}
+          onImport={(importedTxs) => {
+            importedTxs.forEach(tx => handleSaveTransaction(tx));
+            showToast(`Successfully imported ${importedTxs.length} transactions!`, 'success');
+          }}
+          existingTransactions={transactions}
+          currency={budget?.currency || 'INR'}
+        />
+
+        <AchievementBadgesModal
+          isOpen={isBadgesModalOpen}
+          onClose={() => setIsBadgesModalOpen(false)}
+          badges={achievementBadges}
+        />
+
+      <VoiceInputModal
+        isOpen={isVoiceModalOpen}
+        onClose={() => setIsVoiceModalOpen(false)}
+        onAddTransaction={(newTx) => {
+          handleSaveTransaction(newTx);
+          showToast(`Logged voice transaction: ${newTx.title}`, 'success');
+        }}
+        currency={budget?.currency || 'INR'}
+      />
+
+      <PinLockModal
+        isOpen={pinConfig.isEnabled && !isPinUnlocked}
+        correctPin={pinConfig.pin}
+        onUnlock={() => setIsPinUnlocked(true)}
+        onResetPin={() => {
+          setPinConfig({ isEnabled: false, pin: '' });
+          localStorage.removeItem('spendtrack_pin_config');
+          setIsPinUnlocked(true);
+          showToast('PIN lock disabled. Re-authenticated with your account.', 'info');
+        }}
+      />
+
+      {!isAddFormVisible && (
+        <AiCoachWidget
+          transactions={transactions}
+          budgetConfig={budget}
+          subscriptions={subscriptions}
+          savingsGoals={savingsGoals}
+          currency={budget?.currency || 'INR'}
+          themePresetId={themePresetId}
+          isDark={darkMode}
+        />
       )}
 
           </div>

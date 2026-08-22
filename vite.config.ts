@@ -1,11 +1,25 @@
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
-import {defineConfig} from 'vite';
+import {defineConfig, Plugin} from 'vite';
+
+// Plugin to strip 'crossorigin' attribute from index.html scripts/links.
+// Android WebView's WebViewAssetLoader blocks local assets if 'crossorigin' is present.
+const removeCrossorigin = (): Plugin => ({
+  name: 'remove-crossorigin',
+  transformIndexHtml(html: string) {
+    return html.replace(/\s+crossorigin(=("[^"]*"|'[^']*'|[^\s>]+))?/gi, '');
+  }
+});
 
 export default defineConfig(() => {
   return {
-    plugins: [react(), tailwindcss()],
+    base: './',
+    plugins: [
+      react(),
+      tailwindcss(),
+      removeCrossorigin(),
+    ],
     define: {
       'process.env.GEMINI_API_KEY': JSON.stringify(process.env.GEMINI_API_KEY),
     },
@@ -15,11 +29,34 @@ export default defineConfig(() => {
       },
     },
     server: {
-      // HMR is disabled in AI Studio via DISABLE_HMR env var.
-      // Do not modifyâfile watching is disabled to prevent flickering during agent edits.
       hmr: process.env.DISABLE_HMR !== 'true',
-      // Disable file watching when DISABLE_HMR is true to save CPU during agent edits.
       watch: process.env.DISABLE_HMR === 'true' ? null : {},
+    },
+    build: {
+      target: ['chrome60', 'es2015'],
+      cssTarget: 'chrome60',
+      chunkSizeWarningLimit: 2000,
+      modulePreload: false,
+      rollupOptions: {
+        output: {
+          manualChunks(id) {
+            if (id.includes('node_modules')) {
+              if (id.includes('react') || id.includes('react-dom') || id.includes('scheduler') || id.includes('motion')) {
+                return 'vendor-react';
+              }
+              if (id.includes('firebase')) {
+                return 'vendor-firebase';
+              }
+              if (id.includes('recharts') || id.includes('d3')) {
+                return 'vendor-charts';
+              }
+              if (id.includes('lucide-react')) {
+                return 'vendor-icons';
+              }
+            }
+          }
+        }
+      }
     },
   };
 });

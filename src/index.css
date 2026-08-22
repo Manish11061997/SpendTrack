@@ -145,6 +145,15 @@ body {
   box-sizing: border-box;
 }
 
+/* Touch active feedback utility */
+.active-press {
+  transition: transform 0.12s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.12s ease;
+}
+.active-press:active {
+  transform: scale(0.97);
+  opacity: 0.88;
+}
+
 /* Prevent tap delay on interactive elements */
 button, a, [role="button"] {
   -webkit-tap-highlight-color: transparent;
@@ -170,8 +179,8 @@ button, a, [role="button"] {
 /* ── Animation Keyframes ───────────────────────────────────────────────────── */
 
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(6px); }
-  to   { opacity: 1; transform: translateY(0); }
+  from { opacity: 0; }
+  to   { opacity: 1; }
 }
 .animate-fade-in {
   animation: fadeIn 0.28s cubic-bezier(0.22, 1, 0.36, 1) both;
@@ -278,4 +287,45 @@ svg {
 .animate-indeterminate-bar {
   animation: indeterminate-bar 1.8s infinite ease-in-out;
 }
+
+/* ── iOS Safe Area / Notch Support ────────────────────────────────────────── */
+/* Push main app header down to clear notch */
+header.fixed.top-0 {
+  padding-top: calc(env(safe-area-inset-top, 0px)) !important;
+  height: calc(3.5rem + env(safe-area-inset-top, 0px)) !important;
+  display: flex !important;
+  align-items: center !important;
+  padding-bottom: 0px !important;
+}
+
+/* Push main scroll content down — just past the header with a small 6px gap */
+main {
+  padding-top: calc(3.5rem + env(safe-area-inset-top, 0px) + 0.5rem) !important;
+}
+
+/* Push Add Transaction Form header down to clear notch */
+header.sticky-form-header {
+  padding-top: calc(env(safe-area-inset-top, 0px) - 6px) !important;
+  height: calc(3.5rem + env(safe-area-inset-top, 0px)) !important;
+  display: flex !important;
+  align-items: flex-end !important;
+  padding-bottom: 10px !important;
+}
+
+/* Shift inner forms / scrollable content in AddTransactionForm down accordingly */
+.sticky-form-header + * {
+  margin-top: 0px !important;
+}
+
+/* Privacy Blur Mode */
+.privacy-blur-mode .font-mono,
+.privacy-blur-mode .font-bold,
+.privacy-blur-mode .font-black,
+.privacy-blur-mode .font-extrabold {
+  filter: blur(5px);
+  user-select: none;
+  transition: filter 0.2s ease;
+}
+
+
 

@@ -9,8 +9,16 @@ export const DEFAULT_PROFILE: UserProfile = {
   email: ''
 };
 
+export const DEFAULT_QUICK_TEMPLATES = [
+  { id: 'def-1', title: 'Chai / Coffee', amount: 20, category: 'Food' as const },
+  { id: 'def-2', title: 'Metro / Cab', amount: 100, category: 'Transport' as const },
+  { id: 'def-3', title: 'Swiggy Meal', amount: 250, category: 'Food' as const },
+  { id: 'def-4', title: 'Fuel / Petrol', amount: 500, category: 'Transport' as const },
+];
+
 export const DEFAULT_BUDGET: BudgetConfig = {
-  monthlyLimit: 0
+  monthlyLimit: 0,
+  quickTemplates: []
 };
 
 export const DEFAULT_CATEGORY_BUDGETS: CategoryBudget[] = [

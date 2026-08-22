@@ -28,10 +28,17 @@ import {
   Info,
   Scale,
   PiggyBank,
-  Wallet
+  Wallet,
+  Sliders,
+  Target,
+  FileText
 } from 'lucide-react';
 import { Transaction, BudgetConfig, Subscription, SavingsGoal } from '../types';
 import { COLOR_PRESETS } from '../theme';
+import { formatCurrency as formatCustomCurrency, isSubscriptionDoubleCounted, parseRawAmount, formatInputAmount } from '../utils/currency';
+import { FinancialHealthRadarCard } from './FinancialHealthRadarCard';
+import { NoSpendHeatmapCard } from './NoSpendHeatmapCard';
+import { generateMonthlyPdfReport } from '../utils/pdfReportGenerator';
 
 interface InsightsTabProps {
   transactions: Transaction[];
@@ -47,26 +54,27 @@ export default function InsightsTab({
   budget, 
   subscriptions = [],
   savingsGoals = [],
-  themePresetId,
-  isDark
+  themePresetId = 'default',
+  isDark = false
 }: InsightsTabProps) {
-  // Dynamically look up active theme/preset hex colors to avoid d3-color oklch parsing errors
+  // Select theme configuration
   const activeThemePresetId = themePresetId || localStorage.getItem('spendtrack_theme_preset') || 'navy';
-  const activeIsDark = isDark !== undefined ? isDark : document.documentElement.classList.contains('dark');
   const activePreset = COLOR_PRESETS.find(p => p.id === activeThemePresetId) || COLOR_PRESETS[0];
-  const themeColors = activeIsDark ? activePreset.dark : activePreset.light;
+  const themeColors = isDark ? activePreset.dark : activePreset.light;
+  const themeOutline = isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.12)';
 
-  // Get active month dynamically based on the available transactions, defaulting to current calendar month
+  // Find all available months in history
   const today = new Date();
   const currentRealMonth = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
   
-  const availableMonths = Array.from(new Set(transactions.map(t => t.date.substring(0, 7)))).sort((a, b) => b.localeCompare(a));
-  const activeMonth = availableMonths[0] || currentRealMonth;
+  const availableMonths = Array.from(new Set(transactions.map(t => (t.date || '').substring(0, 7)))).filter(Boolean).sort((a, b) => b.localeCompare(a));
+  const [selectedMonthState, setSelectedMonthState] = useState<string | null>(null);
+  const activeMonth = selectedMonthState || availableMonths[0] || currentRealMonth;
 
-  // Filter current active dashboard month
+  // Filter transactions for active month
   const activeTxs = transactions.filter(t => t.date.startsWith(activeMonth));
   
-  // Dynamic monthly income sandbox initial setup
+  // Dynamic monthly income initial setup
   const activeMonthInflow = transactions
     .filter(t => t.date.startsWith(activeMonth) && t.amount > 0)
     .reduce((sum, t) => sum + t.amount, 0);
@@ -74,33 +82,40 @@ export default function InsightsTab({
   const [customIncome, setCustomIncome] = useState<number>(() => {
     return activeMonthInflow > 0 ? activeMonthInflow : ((budget?.monthlyLimit ?? 3000) * 1.5 || 50000);
   });
+
+  // Simulator States
+  const [simFood, setSimFood] = useState<number>(-1);
+  const [simTransport, setSimTransport] = useState<number>(-1);
+  const [simRent, setSimRent] = useState<number>(-1);
+  const [simShopping, setSimShopping] = useState<number>(-1);
+  const [simOther, setSimOther] = useState<number>(-1);
   
   // Active subscriptions total recurring monthly expense (guarded against double-counting)
   const activeSubsTotal = subscriptions
-    .filter(s => s.isActive)
+    .filter(s => s.isActive !== false)
     .reduce((sum, s) => {
       const isAlreadyLogged = activeTxs.some(t => 
         t.amount < 0 &&
-        (t.label === 'Subscription' || t.title.toLowerCase().includes(s.title.toLowerCase()) || s.title.toLowerCase().includes(t.title.toLowerCase()))
+        isSubscriptionDoubleCounted(s.title, t.title)
       );
-      return sum + (isAlreadyLogged ? 0 : s.amount);
+      return sum + (isAlreadyLogged ? 0 : (Number(s.amount) || 0));
     }, 0);
 
-  // Calculate expenses by category
+  // Calculate expenses by category (including unlogged active recurring subscriptions)
   const getCategorySpend = (catName: 'Food' | 'Transport' | 'Rent' | 'Shopping' | 'Other') => {
     const txSpend = Math.abs(
       activeTxs
-        .filter(t => t.category === catName && t.amount < 0)
-        .reduce((sum, t) => sum + t.amount, 0)
+        .filter(t => t.category === catName && Number(t.amount) < 0)
+        .reduce((sum, t) => sum + (Number(t.amount) || 0), 0)
     );
     const subSpend = subscriptions
-      .filter(s => s.isActive && s.category === catName)
+      .filter(s => s.isActive !== false && s.category === catName)
       .reduce((sum, s) => {
         const isAlreadyLogged = activeTxs.some(t => 
-          t.amount < 0 &&
-          (t.label === 'Subscription' || t.title.toLowerCase().includes(s.title.toLowerCase()) || s.title.toLowerCase().includes(t.title.toLowerCase()))
+          Number(t.amount) < 0 &&
+          isSubscriptionDoubleCounted(s.title, t.title)
         );
-        return sum + (isAlreadyLogged ? 0 : s.amount);
+        return sum + (isAlreadyLogged ? 0 : (Number(s.amount) || 0));
       }, 0);
     return txSpend + subSpend;
   };
@@ -113,32 +128,29 @@ export default function InsightsTab({
 
   // Total spending (Sum of category spending, includes active subscriptions)
   const totalSpent = foodSpent + transportSpent + rentSpent + shoppingSpent + otherSpent;
-  const targetAverage = budget.monthlyLimit;
+  const hasBudget = budget && Number(budget.monthlyLimit) > 0;
+  const targetAverage = hasBudget ? Number(budget.monthlyLimit) : 0;
 
-  const overUnderAmount = totalSpent - targetAverage;
+  const overUnderAmount = hasBudget ? totalSpent - targetAverage : 0;
   const isOver = overUnderAmount > 0;
   const pctOfTarget = targetAverage > 0 ? Math.round((totalSpent / targetAverage) * 100) : 0;
 
   // 50/30/20 actuals calculation
-  const sandboxNeeds = rentSpent + transportSpent + activeSubsTotal;
-  const sandboxWants = foodSpent + shoppingSpent + otherSpent;
-  const sandboxSurplus = Math.max(0, customIncome - (sandboxNeeds + sandboxWants));
+  const actualNeeds = rentSpent + transportSpent;
+  const actualWants = foodSpent + shoppingSpent + otherSpent;
+  const actualSurplus = Math.max(0, customIncome - totalSpent);
 
   // Helper to format currency
   const formatCurrency = (val: number) => {
-    return new Intl.NumberFormat('en-IN', {
-      style: 'currency',
-      currency: 'INR',
-      maximumFractionDigits: 0
-    }).format(val);
+    return formatCustomCurrency(val, budget?.currency || 'INR');
   };
 
-  // Dynamically divide monthly limit budget proportionally
-  const foodLimit = Math.round(budget.monthlyLimit * 0.20);
-  const transportLimit = Math.round(budget.monthlyLimit * 0.12);
-  const rentLimit = Math.round(budget.monthlyLimit * 0.40);
-  const shoppingLimit = Math.round(budget.monthlyLimit * 0.18);
-  const otherLimit = Math.round(budget.monthlyLimit * 0.10);
+  // Use user-defined category limits if set; otherwise proportional limits if budget is set, or 0 if no budget
+  const foodLimit      = budget.categoryLimits?.Food      ?? (hasBudget ? Math.round(Number(budget.monthlyLimit) * 0.20) : 0);
+  const transportLimit = budget.categoryLimits?.Transport  ?? (hasBudget ? Math.round(Number(budget.monthlyLimit) * 0.12) : 0);
+  const rentLimit      = budget.categoryLimits?.Rent       ?? (hasBudget ? Math.round(Number(budget.monthlyLimit) * 0.40) : 0);
+  const shoppingLimit  = budget.categoryLimits?.Shopping   ?? (hasBudget ? Math.round(Number(budget.monthlyLimit) * 0.18) : 0);
+  const otherLimit     = budget.categoryLimits?.Other      ?? (hasBudget ? Math.round(Number(budget.monthlyLimit) * 0.10) : 0);
 
   // Categories definitions matching screens
   const categoriesAnalysis = [
@@ -195,400 +207,205 @@ export default function InsightsTab({
   const velocityStatus = totalSpent > (budgetLimit * 0.8) ? 'High' : totalSpent > (budgetLimit * 0.5) ? 'Moderate' : 'Low';
   const velocityDesc = velocityStatus === 'High' ? 'Nearing budget limit quickly.' : velocityStatus === 'Moderate' ? 'Healthy spending rate.' : 'Excellent budget buffer.';
 
-  // --- PREDICTIVE ENGINE CALCULATIONS ---
-  const [activeYear, activeMonthNum] = activeMonth.split('-').map(Number);
-  const totalDays = new Date(activeYear, activeMonthNum, 0).getDate();
-  const isCurrentMonth = activeMonth === currentRealMonth;
-  const currentDay = isCurrentMonth ? Math.min(today.getDate(), totalDays) : totalDays;
-  const daysRemaining = totalDays - currentDay;
-
-  // Actual daily rate calculation based on current spending
-  const dailySpendRate = currentDay > 0 ? totalSpent / currentDay : 0;
-  
-  // Forecasted total based on current pace
-  const projectedRemainingSpend = dailySpendRate * daysRemaining;
-  const projectedTotal = totalSpent + projectedRemainingSpend;
-  const projectedIsOver = projectedTotal > budgetLimit;
-  const projectedSavings = budgetLimit - projectedTotal;
-
-  // Status Level for visual cues
-  const forecastStatus: 'on-track' | 'caution' | 'at-risk' = projectedTotal > budgetLimit * 1.12
-    ? 'at-risk'
-    : projectedTotal > budgetLimit
-    ? 'caution'
-    : 'on-track';
-
-  // Recommended daily rate for remaining days
-  const recommendedDailyCap = daysRemaining > 0 
-    ? Math.max(0, (budgetLimit - totalSpent) / daysRemaining)
-    : 0;
-
-  // Fetch true historical baseline
   const pastMonths = availableMonths.filter(m => m !== activeMonth);
-  let historicalAvgTotal = 0;
-  if (pastMonths.length > 0) {
-    const pastExpenses = pastMonths.map(m => {
-      const monthTxs = transactions.filter(t => t.date.startsWith(m) && t.amount < 0);
-      const txTotal = Math.abs(monthTxs.reduce((sum, t) => sum + t.amount, 0));
-      const monthActiveSubsTotal = subscriptions
-        .filter(s => s.isActive)
-        .reduce((sum, s) => {
-          const isAlreadyLogged = transactions.some(t => 
-            t.date.startsWith(m) &&
-            t.amount < 0 &&
-            (t.label === 'Subscription' || t.title.toLowerCase().includes(s.title.toLowerCase()) || s.title.toLowerCase().includes(t.title.toLowerCase()))
-          );
-          return sum + (isAlreadyLogged ? 0 : s.amount);
-        }, 0);
-      return txTotal + monthActiveSubsTotal;
-    });
-    historicalAvgTotal = Math.round(pastExpenses.reduce((sum, val) => sum + val, 0) / pastMonths.length);
-  } else {
-    historicalAvgTotal = budget.monthlyLimit;
-  }
 
-  // --- CHART DATA GENERATION ---
-  interface ProjectionDataPoint {
-    day: number;
-    dayLabel: string;
-    actual?: number | null;
-    projected?: number | null;
-    budgetLine: number;
-  }
+  const currentFood = foodSpent;
+  const currentTransport = transportSpent;
+  const currentRent = rentSpent;
+  const currentShopping = shoppingSpent;
+  const currentOther = otherSpent;
 
-  const projectionData: ProjectionDataPoint[] = [];
+  const valFood = simFood === -1 ? currentFood : simFood;
+  const valTransport = simTransport === -1 ? currentTransport : simTransport;
+  const valRent = simRent === -1 ? currentRent : simRent;
+  const valShopping = simShopping === -1 ? currentShopping : simShopping;
+  const valOther = simOther === -1 ? currentOther : simOther;
+
+  const currentTotal = currentFood + currentTransport + currentRent + currentShopping + currentOther;
+  const simTotal = valFood + valTransport + valRent + valShopping + valOther;
+  const savingsDiff = currentTotal - simTotal;
+
+  // Let's calculate the runway
+  const savingsBalance = savingsGoals.reduce((sum, g) => sum + g.currentAmount, 0) || 15000;
   
-  const dailyExpensesMap: Record<number, number> = {};
-  activeTxs.forEach(t => {
-    if (t.amount < 0) {
-      const day = parseInt(t.date.split('-')[2]);
-      if (!isNaN(day)) {
-        dailyExpensesMap[day] = (dailyExpensesMap[day] || 0) + Math.abs(t.amount);
+  // Current runway = savings / Math.max(1, currentTotal) (in months)
+  // Simulated runway = savings / Math.max(1, simTotal)
+  const currentRunway = currentTotal > 0 ? (savingsBalance / currentTotal) : 12;
+  const simRunway = simTotal > 0 ? (savingsBalance / simTotal) : 12;
+  const runwayExtension = Math.max(0, simRunway - currentRunway);
+
+  // Goal impact
+  const primaryGoal = savingsGoals[0];
+  let goalImpactText = '';
+  if (primaryGoal) {
+    const remainingTarget = primaryGoal.targetAmount - primaryGoal.currentAmount;
+    if (remainingTarget > 0) {
+      const currentRate = Math.max(10, customIncome - currentTotal);
+      const simRate = Math.max(10, customIncome - simTotal);
+      const currentMonths = remainingTarget / currentRate;
+      const simMonths = remainingTarget / simRate;
+      const monthsSaved = currentMonths - simMonths;
+      if (monthsSaved > 0) {
+        goalImpactText = `At this simulated rate, you will reach your '${primaryGoal.title}' goal ${monthsSaved.toFixed(1)} months faster!`;
       }
     }
-  });
-
-  const dailySubsMap: Record<number, number> = {};
-  subscriptions.forEach(s => {
-    if (s.isActive) {
-      const day = s.billingDate;
-      dailySubsMap[day] = (dailySubsMap[day] || 0) + s.amount;
-    }
-  });
-
-  let accumActual = 0;
-  let accumProjected = 0;
-
-  for (let d = 1; d <= totalDays; d++) {
-    const dayTx = dailyExpensesMap[d] || 0;
-    const daySub = dailySubsMap[d] || 0;
-    const dayCost = dayTx + daySub;
-
-    if (d <= currentDay) {
-      accumActual += dayCost;
-      accumProjected = accumActual;
-      
-      projectionData.push({
-        day: d,
-        dayLabel: `Day ${d}`,
-        actual: accumActual,
-        projected: accumActual,
-        budgetLine: budgetLimit
-      });
-    } else {
-      accumProjected += dailySpendRate;
-      
-      projectionData.push({
-        day: d,
-        dayLabel: `Day ${d}`,
-        actual: null,
-        projected: Math.round(accumProjected),
-        budgetLine: budgetLimit
-      });
-    }
   }
 
-  // Custom tooltips for Recharts
-  const CustomChartTooltip = ({ active, payload, label }: any) => {
-    if (active && payload && payload.length) {
-      const actualValue = payload.find((p: any) => p.name === 'Actual spent')?.value;
-      const projectedValue = payload.find((p: any) => p.name === 'Projected path')?.value;
-      const budgetValue = payload.find((p: any) => p.name === 'Budget limit')?.value;
-
-      return (
-        <div className="bg-slate-900 dark:bg-slate-950 text-white text-xs p-3.5 rounded-xl border border-slate-800 shadow-xl space-y-1.5 font-sans">
-          <p className="font-bold text-slate-300">{label}</p>
-          {actualValue !== undefined && actualValue !== null && (
-            <p className="flex justify-between gap-5">
-              <span className="opacity-80">Spent:</span>
-              <span className="font-mono font-semibold text-teal-300">{formatCurrency(actualValue)}</span>
-            </p>
-          )}
-          {projectedValue !== undefined && projectedValue !== null && (
-            <p className="flex justify-between gap-5">
-              <span className="opacity-80">Projected:</span>
-              <span className="font-mono font-semibold text-amber-200">{formatCurrency(projectedValue)}</span>
-            </p>
-          )}
-          {budgetValue !== undefined && (
-            <p className="flex justify-between gap-5 border-t border-slate-800 pt-1.5 mt-1 text-[10px]">
-              <span className="opacity-60">Budget Limit:</span>
-              <span className="font-mono font-bold text-error">{formatCurrency(budgetValue)}</span>
-            </p>
-          )}
-        </div>
-      );
+  // Calculate the savings streak
+  const calculateStreak = () => {
+    let streak = 0;
+    const sortedMonths = [...availableMonths].sort((a, b) => b.localeCompare(a));
+    for (const m of sortedMonths) {
+      const monthTxs = transactions.filter(t => t.date.startsWith(m) && t.amount < 0);
+      const txTotal = Math.abs(monthTxs.reduce((sum, t) => sum + t.amount, 0));
+      const monthSubsTotal = subscriptions
+        .filter(s => s.isActive !== false)
+        .reduce((sum, s) => {
+          const isAlreadyLogged = monthTxs.some(t => 
+            isSubscriptionDoubleCounted(s.title, t.title)
+          );
+          return sum + (isAlreadyLogged ? 0 : (Number(s.amount) || 0));
+        }, 0);
+      const total = txTotal + monthSubsTotal;
+      const limit = budget.monthlyLimit || 3000;
+      if (total <= limit && total > 0) {
+        streak++;
+      } else if (total > limit) {
+        break; // Streak broken
+      }
     }
-    return null;
+    return streak;
   };
+  const savingsStreak = calculateStreak();
 
   return (
     <div className="space-y-6 pb-24 animate-fade-in">
       
       {/* Header */}
-      <div className="space-y-1">
-        <h2 className="font-headline-md text-2xl font-bold text-on-surface">Spending Analysis</h2>
-        <p className="font-body-md text-sm text-on-surface-variant">Review your current pace against historical averages.</p>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div className="space-y-1">
+          <h2 className="font-headline-md text-2xl font-bold text-on-surface">Spending Analysis & Intelligence</h2>
+          <p className="font-body-md text-sm text-on-surface-variant">
+            {pastMonths.length > 0 
+              ? "Review your current pace against historical averages." 
+              : "Review your current spending and budget allocation."}
+          </p>
+        </div>
+
+        <button
+          onClick={() => {
+            generateMonthlyPdfReport({
+              transactions,
+              budget,
+              subscriptions,
+              savingsGoals,
+              monthKey: activeMonth
+            });
+          }}
+          className="px-4 py-2 bg-primary hover:bg-primary/90 text-on-primary font-bold text-xs rounded-full shadow transition-all flex items-center justify-center gap-1.5 cursor-pointer shrink-0"
+        >
+          <FileText className="w-4 h-4" />
+          Export PDF Statement
+        </button>
       </div>
 
-      {/* Primary Comparison Card */}
-      <section>
-        <div className="bg-surface-container-low rounded-2xl p-5 shadow-sm border border-outline-variant/30 relative overflow-hidden">
-          <div className="flex flex-col gap-4 relative z-10">
-            <div className="flex justify-between items-start gap-2 flex-wrap">
-              <div>
-                <span className="font-label-lg text-xs text-on-surface-variant uppercase tracking-wider font-semibold">
-                  Total Current Spending
-                </span>
-                <div className="font-headline-lg text-3xl font-extrabold text-primary mt-1">
-                  {formatCurrency(totalSpent)}
-                </div>
-              </div>
-              
-              {targetAverage > 0 && (
-                <div className="flex flex-col items-end">
-                  <span className={`font-label-md text-xs px-3 py-1 rounded-full flex items-center gap-1 font-bold ${
-                    isOver ? 'bg-error-container text-on-error-container' : 'bg-secondary-container text-on-secondary-container'
-                  }`}>
-                    {isOver ? <TrendingUp className="w-3.5 h-3.5" /> : <TrendingDown className="w-3.5 h-3.5" />}
-                    {pctOfTarget}%
-                  </span>
-                  <span className={`font-label-md text-xs mt-1.5 font-bold ${isOver ? 'text-error' : 'text-secondary'}`}>
-                    {isOver ? `+${formatCurrency(overUnderAmount)} Over` : `${formatCurrency(Math.abs(overUnderAmount))} Under`}
-                  </span>
-                </div>
-              )}
-            </div>
+      {/* 360° Financial Health Radar */}
+      <FinancialHealthRadarCard
+        transactions={transactions}
+        budget={budget}
+        subscriptions={subscriptions}
+        currency={budget?.currency || 'INR'}
+      />
 
-            {targetAverage > 0 && (
-              <div className="pt-2 border-t border-outline-variant/25">
-                <div className="flex justify-between font-label-md text-xs text-on-surface-variant mb-2 font-semibold">
-                  <span>Target Average: {formatCurrency(targetAverage)}</span>
-                  <span className="font-bold text-primary">{pctOfTarget}% of average</span>
-                </div>
-                <div className="h-3 w-full bg-surface-variant rounded-full overflow-hidden relative">
-                  <div 
-                    className={`h-full rounded-full transition-all duration-1000 ${isOver ? 'bg-error' : 'bg-primary'}`}
-                    style={{ width: `${Math.min(pctOfTarget, 100)}%` }}
-                  ></div>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      </section>
-
-      {/* Predictive Engine & End-of-Month Status Forecast */}
-      <section className="space-y-3">
-        <div className="flex items-center gap-2 px-1">
-          <div className="p-1 rounded-lg bg-primary/10 text-primary">
-            <Sparkles className="w-4 h-4" />
-          </div>
-          <h3 className="font-title-md text-sm font-bold text-on-surface">Predictive Insights & Forecast</h3>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          
-          {/* Status and KPIs */}
-          <div className="md:col-span-1 bg-surface-container-low rounded-2xl p-4 border border-outline-variant/30 flex flex-col justify-between space-y-4">
-            <div className="space-y-3">
-              <span className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider block">
-                Potential EOM Status
-              </span>
-              
-              {forecastStatus === 'on-track' && (
-                <div className="flex flex-col gap-2 p-3 bg-primary/10 border border-primary/20 rounded-xl text-primary">
-                  <div className="flex items-center gap-1.5 font-bold text-sm">
-                    <CheckCircle className="w-4 h-4 shrink-0 text-primary" />
-                    Projected On Track 🎉
-                  </div>
-                  <p className="text-[11px] leading-relaxed opacity-90 font-medium">
-                    Excellent pacing! You are currently projected to stay below your monthly limit with potential savings.
-                  </p>
-                </div>
-              )}
-
-              {forecastStatus === 'caution' && (
-                <div className="flex flex-col gap-2 p-3 bg-secondary/10 border border-secondary/20 rounded-xl text-secondary">
-                  <div className="flex items-center gap-1.5 font-bold text-sm">
-                    <AlertTriangle className="w-4 h-4 shrink-0 text-secondary" />
-                    Slight Overrun Risk ⚠️
-                  </div>
-                  <p className="text-[11px] leading-relaxed opacity-90 font-medium">
-                    Caution advised. Your pacing is projected to slightly exceed the budget by month-end. Consider minor adjustments.
-                  </p>
-                </div>
-              )}
-
-              {forecastStatus === 'at-risk' && (
-                <div className="flex flex-col gap-2 p-3 bg-error-container/60 border border-error/15 rounded-xl text-on-error-container">
-                  <div className="flex items-center gap-1.5 font-bold text-sm text-error">
-                    <Flame className="w-4 h-4 shrink-0" />
-                    High Budget Risk 🚨
-                  </div>
-                  <p className="text-[11px] leading-relaxed opacity-90 font-medium">
-                    Action required. Spending is highly accelerated. Continuous pacing will likely push you significantly over budget.
-                  </p>
-                </div>
-              )}
-
-              <div className="pt-2 border-t border-outline-variant/20 space-y-3">
-                <div>
-                  <span className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider block">
-                    Projected Total Outlay
-                  </span>
-                  <div className="text-xl font-black text-on-surface font-mono mt-0.5">
-                    {formatCurrency(projectedTotal)}
-                  </div>
-                </div>
-
-                <div>
-                  <span className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider block">
-                    Projected EOM {projectedIsOver ? 'Deficit' : 'Savings'}
-                  </span>
-                  <div className={`text-sm font-bold font-mono mt-0.5 ${projectedIsOver ? 'text-error' : 'text-primary'}`}>
-                    {projectedIsOver ? '+' : ''}{formatCurrency(Math.abs(projectedSavings))}
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="p-3 bg-surface-container-highest/50 rounded-xl border border-outline-variant/20 space-y-1">
-              <span className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider block flex items-center gap-1">
-                <Info className="w-3 h-3 text-primary" /> Recommendation
-              </span>
-              <p className="text-[10px] leading-relaxed text-on-surface-variant font-medium">
-                {daysRemaining > 0 ? (
-                  <>
-                    Limit future non-essential spend to <strong className="text-primary font-mono">{formatCurrency(recommendedDailyCap)}</strong>/day for the next <strong>{daysRemaining}</strong> days to remain strictly within budget.
-                  </>
-                ) : (
-                  "The active month is complete. This is your final budget status."
-                )}
-              </p>
-            </div>
+      {/* Monthly Budget & Net Cashflow Intelligence Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Remaining Budget & Cap Status */}
+        <div className="p-4 rounded-3xl bg-surface-container-low border border-outline-variant/30 space-y-3 shadow-2xs">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-on-surface-variant uppercase tracking-wider flex items-center gap-1.5">
+              <Wallet className="w-4 h-4 text-primary" />
+              Monthly Budget Status
+            </span>
+            <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full border ${
+              targetAverage - totalSpent >= 0
+                ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20'
+                : 'bg-error/10 text-error border-error/20'
+            }`}>
+              {targetAverage - totalSpent >= 0 ? 'Within Target' : 'Exceeded Limit'}
+            </span>
           </div>
 
-          {/* Interactive Chart */}
-          <div className="md:col-span-2 bg-surface-container-low rounded-2xl p-4 border border-outline-variant/30 flex flex-col justify-between space-y-3">
+          <div className="flex items-baseline justify-between pt-1">
             <div>
-              <div className="flex justify-between items-center">
-                <h4 className="text-xs font-bold text-on-surface uppercase tracking-wider">
-                  Cumulative Spend & Projection Path
-                </h4>
-                <div className="flex items-center gap-3 text-[10px] font-bold">
-                  <span className="flex items-center gap-1 text-primary">
-                    <span className="w-2 h-2 rounded-full bg-primary"></span> Actual
-                  </span>
-                  <span className="flex items-center gap-1 text-secondary">
-                    <span className="w-2.5 h-0.5 border-t-2 border-dashed border-secondary"></span> Projected
-                  </span>
-                  <span className="flex items-center gap-1 text-error">
-                    <span className="w-2.5 h-0.5 bg-error"></span> Budget Limit
-                  </span>
-                </div>
-              </div>
-              <p className="text-[10px] text-on-surface-variant mt-1">
-                Comparing day-by-day accumulated expenses against the {formatCurrency(budgetLimit)} limit path.
-              </p>
-            </div>
-
-            <div className="h-48 w-full mt-2 select-none">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart
-                  data={projectionData}
-                  margin={{ top: 5, right: 5, left: -20, bottom: 0 }}
-                >
-                  <defs>
-                    <linearGradient id="colorActual" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor={themeColors.primary} stopOpacity={0.25}/>
-                      <stop offset="95%" stopColor={themeColors.primary} stopOpacity={0}/>
-                    </linearGradient>
-                    <linearGradient id="colorProjected" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor={themeColors.secondary} stopOpacity={0.15}/>
-                      <stop offset="95%" stopColor={themeColors.secondary} stopOpacity={0}/>
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(148, 163, 184, 0.08)" />
-                  <XAxis 
-                    dataKey="day" 
-                    tickLine={false}
-                    axisLine={false}
-                    tick={{ fontSize: 9, fill: 'currentColor', opacity: 0.5 }}
-                    padding={{ left: 10, right: 10 }}
-                  />
-                  <YAxis 
-                    tickLine={false}
-                    axisLine={false}
-                    tickFormatter={(val) => `₹${val >= 1000 ? (val / 1000) + 'k' : val}`}
-                    tick={{ fontSize: 9, fill: 'currentColor', opacity: 0.5 }}
-                  />
-                  <Tooltip content={<CustomChartTooltip />} cursor={false} />
-                  <ReferenceLine y={budgetLimit} stroke="#f87171" strokeDasharray="5 5" strokeWidth={1.5} />
-                  
-                  {/* Projected Path Area */}
-                  <Area 
-                    name="Projected path"
-                    type="monotone" 
-                    dataKey="projected" 
-                    stroke={themeColors.secondary} 
-                    strokeWidth={1.5} 
-                    strokeDasharray={isCurrentMonth ? "5 5" : undefined}
-                    fillOpacity={1} 
-                    fill="url(#colorProjected)" 
-                    activeDot={{ stroke: 'none', strokeWidth: 0, r: 4 }}
-                  />
-
-                  {/* Actual Path Area */}
-                  <Area 
-                    name="Actual spent"
-                    type="monotone" 
-                    dataKey="actual" 
-                    stroke={themeColors.primary} 
-                    strokeWidth={2} 
-                    fillOpacity={1} 
-                    fill="url(#colorActual)" 
-                    activeDot={{ stroke: 'none', strokeWidth: 0, r: 5 }}
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
-
-            <div className="flex justify-between items-center text-[10px] text-on-surface-variant font-medium border-t border-outline-variant/15 pt-2">
-              <span className="flex items-center gap-1">
-                <Calendar className="w-3.5 h-3.5 text-primary" />
-                Current Run Rate: <strong className="text-on-surface font-mono">{formatCurrency(dailySpendRate)}/day</strong>
+              <span className="text-[10px] text-on-surface-variant font-medium block">Remaining Safe Cap</span>
+              <span className={`text-2xl font-black font-mono ${targetAverage - totalSpent >= 0 ? 'text-primary' : 'text-error'}`}>
+                {formatCurrency(targetAverage - totalSpent)}
               </span>
-              {isCurrentMonth ? (
-                <span>{daysRemaining} days remaining in month</span>
-              ) : (
-                <span>Month complete (Historical analysis)</span>
-              )}
+            </div>
+            <div className="text-right">
+              <span className="text-[10px] text-on-surface-variant font-medium block">Monthly Limit</span>
+              <span className="text-sm font-bold text-on-surface font-mono">
+                {formatCurrency(targetAverage)}
+              </span>
             </div>
           </div>
 
+          {/* Progress Bar */}
+          <div className="space-y-1">
+            <div className="h-2 w-full bg-surface-container-highest rounded-full overflow-hidden p-0.5">
+              <div 
+                className={`h-full rounded-full transition-all duration-500 ${
+                  pctOfTarget > 100 ? 'bg-error' : pctOfTarget > 80 ? 'bg-amber-500' : 'bg-primary'
+                }`}
+                style={{ width: `${Math.min(100, pctOfTarget)}%` }}
+              />
+            </div>
+            <div className="flex justify-between text-[10px] text-on-surface-variant font-medium">
+              <span>Spent {pctOfTarget}% of monthly cap</span>
+              <span>{targetAverage - totalSpent < 0 ? `${formatCurrency(Math.abs(targetAverage - totalSpent))} over` : 'On track'}</span>
+            </div>
+          </div>
         </div>
-      </section>
+
+        {/* Net Cashflow & Monthly Savings */}
+        <div className="p-4 rounded-3xl bg-surface-container-low border border-outline-variant/30 space-y-3 shadow-2xs">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-on-surface-variant uppercase tracking-wider flex items-center gap-1.5">
+              <TrendingUp className="w-4 h-4 text-emerald-600" />
+              Net Monthly Cashflow
+            </span>
+            <span className="text-[10px] font-bold text-on-surface-variant">
+              Inflow vs Outflow
+            </span>
+          </div>
+
+          <div className="flex items-baseline justify-between pt-1">
+            <div>
+              <span className="text-[10px] text-on-surface-variant font-medium block">Net Saved / Surplus</span>
+              <span className={`text-2xl font-black font-mono ${customIncome - totalSpent >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-error'}`}>
+                {customIncome - totalSpent >= 0 ? '+' : ''}{formatCurrency(customIncome - totalSpent)}
+              </span>
+            </div>
+            <div className="text-right">
+              <span className="text-[10px] text-on-surface-variant font-medium block">Monthly Income</span>
+              <span className="text-sm font-bold text-emerald-600 dark:text-emerald-400 font-mono">
+                +{formatCurrency(customIncome)}
+              </span>
+            </div>
+          </div>
+
+          <div className="p-2.5 rounded-2xl bg-surface-container-high/60 flex justify-between items-center text-xs">
+            <span className="text-[11px] text-on-surface-variant font-medium">End-of-Month Projection</span>
+            <span className="font-mono font-bold text-on-surface">
+              {formatCurrency(Math.round((totalSpent / Math.max(1, today.getDate())) * 30))} est.
+            </span>
+          </div>
+        </div>
+      </div>
+
+
+
+
 
       {/* Category Comparison List */}
       <section className="space-y-3">
@@ -616,7 +433,9 @@ export default function InsightsTab({
                     <div>
                       <div className="font-title-md text-sm font-bold text-on-surface">{cat.name}</div>
                       {hasBudget && (
-                        <div className="text-xs text-on-surface-variant">Target Average: {formatCurrency(cat.avg)}</div>
+                        <div className="text-xs text-on-surface-variant">
+                          {pastMonths.length > 0 ? 'Target Average' : 'Budget Limit'}: {formatCurrency(cat.avg)}
+                        </div>
                       )}
                     </div>
                   </div>
@@ -627,7 +446,11 @@ export default function InsightsTab({
                     </div>
                     {hasBudget && (
                       <div className={`font-label-md text-xs font-semibold ${isCatOver ? 'text-error' : 'text-secondary'}`}>
-                        {isCatOver ? 'Over Average' : diff === 0 ? 'At Average' : 'Under Average'}
+                        {isCatOver 
+                          ? (pastMonths.length > 0 ? 'Over Average' : 'Over Limit') 
+                          : diff === 0 
+                            ? (pastMonths.length > 0 ? 'At Average' : 'At Limit') 
+                            : (pastMonths.length > 0 ? 'Under Average' : 'Under Limit')}
                       </div>
                     )}
                   </div>
@@ -659,255 +482,14 @@ export default function InsightsTab({
         </div>
       </section>
 
-      {/* 50/30/20 Budgeting Rule Sandbox */}
-      <section className="space-y-4">
-        <div className="flex items-center gap-2 px-1">
-          <div className="p-1 rounded-lg bg-primary/10 text-primary">
-            <Scale className="w-4 h-4" />
-          </div>
-          <h3 className="font-title-md text-sm font-bold text-on-surface">50/30/20 Budgeting Sandbox</h3>
-        </div>
 
-        <div className="p-5 bg-surface-container-low rounded-2xl border border-outline-variant/30 shadow-sm space-y-5">
-          <div className="space-y-2">
-            <h4 className="text-xs font-bold text-on-surface uppercase tracking-wider">Configure Monthly Net Income</h4>
-            <p className="text-[11px] text-on-surface-variant leading-relaxed">
-              Model your ideal distribution based on custom income thresholds. Use the slider or the direct input to preview the allocation targets.
-            </p>
-            
-            {/* Slider / Custom Input */}
-            <div className="flex items-center gap-4 pt-2">
-              <div className="flex-1">
-                <input 
-                  type="range" 
-                  min="10000" 
-                  max="300000" 
-                  step="5000"
-                  value={customIncome} 
-                  onChange={(e) => setCustomIncome(parseFloat(e.target.value) || 0)}
-                  className="w-full accent-primary h-1.5 bg-surface-variant rounded-lg appearance-none cursor-pointer"
-                />
-                <div className="flex justify-between text-[9px] text-on-surface-variant font-semibold font-mono mt-1">
-                  <span>₹10,000</span>
-                  <span>₹1.5L</span>
-                  <span>₹3,00,000</span>
-                </div>
-              </div>
-              <div className="w-32 shrink-0 relative">
-                <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs font-bold text-primary">₹</span>
-                <input 
-                  type="number"
-                  value={customIncome || ''}
-                  onChange={(e) => setCustomIncome(parseFloat(e.target.value) || 0)}
-                  className="w-full bg-surface-container-highest border border-outline-variant/50 rounded-xl pl-6 pr-2.5 py-1.5 text-xs font-bold font-mono text-on-surface focus:outline-hidden"
-                  placeholder="0"
-                />
-              </div>
-            </div>
-          </div>
 
-          {/* Core Comparative Cards */}
-          <div className="space-y-3.5 pt-2 border-t border-outline-variant/20">
-            {/* Row 1: Needs */}
-            <div className="space-y-1.5">
-              <div className="flex justify-between items-center text-xs">
-                <div className="flex items-center gap-1.5 font-bold text-on-surface">
-                  <Wallet className="w-3.5 h-3.5 text-primary" />
-                  <span>Essential Needs (50%)</span>
-                </div>
-                <div className="font-mono text-[11px] font-bold">
-                  <span className="text-on-surface-variant">Ideal: {formatCurrency(customIncome * 0.5)}</span>
-                  <span className="mx-1.5 text-outline-variant">|</span>
-                  <span className={sandboxNeeds > (customIncome * 0.5) ? "text-error" : "text-primary"}>
-                    Actual: {formatCurrency(sandboxNeeds)}
-                  </span>
-                </div>
-              </div>
-              {/* Double percentage bar overlay */}
-              <div className="space-y-1">
-                <div className="h-2 w-full bg-surface-container-highest rounded-full overflow-hidden relative">
-                  {/* Ideal Fill (50% target width indicator background) */}
-                  <div className="absolute top-0 left-0 h-full bg-primary/20 rounded-full" style={{ width: '50%' }} />
-                  {/* Actual Fill */}
-                  <div 
-                    className={`h-full rounded-full transition-all duration-300 ${
-                      sandboxNeeds > (customIncome * 0.5) ? 'bg-error' : 'bg-primary'
-                    }`} 
-                    style={{ width: `${Math.min(100, (sandboxNeeds / customIncome) * 100)}%` }}
-                  />
-                </div>
-                <div className="flex justify-between text-[9px] font-semibold">
-                  <span className="text-on-surface-variant">Target allocation: 50%</span>
-                  <span className={sandboxNeeds > (customIncome * 0.5) ? "text-error font-bold" : "text-on-surface-variant"}>
-                    Current: {customIncome > 0 ? Math.round((sandboxNeeds / customIncome) * 100) : 0}%
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* Row 2: Wants */}
-            <div className="space-y-1.5">
-              <div className="flex justify-between items-center text-xs">
-                <div className="flex items-center gap-1.5 font-bold text-on-surface">
-                  <ShoppingBag className="w-3.5 h-3.5 text-secondary" />
-                  <span>Discretionary Wants (30%)</span>
-                </div>
-                <div className="font-mono text-[11px] font-bold">
-                  <span className="text-on-surface-variant">Ideal: {formatCurrency(customIncome * 0.3)}</span>
-                  <span className="mx-1.5 text-outline-variant">|</span>
-                  <span className={sandboxWants > (customIncome * 0.3) ? "text-error" : "text-secondary"}>
-                    Actual: {formatCurrency(sandboxWants)}
-                  </span>
-                </div>
-              </div>
-              {/* Double percentage bar overlay */}
-              <div className="space-y-1">
-                <div className="h-2 w-full bg-surface-container-highest rounded-full overflow-hidden relative">
-                  {/* Ideal Fill (30% target width indicator background) */}
-                  <div className="absolute top-0 left-0 h-full bg-secondary/20 rounded-full" style={{ width: '30%' }} />
-                  {/* Actual Fill */}
-                  <div 
-                    className={`h-full rounded-full transition-all duration-300 ${
-                      sandboxWants > (customIncome * 0.3) ? 'bg-error' : 'bg-secondary'
-                    }`} 
-                    style={{ width: `${Math.min(100, (sandboxWants / customIncome) * 100)}%` }}
-                  />
-                </div>
-                <div className="flex justify-between text-[9px] font-semibold">
-                  <span className="text-on-surface-variant">Target allocation: 30%</span>
-                  <span className={sandboxWants > (customIncome * 0.3) ? "text-error font-bold" : "text-on-surface-variant"}>
-                    Current: {customIncome > 0 ? Math.round((sandboxWants / customIncome) * 100) : 0}%
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* Row 3: Savings */}
-            <div className="space-y-1.5">
-              <div className="flex justify-between items-center text-xs">
-                <div className="flex items-center gap-1.5 font-bold text-on-surface">
-                  <PiggyBank className="w-3.5 h-3.5 text-emerald-600" />
-                  <span>Savings & Investments (20%)</span>
-                </div>
-                <div className="font-mono text-[11px] font-bold">
-                  <span className="text-on-surface-variant">Ideal: {formatCurrency(customIncome * 0.2)}</span>
-                  <span className="mx-1.5 text-outline-variant">|</span>
-                  <span className={sandboxSurplus >= (customIncome * 0.2) ? "text-emerald-600" : "text-amber-600"}>
-                    Surplus: {formatCurrency(sandboxSurplus)}
-                  </span>
-                </div>
-              </div>
-              {/* Double percentage bar overlay */}
-              <div className="space-y-1">
-                <div className="h-2 w-full bg-surface-container-highest rounded-full overflow-hidden relative">
-                  {/* Ideal Fill (20% target width indicator background) */}
-                  <div className="absolute top-0 left-0 h-full bg-emerald-500/10 rounded-full" style={{ width: '20%' }} />
-                  {/* Actual Fill */}
-                  <div 
-                    className="h-full bg-emerald-500 rounded-full transition-all duration-300" 
-                    style={{ width: `${Math.min(100, (sandboxSurplus / customIncome) * 100)}%` }}
-                  />
-                </div>
-                <div className="flex justify-between text-[9px] font-semibold">
-                  <span className="text-on-surface-variant">Target allocation: 20%</span>
-                  <span className={sandboxSurplus >= (customIncome * 0.2) ? "text-emerald-600 font-bold" : "text-on-surface-variant"}>
-                    Available Surplus: {customIncome > 0 ? Math.round((sandboxSurplus / customIncome) * 100) : 0}%
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Sandbox Advice Narrative Box */}
-          <div className="p-3.5 bg-primary/5 rounded-xl border border-primary/10 text-xs text-on-surface-variant leading-relaxed">
-            {(() => {
-              const needsPct = customIncome > 0 ? (sandboxNeeds / customIncome) : 0;
-              const wantsPct = customIncome > 0 ? (sandboxWants / customIncome) : 0;
-              const savingsPct = customIncome > 0 ? (sandboxSurplus / customIncome) : 0;
-
-              if (needsPct > 0.5) {
-                return (
-                  <p>
-                    ⚠️ <strong className="font-bold text-on-surface">Needs allocation exceeds 50%:</strong> Your essential spending is taking up {Math.round(needsPct * 100)}% of your modeled income. Consider trimming recurring subscription load (currently {formatCurrency(activeSubsTotal)}) or looking for ways to optimize fixed expenses like rent or basic transportation.
-                  </p>
-                );
-              } else if (wantsPct > 0.3) {
-                return (
-                  <p>
-                    ⚠️ <strong className="font-bold text-on-surface">Wants allocation exceeds 30%:</strong> You are spending {Math.round(wantsPct * 100)}% on non-essential desires. Try setting specific category limits in Settings for Food (currently {formatCurrency(foodSpent)}) or Shopping (currently {formatCurrency(shoppingSpent)}) to divert extra funds into your active savings targets!
-                  </p>
-                );
-              } else if (savingsPct >= 0.2) {
-                return (
-                  <p>
-                    🎉 <strong className="font-bold text-emerald-700">Gold Standard Alignment!</strong> Your potential savings rate is {Math.round(savingsPct * 100)}%, which safely exceeds the recommended 20% target. You have an estimated leftover surplus of <strong className="font-bold text-emerald-700 font-mono">{formatCurrency(sandboxSurplus)}</strong>. This is an exceptional opportunity to fund your active savings targets!
-                  </p>
-                );
-              } else {
-                return (
-                  <p>
-                    💡 <strong className="font-bold text-on-surface">Pacing to save {Math.round(savingsPct * 100)}%:</strong> To hit the golden 20% savings rule, try pruning your Wants category by {formatCurrency(Math.max(0, (customIncome * 0.2) - sandboxSurplus))} this month. Your wallet will thank you!
-                  </p>
-                );
-              }
-            })()}
-          </div>
-        </div>
-      </section>
-
-      {/* Insights Bento Box Alert */}
-      <section className="grid grid-cols-2 gap-4 mt-6">
-        
-        {/* Smart Insight Alert */}
-        <div className="col-span-2 p-5 bg-primary-container text-on-primary-container rounded-2xl border border-primary/10 shadow-sm relative overflow-hidden group">
-          <div className="absolute top-0 right-0 translate-x-4 -translate-y-4 w-24 h-24 bg-white/5 rounded-full blur-xl"></div>
-          <div className="flex items-start gap-3 z-10 relative">
-            <span className="p-1.5 rounded-full bg-white/10 shrink-0">
-              <Lightbulb className="w-5 h-5 text-on-primary-container" />
-            </span>
-            <div>
-              <span className="font-title-md text-sm font-bold block text-on-primary-container">Smart Insight</span>
-              <p className="text-xs leading-relaxed text-on-primary-container/90 mt-1">
-                {shoppingSpent > 500 
-                  ? `Your 'Shopping' category is ${Math.round(((shoppingSpent - 500)/500)*100)}% above typical levels this month. Most of this was spent on apple accessories & outerwear in the first week.`
-                  : "Your spending is extremely balanced this month. You've successfully kept non-essential categories under active limits."}
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* Spending Velocity Bento Box */}
-        <div className="p-4 bg-secondary-container text-on-secondary-container rounded-2xl flex flex-col justify-between h-32 border border-secondary/10 shadow-xs relative overflow-hidden">
-          <div className="absolute right-0 bottom-0 translate-x-4 translate-y-4 opacity-5">
-            <CheckCircle className="w-20 h-20" />
-          </div>
-          <span className="font-label-md text-xs font-bold uppercase tracking-wider opacity-95">Spending Rate</span>
-          <div className="space-y-1">
-            <div className="font-headline-sm text-xl font-extrabold flex items-center gap-1">
-              {velocityStatus}
-            </div>
-            <p className="text-[10px] opacity-80 leading-tight">
-              {velocityDesc}
-            </p>
-          </div>
-        </div>
-
-        {/* Remaining Budget Bento Box */}
-        <div className="p-4 bg-surface-container-high rounded-2xl flex flex-col justify-between h-32 border border-outline-variant/30 shadow-xs relative overflow-hidden">
-          <div className="absolute right-0 bottom-0 translate-x-4 translate-y-4 opacity-5">
-            <LineChart className="w-20 h-20 text-primary" />
-          </div>
-          <span className="font-label-md text-xs font-bold uppercase tracking-wider text-on-surface-variant">Remaining Limit</span>
-          <div className="space-y-1">
-            <div className="font-headline-sm text-xl font-extrabold text-primary">
-              {formatCurrency(remainingBudget)}
-            </div>
-            <p className="text-[10px] text-on-surface-variant leading-tight">
-              Current unused budget allocation.
-            </p>
-          </div>
-        </div>
-
+      {/* No-Spend Heatmap & Discipline Streaks */}
+      <section className="space-y-3">
+        <NoSpendHeatmapCard
+          transactions={transactions}
+          budget={budget}
+        />
       </section>
 
     </div>
