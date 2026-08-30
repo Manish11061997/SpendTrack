@@ -1,9 +1,10 @@
 import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, RadialBarChart, RadialBar, PolarAngleAxis } from 'recharts';
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Sector, RadialBarChart, RadialBar, PolarAngleAxis } from 'recharts';
 import { Transaction, UserProfile, BudgetConfig, Subscription } from '../types';
 import { formatCurrency as formatCustomCurrency, isSubscriptionDoubleCounted, parseRawAmount } from '../utils/currency';
 import { COLOR_PRESETS } from '../theme';
+import { triggerHaptic } from '../utils/haptics';
 import { QuickShortcutsWidget } from './QuickShortcutsWidget';
 import { FinancialHealthRadarCard } from './FinancialHealthRadarCard';
 import { NoSpendHeatmapCard } from './NoSpendHeatmapCard';
@@ -118,6 +119,7 @@ export default function DashboardTab({
   const [selectedTx, setSelectedTx] = useState<Transaction | null>(null);
   const [showCalcTooltip, setShowCalcTooltip] = useState<boolean>(false);
   const [activeCategoryFilter, setActiveCategoryFilter] = useState<string | null>(null);
+  const [hoveredCategory, setHoveredCategory] = useState<string | null>(null);
   const [isBankSmsOpen, setIsBankSmsOpen] = useState(false);
   const [isSubsExpanded, setIsSubsExpanded] = useState<boolean>(false);
   const [isGoalsExpanded, setIsGoalsExpanded] = useState<boolean>(false);
@@ -673,6 +675,30 @@ export default function DashboardTab({
 
   const totalSpendingForMonth = chartData.reduce((sum, item) => sum + item.value, 0);
 
+  const renderActiveShape = (props: any) => {
+    const { cx, cy, innerRadius, outerRadius, startAngle, endAngle, fill } = props;
+    return (
+      <g>
+        <Sector
+          cx={cx}
+          cy={cy}
+          innerRadius={Math.max(0, innerRadius - 2)}
+          outerRadius={outerRadius + 8}
+          startAngle={startAngle}
+          endAngle={endAngle}
+          fill={fill}
+          stroke="#ffffff"
+          strokeWidth={1.5}
+          style={{
+            filter: 'drop-shadow(0px 6px 14px rgba(0, 0, 0, 0.28))',
+            transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+            cursor: 'pointer',
+          }}
+        />
+      </g>
+    );
+  };
+
   interface CustomTooltipProps {
     active?: boolean;
     payload?: Array<{
@@ -690,22 +716,24 @@ export default function DashboardTab({
     if (active && payload && payload.length) {
       const data = payload[0].payload;
       return (
-        <div className="bg-surface/90 backdrop-blur-md text-on-surface text-xs p-3 py-2.5 rounded-xl border border-outline-variant/30 shadow-xl space-y-1 font-sans">
+        <div className="bg-surface-container-highest text-on-surface text-xs p-2.5 px-3 rounded-xl border border-outline-variant/40 shadow-2xl space-y-0.5 font-sans pointer-events-none z-50">
           <div className="flex items-center gap-1.5">
             <span 
-              className="w-2.5 h-2.5 rounded-full shrink-0" 
+              className="w-2.5 h-2.5 rounded-full shrink-0 shadow-xs" 
               style={{ backgroundColor: data.color }} 
             />
-            <p className="font-bold text-on-surface">{data.name}</p>
+            <p className="font-bold text-on-surface text-xs">{data.name}</p>
           </div>
-          <p className="font-mono text-primary font-bold text-sm pl-4">
-            {formatCurrency(data.value)}
-          </p>
-          {totalSpendingForMonth > 0 && (
-            <p className="text-[10px] text-on-surface-variant pl-4">
-              {((data.value / totalSpendingForMonth) * 100).toFixed(1)}% of total
+          <div className="flex items-baseline gap-2 pl-4">
+            <p className="font-mono text-primary font-black text-sm">
+              {formatCurrency(data.value)}
             </p>
-          )}
+            {totalSpendingForMonth > 0 && (
+              <p className="text-[10px] text-on-surface-variant font-semibold">
+                {((data.value / totalSpendingForMonth) * 100).toFixed(1)}%
+              </p>
+            )}
+          </div>
         </div>
       );
     }
@@ -1193,7 +1221,24 @@ export default function DashboardTab({
       {/* Visual Summary (Category Breakdown Pie Chart) */}
       <section className="space-y-3">
         <div className="flex items-center justify-between">
-          <h3 className="font-outfit text-lg text-on-surface font-black tracking-tight">Visual Summary</h3>
+          <div className="flex items-center gap-2">
+            <h3 className="font-outfit text-lg text-on-surface font-black tracking-tight">Visual Summary</h3>
+            {activeCategoryFilter && (
+              <button
+                type="button"
+                onClick={() => {
+                  triggerHaptic('light');
+                  setActiveCategoryFilter(null);
+                  setHoveredCategory(null);
+                }}
+                className="text-[10px] font-bold text-primary bg-primary/10 hover:bg-primary/20 px-2 py-0.5 rounded-full border border-primary/20 transition-all flex items-center gap-1 cursor-pointer"
+                title="Clear category filter"
+              >
+                <span>Filter: {activeCategoryFilter}</span>
+                <span className="text-xs font-bold leading-none">×</span>
+              </button>
+            )}
+          </div>
           {availableMonths.length > 1 ? (
             <div className="relative">
               <button
@@ -1252,86 +1297,169 @@ export default function DashboardTab({
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-12 gap-6 items-center">
               {/* Pie Chart Area */}
-              <div className="sm:col-span-6 h-52 relative flex items-center justify-center">
+              <div 
+                className="sm:col-span-6 h-56 relative flex items-center justify-center"
+                onMouseLeave={() => setHoveredCategory(null)}
+              >
                 <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
+                  <PieChart onMouseLeave={() => setHoveredCategory(null)}>
                     <Pie
                       data={chartData}
                       cx="50%"
                       cy="50%"
-                      innerRadius={55}
-                      outerRadius={75}
+                      innerRadius={54}
+                      outerRadius={76}
                       paddingAngle={3}
                       dataKey="value"
                       stroke="none"
-                      activeShape={false}
+                      activeShape={renderActiveShape}
+                      onMouseEnter={(_, index) => {
+                        if (chartData[index]) {
+                          setHoveredCategory(chartData[index].name);
+                        }
+                      }}
+                      onMouseLeave={() => setHoveredCategory(null)}
                     >
                       {chartData.map((entry, index) => {
                         const isSelected = activeCategoryFilter === entry.name;
+                        const isHovered = hoveredCategory === entry.name;
+                        const isAnyHovered = Boolean(hoveredCategory);
+                        const isAnySelected = Boolean(activeCategoryFilter);
+
                         return (
                           <Cell 
                             key={`cell-${index}`} 
                             fill={entry.color} 
-                            stroke={isSelected ? '#ffffff' : 'none'}
-                            strokeWidth={isSelected ? 2 : 0}
-                            className="cursor-pointer transition-opacity hover:opacity-85"
+                            stroke={isSelected || isHovered ? '#ffffff' : 'none'}
+                            strokeWidth={isSelected ? 2.5 : (isHovered ? 1.5 : 0)}
+                            opacity={
+                              isAnyHovered 
+                                ? (isHovered ? 1 : 0.35) 
+                                : (isAnySelected ? (isSelected ? 1 : 0.4) : 1)
+                            }
+                            style={{
+                              transition: 'opacity 0.25s ease, filter 0.25s ease',
+                              cursor: 'pointer',
+                            }}
                             onClick={() => {
-                              setActiveCategoryFilter(activeCategoryFilter === entry.name ? null : entry.name);
+                              triggerHaptic('light');
+                              const next = isSelected ? null : entry.name;
+                              setActiveCategoryFilter(next);
+                              setHoveredCategory(next);
                             }}
                           />
                         );
                       })}
                     </Pie>
-                    <Tooltip content={<CustomTooltip />} cursor={false} />
+                    <Tooltip content={<CustomTooltip />} cursor={false} isAnimationActive={false} />
                   </PieChart>
                 </ResponsiveContainer>
                 
-                {/* Center text for the donut chart */}
-                <div className="absolute text-center flex flex-col justify-center items-center pointer-events-none">
-                  <span className="text-[10px] uppercase font-semibold text-on-surface-variant tracking-wider">
-                    Total Spent
-                  </span>
-                  <span className="text-base font-bold text-on-surface font-mono mt-0.5 truncate max-w-[120px]">
-                    {formatCurrency(totalSpendingForMonth)}
-                  </span>
-                </div>
+                {/* Dynamic Center Metric for Donut Chart */}
+                {(() => {
+                  const focusedCategory = hoveredCategory || activeCategoryFilter;
+                  const focusedItem = focusedCategory ? chartData.find(item => item.name === focusedCategory) : null;
+
+                  return (
+                    <div className="absolute text-center flex flex-col justify-center items-center pointer-events-none transition-all duration-200 select-none z-10">
+                      {focusedItem ? (
+                        <div className="flex flex-col items-center animate-in fade-in zoom-in-95 duration-150">
+                          <div className="flex items-center gap-1.5 max-w-[110px]">
+                            <span 
+                              className="w-2 h-2 rounded-full shrink-0 shadow-xs" 
+                              style={{ backgroundColor: focusedItem.color }} 
+                            />
+                            <span 
+                              className="text-[11px] uppercase font-extrabold tracking-wider truncate"
+                              style={{ color: focusedItem.color }}
+                            >
+                              {focusedItem.name}
+                            </span>
+                          </div>
+                          <span className="text-base font-black text-on-surface font-mono mt-0.5 truncate max-w-[120px]">
+                            {formatCurrency(focusedItem.value)}
+                          </span>
+                          <span className="text-[10px] text-on-surface-variant font-bold bg-surface-container-high/90 px-2 py-0.5 rounded-full mt-1 border border-outline-variant/30">
+                            {totalSpendingForMonth > 0 ? ((focusedItem.value / totalSpendingForMonth) * 100).toFixed(1) : 0}%
+                          </span>
+                        </div>
+                      ) : (
+                        <div className="flex flex-col items-center animate-in fade-in zoom-in-95 duration-150">
+                          <span className="text-[10px] uppercase font-semibold text-on-surface-variant tracking-wider">
+                            Total Spent
+                          </span>
+                          <span className="text-base font-black text-on-surface font-mono mt-0.5 truncate max-w-[120px]">
+                            {formatCurrency(totalSpendingForMonth)}
+                          </span>
+                          <span className="text-[9px] text-on-surface-variant/70 font-medium mt-0.5">
+                            {chartData.length} {chartData.length === 1 ? 'category' : 'categories'}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
               </div>
 
               {/* Legend/Breakdown Area */}
-              <div className="sm:col-span-6 space-y-2.5">
+              <div 
+                className="sm:col-span-6 space-y-2.5"
+                onMouseLeave={() => setHoveredCategory(null)}
+              >
                 {chartData.map((item, index) => {
                   const percent = totalSpendingForMonth > 0 ? ((item.value / totalSpendingForMonth) * 100).toFixed(1) : '0';
                   const hasLimit = budget?.categoryLimits && budget.categoryLimits[item.name] !== undefined;
                   const limitVal = hasLimit ? (budget.categoryLimits?.[item.name] || 0) : 0;
                   const isOver = hasLimit && item.value > limitVal;
+                  const isSelected = activeCategoryFilter === item.name;
+                  const isHovered = hoveredCategory === item.name;
 
                   return (
                     <div 
                       key={index} 
+                      onMouseEnter={() => setHoveredCategory(item.name)}
+                      onMouseLeave={() => setHoveredCategory(null)}
                       onClick={() => {
-                        setActiveCategoryFilter(activeCategoryFilter === item.name ? null : item.name);
+                        triggerHaptic('light');
+                        const next = isSelected ? null : item.name;
+                        setActiveCategoryFilter(next);
+                        setHoveredCategory(next);
                       }}
-                      className={`p-2 rounded-xl hover:bg-surface-container-high/60 transition-all space-y-1 cursor-pointer border ${
-                        activeCategoryFilter === item.name 
-                          ? 'border-primary bg-primary/5 dark:bg-primary/10' 
-                          : 'border-transparent'
+                      className={`p-2.5 rounded-xl transition-all duration-200 space-y-1.5 cursor-pointer border ${
+                        isSelected 
+                          ? 'border-primary bg-primary/10 shadow-xs ring-1 ring-primary/30' 
+                          : isHovered
+                            ? 'border-outline-variant/60 bg-surface-container-high/90 scale-[1.015] shadow-xs'
+                            : 'border-transparent hover:bg-surface-container-high/40'
                       }`}
                     >
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2.5 min-w-0">
                           <div 
-                            className="w-3.5 h-3.5 rounded-full shrink-0 border border-black/10 dark:border-white/10" 
-                            style={{ backgroundColor: item.color }}
+                            className="w-3.5 h-3.5 rounded-full shrink-0 border border-black/10 dark:border-white/10 transition-transform duration-200" 
+                            style={{ 
+                              backgroundColor: item.color,
+                              transform: isHovered || isSelected ? 'scale(1.25)' : 'scale(1)'
+                            }}
                           />
-                          <span className="text-xs font-semibold text-on-surface truncate">
+                          <span className={`text-xs truncate transition-colors ${
+                            isSelected || isHovered ? 'font-bold text-primary' : 'font-medium text-on-surface'
+                          }`}>
                             {item.name}
                           </span>
+                          {isSelected && (
+                            <span className="text-[9px] font-bold text-primary bg-primary/15 px-1.5 py-0.5 rounded-md">
+                              Filtered
+                            </span>
+                          )}
                         </div>
                         <div className="flex items-center gap-3 font-mono text-right shrink-0">
-                          <span className="text-xs font-bold text-on-surface">
+                          <span className={`text-xs transition-colors ${
+                            isSelected || isHovered ? 'font-black text-on-surface' : 'font-bold text-on-surface'
+                          }`}>
                             {formatCurrency(item.value)}
                           </span>
-                          <span className="text-[10px] text-on-surface-variant/80 bg-surface-container-high px-1.5 py-0.5 rounded-md font-sans">
+                          <span className="text-[10px] text-on-surface-variant font-semibold bg-surface-container-high px-1.5 py-0.5 rounded-md font-sans">
                             {percent}%
                           </span>
                         </div>
@@ -1351,7 +1479,7 @@ export default function DashboardTab({
                               Max: {formatCurrency(limitVal)}
                             </span>
                           </div>
-                          <div className="w-full h-1 bg-surface-container rounded-full overflow-hidden">
+                          <div className="w-full h-1.5 bg-surface-container rounded-full overflow-hidden">
                             <div 
                               className={`h-full rounded-full transition-all duration-300 ${
                                 isOver ? "bg-error animate-pulse" : "bg-primary"
