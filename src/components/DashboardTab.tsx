@@ -675,70 +675,32 @@ export default function DashboardTab({
 
   const totalSpendingForMonth = chartData.reduce((sum, item) => sum + item.value, 0);
 
-  const renderActiveShape = (props: any) => {
-    const { cx, cy, innerRadius, outerRadius, startAngle, endAngle, fill } = props;
-    return (
-      <g>
-        <Sector
-          cx={cx}
-          cy={cy}
-          innerRadius={Math.max(0, innerRadius - 2)}
-          outerRadius={outerRadius + 8}
-          startAngle={startAngle}
-          endAngle={endAngle}
-          fill={fill}
-          stroke="#ffffff"
-          strokeWidth={1.5}
-          style={{
-            filter: 'drop-shadow(0px 6px 14px rgba(0, 0, 0, 0.28))',
-            transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-            cursor: 'pointer',
-          }}
-        />
-      </g>
-    );
+  // Pure-SVG donut: compute arc path descriptor
+  const describeArc = (cx: number, cy: number, r: number, startAngle: number, endAngle: number): string => {
+    const toRad = (deg: number) => (deg * Math.PI) / 180;
+    const x1 = cx + r * Math.cos(toRad(startAngle));
+    const y1 = cy + r * Math.sin(toRad(startAngle));
+    const x2 = cx + r * Math.cos(toRad(endAngle));
+    const y2 = cy + r * Math.sin(toRad(endAngle));
+    const largeArc = endAngle - startAngle > 180 ? 1 : 0;
+    return `M ${x1} ${y1} A ${r} ${r} 0 ${largeArc} 1 ${x2} ${y2}`;
   };
 
-  interface CustomTooltipProps {
-    active?: boolean;
-    payload?: Array<{
-      name: string;
-      value: number;
-      payload: {
-        name: string;
-        value: number;
-        color: string;
-      };
-    }>;
-  }
-
-  const CustomTooltip = ({ active, payload }: CustomTooltipProps) => {
-    if (active && payload && payload.length) {
-      const data = payload[0].payload;
-      return (
-        <div className="bg-surface-container-highest text-on-surface text-xs p-2.5 px-3 rounded-xl border border-outline-variant/40 shadow-2xl space-y-0.5 font-sans pointer-events-none z-50">
-          <div className="flex items-center gap-1.5">
-            <span 
-              className="w-2.5 h-2.5 rounded-full shrink-0 shadow-xs" 
-              style={{ backgroundColor: data.color }} 
-            />
-            <p className="font-bold text-on-surface text-xs">{data.name}</p>
-          </div>
-          <div className="flex items-baseline gap-2 pl-4">
-            <p className="font-mono text-primary font-black text-sm">
-              {formatCurrency(data.value)}
-            </p>
-            {totalSpendingForMonth > 0 && (
-              <p className="text-[10px] text-on-surface-variant font-semibold">
-                {((data.value / totalSpendingForMonth) * 100).toFixed(1)}%
-              </p>
-            )}
-          </div>
-        </div>
-      );
-    }
-    return null;
+  const buildDonutSlices = () => {
+    if (totalSpendingForMonth === 0 || chartData.length === 0) return [];
+    const GAP_DEG = chartData.length > 1 ? 3 : 0;
+    const total = totalSpendingForMonth;
+    let cursor = -90; // start from top
+    return chartData.map((item) => {
+      const sweep = (item.value / total) * 360 - GAP_DEG;
+      const start = cursor + GAP_DEG / 2;
+      const end = start + sweep;
+      cursor += (item.value / total) * 360;
+      return { ...item, startAngle: start, endAngle: end, sweep };
+    });
   };
+
+  const donutSlices = useMemo(buildDonutSlices, [chartData, totalSpendingForMonth]);
 
   const formatMonthName = (monthKey: string) => {
     const [y, m] = monthKey.split('-');
@@ -1218,27 +1180,25 @@ export default function DashboardTab({
         </section>
       )}
 
-      {/* Visual Summary (Category Breakdown Pie Chart) */}
+      {/* ── Visual Summary ─────────────────────────────────────── */}
       <section className="space-y-3">
+        {/* Header row */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <h3 className="font-outfit text-lg text-on-surface font-black tracking-tight">Visual Summary</h3>
             {activeCategoryFilter && (
               <button
                 type="button"
-                onClick={() => {
-                  triggerHaptic('light');
-                  setActiveCategoryFilter(null);
-                  setHoveredCategory(null);
-                }}
-                className="text-[10px] font-bold text-primary bg-primary/10 hover:bg-primary/20 px-2 py-0.5 rounded-full border border-primary/20 transition-all flex items-center gap-1 cursor-pointer"
-                title="Clear category filter"
+                onClick={() => { triggerHaptic('light'); setActiveCategoryFilter(null); setHoveredCategory(null); }}
+                className="flex items-center gap-1 text-[10px] font-bold text-primary bg-primary/10 hover:bg-primary/20 px-2 py-0.5 rounded-full border border-primary/20 transition-all cursor-pointer"
               >
-                <span>Filter: {activeCategoryFilter}</span>
-                <span className="text-xs font-bold leading-none">×</span>
+                <span>{activeCategoryFilter}</span>
+                <span className="text-xs leading-none">×</span>
               </button>
             )}
           </div>
+
+          {/* Month selector */}
           {availableMonths.length > 1 ? (
             <div className="relative">
               <button
@@ -1282,8 +1242,8 @@ export default function DashboardTab({
             </span>
           )}
         </div>
-        
-        <div className="p-5 rounded-2xl bg-surface-container-low border border-outline-variant/30 shadow-sm">
+        {/* Card */}
+        <div className="p-4 sm:p-5 rounded-2xl bg-surface-container-low border border-outline-variant/30 shadow-sm">
           {chartData.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-10 text-center space-y-2">
               <div className="p-3 bg-surface-container-high rounded-full text-on-surface-variant">
@@ -1294,207 +1254,222 @@ export default function DashboardTab({
                 Add your transactions for the active month to view the category distribution.
               </p>
             </div>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-12 gap-6 items-center">
-              {/* Pie Chart Area */}
-              <div 
-                className="sm:col-span-6 h-56 relative flex items-center justify-center"
-                onMouseLeave={() => setHoveredCategory(null)}
-              >
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart onMouseLeave={() => setHoveredCategory(null)}>
-                    <Pie
-                      data={chartData}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={54}
-                      outerRadius={76}
-                      paddingAngle={3}
-                      dataKey="value"
-                      stroke="none"
-                      activeShape={renderActiveShape}
-                      onMouseEnter={(_, index) => {
-                        if (chartData[index]) {
-                          setHoveredCategory(chartData[index].name);
-                        }
-                      }}
-                      onMouseLeave={() => setHoveredCategory(null)}
-                    >
-                      {chartData.map((entry, index) => {
-                        const isSelected = activeCategoryFilter === entry.name;
-                        const isHovered = hoveredCategory === entry.name;
-                        const isAnyHovered = Boolean(hoveredCategory);
-                        const isAnySelected = Boolean(activeCategoryFilter);
+          ) : (() => {
+            const CX = 90, CY = 90, R_OUTER = 72, R_INNER = 50;
+            const focusedName = hoveredCategory || activeCategoryFilter;
+            const focusedItem = focusedName ? chartData.find(d => d.name === focusedName) : null;
 
-                        return (
-                          <Cell 
-                            key={`cell-${index}`} 
-                            fill={entry.color} 
-                            stroke={isSelected || isHovered ? '#ffffff' : 'none'}
-                            strokeWidth={isSelected ? 2.5 : (isHovered ? 1.5 : 0)}
-                            opacity={
-                              isAnyHovered 
-                                ? (isHovered ? 1 : 0.35) 
-                                : (isAnySelected ? (isSelected ? 1 : 0.4) : 1)
-                            }
-                            style={{
-                              transition: 'opacity 0.25s ease, filter 0.25s ease',
-                              cursor: 'pointer',
-                            }}
-                            onClick={() => {
-                              triggerHaptic('light');
-                              const next = isSelected ? null : entry.name;
-                              setActiveCategoryFilter(next);
-                              setHoveredCategory(next);
-                            }}
-                          />
-                        );
-                      })}
-                    </Pie>
-                    <Tooltip content={<CustomTooltip />} cursor={false} isAnimationActive={false} />
-                  </PieChart>
-                </ResponsiveContainer>
-                
-                {/* Dynamic Center Metric for Donut Chart */}
-                {(() => {
-                  const focusedCategory = hoveredCategory || activeCategoryFilter;
-                  const focusedItem = focusedCategory ? chartData.find(item => item.name === focusedCategory) : null;
+            const slicePath = (s: typeof donutSlices[0], outerR: number, innerR: number) => {
+              const toR = (d: number) => (d * Math.PI) / 180;
+              const ox1 = CX + outerR * Math.cos(toR(s.startAngle));
+              const oy1 = CY + outerR * Math.sin(toR(s.startAngle));
+              const ox2 = CX + outerR * Math.cos(toR(s.endAngle));
+              const oy2 = CY + outerR * Math.sin(toR(s.endAngle));
+              const ix1 = CX + innerR * Math.cos(toR(s.endAngle));
+              const iy1 = CY + innerR * Math.sin(toR(s.endAngle));
+              const ix2 = CX + innerR * Math.cos(toR(s.startAngle));
+              const iy2 = CY + innerR * Math.sin(toR(s.startAngle));
+              const lg = s.sweep > 180 ? 1 : 0;
+              return [
+                `M ${ox1} ${oy1}`,
+                `A ${outerR} ${outerR} 0 ${lg} 1 ${ox2} ${oy2}`,
+                `L ${ix1} ${iy1}`,
+                `A ${innerR} ${innerR} 0 ${lg} 0 ${ix2} ${iy2}`,
+                'Z'
+              ].join(' ');
+            };
 
-                  return (
-                    <div className="absolute text-center flex flex-col justify-center items-center pointer-events-none transition-all duration-200 select-none z-10">
-                      {focusedItem ? (
-                        <div className="flex flex-col items-center animate-in fade-in zoom-in-95 duration-150">
-                          <div className="flex items-center gap-1.5 max-w-[110px]">
-                            <span 
-                              className="w-2 h-2 rounded-full shrink-0 shadow-xs" 
-                              style={{ backgroundColor: focusedItem.color }} 
-                            />
-                            <span 
-                              className="text-[11px] uppercase font-extrabold tracking-wider truncate"
-                              style={{ color: focusedItem.color }}
-                            >
+            return (
+              <div className="flex flex-col sm:flex-row gap-5 sm:gap-6 items-center">
+
+                {/* ── Pure SVG Donut ── */}
+                <div className="shrink-0 flex items-center justify-center">
+                  <svg
+                    width="180" height="180"
+                    viewBox="0 0 180 180"
+                    className="overflow-visible"
+                    onMouseLeave={() => setHoveredCategory(null)}
+                  >
+                    <defs>
+                      {donutSlices.map((s) => (
+                        <filter key={`glow-${s.name}`} id={`glow-${s.name.replace(/\s+/g, '-')}`} x="-30%" y="-30%" width="160%" height="160%">
+                          <feDropShadow dx="0" dy="3" stdDeviation="5" floodColor={s.color} floodOpacity="0.45" />
+                        </filter>
+                      ))}
+                    </defs>
+
+                    {donutSlices.map((s) => {
+                      const isActive = s.name === focusedName;
+                      const anyFocused = Boolean(focusedName);
+                      const outerR = isActive ? R_OUTER + 9 : R_OUTER;
+                      const innerR = isActive ? R_INNER - 3 : R_INNER;
+                      return (
+                        <path
+                          key={s.name}
+                          d={slicePath(s, outerR, innerR)}
+                          fill={s.color}
+                          opacity={anyFocused ? (isActive ? 1 : 0.28) : 1}
+                          filter={isActive ? `url(#glow-${s.name.replace(/\s+/g, '-')})` : undefined}
+                          style={{
+                            transition: 'all 0.22s cubic-bezier(0.34, 1.56, 0.64, 1)',
+                            cursor: 'pointer',
+                          }}
+                          onMouseEnter={() => setHoveredCategory(s.name)}
+                          onMouseLeave={() => setHoveredCategory(null)}
+                          onClick={() => {
+                            triggerHaptic('light');
+                            const next = activeCategoryFilter === s.name ? null : s.name;
+                            setActiveCategoryFilter(next);
+                            setHoveredCategory(next);
+                          }}
+                        />
+                      );
+                    })}
+
+                    {/* Center content via foreignObject */}
+                    <foreignObject x="36" y="36" width="108" height="108">
+                      <div style={{ width: '108px', height: '108px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none', userSelect: 'none', textAlign: 'center', padding: '4px' }}>
+                        {focusedItem ? (
+                          <>
+                            <span style={{ fontSize: '9px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.06em', color: focusedItem.color, lineHeight: 1.2, maxWidth: '96px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                               {focusedItem.name}
                             </span>
-                          </div>
-                          <span className="text-base font-black text-on-surface font-mono mt-0.5 truncate max-w-[120px]">
-                            {formatCurrency(focusedItem.value)}
-                          </span>
-                          <span className="text-[10px] text-on-surface-variant font-bold bg-surface-container-high/90 px-2 py-0.5 rounded-full mt-1 border border-outline-variant/30">
-                            {totalSpendingForMonth > 0 ? ((focusedItem.value / totalSpendingForMonth) * 100).toFixed(1) : 0}%
-                          </span>
-                        </div>
-                      ) : (
-                        <div className="flex flex-col items-center animate-in fade-in zoom-in-95 duration-150">
-                          <span className="text-[10px] uppercase font-semibold text-on-surface-variant tracking-wider">
-                            Total Spent
-                          </span>
-                          <span className="text-base font-black text-on-surface font-mono mt-0.5 truncate max-w-[120px]">
-                            {formatCurrency(totalSpendingForMonth)}
-                          </span>
-                          <span className="text-[9px] text-on-surface-variant/70 font-medium mt-0.5">
-                            {chartData.length} {chartData.length === 1 ? 'category' : 'categories'}
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })()}
-              </div>
-
-              {/* Legend/Breakdown Area */}
-              <div 
-                className="sm:col-span-6 space-y-2.5"
-                onMouseLeave={() => setHoveredCategory(null)}
-              >
-                {chartData.map((item, index) => {
-                  const percent = totalSpendingForMonth > 0 ? ((item.value / totalSpendingForMonth) * 100).toFixed(1) : '0';
-                  const hasLimit = budget?.categoryLimits && budget.categoryLimits[item.name] !== undefined;
-                  const limitVal = hasLimit ? (budget.categoryLimits?.[item.name] || 0) : 0;
-                  const isOver = hasLimit && item.value > limitVal;
-                  const isSelected = activeCategoryFilter === item.name;
-                  const isHovered = hoveredCategory === item.name;
-
-                  return (
-                    <div 
-                      key={index} 
-                      onMouseEnter={() => setHoveredCategory(item.name)}
-                      onMouseLeave={() => setHoveredCategory(null)}
-                      onClick={() => {
-                        triggerHaptic('light');
-                        const next = isSelected ? null : item.name;
-                        setActiveCategoryFilter(next);
-                        setHoveredCategory(next);
-                      }}
-                      className={`p-2.5 rounded-xl transition-all duration-200 space-y-1.5 cursor-pointer border ${
-                        isSelected 
-                          ? 'border-primary bg-primary/10 shadow-xs ring-1 ring-primary/30' 
-                          : isHovered
-                            ? 'border-outline-variant/60 bg-surface-container-high/90 scale-[1.015] shadow-xs'
-                            : 'border-transparent hover:bg-surface-container-high/40'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2.5 min-w-0">
-                          <div 
-                            className="w-3.5 h-3.5 rounded-full shrink-0 border border-black/10 dark:border-white/10 transition-transform duration-200" 
-                            style={{ 
-                              backgroundColor: item.color,
-                              transform: isHovered || isSelected ? 'scale(1.25)' : 'scale(1)'
-                            }}
-                          />
-                          <span className={`text-xs truncate transition-colors ${
-                            isSelected || isHovered ? 'font-bold text-primary' : 'font-medium text-on-surface'
-                          }`}>
-                            {item.name}
-                          </span>
-                          {isSelected && (
-                            <span className="text-[9px] font-bold text-primary bg-primary/15 px-1.5 py-0.5 rounded-md">
-                              Filtered
+                            <span style={{ fontSize: '14px', fontWeight: 900, fontFamily: 'monospace', color: 'var(--color-on-surface,#1c1b1f)', marginTop: '3px', lineHeight: 1.1, maxWidth: '96px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {formatCurrency(focusedItem.value)}
                             </span>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-3 font-mono text-right shrink-0">
-                          <span className={`text-xs transition-colors ${
-                            isSelected || isHovered ? 'font-black text-on-surface' : 'font-bold text-on-surface'
-                          }`}>
-                            {formatCurrency(item.value)}
-                          </span>
-                          <span className="text-[10px] text-on-surface-variant font-semibold bg-surface-container-high px-1.5 py-0.5 rounded-md font-sans">
-                            {percent}%
-                          </span>
-                        </div>
+                            <span style={{ fontSize: '10px', fontWeight: 700, color: focusedItem.color, marginTop: '4px', background: `${focusedItem.color}22`, padding: '1px 6px', borderRadius: '99px', lineHeight: 1.6 }}>
+                              {totalSpendingForMonth > 0 ? ((focusedItem.value / totalSpendingForMonth) * 100).toFixed(1) : 0}%
+                            </span>
+                          </>
+                        ) : (
+                          <>
+                            <span style={{ fontSize: '9px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--color-on-surface-variant,#49454f)', lineHeight: 1.2 }}>
+                              Total
+                            </span>
+                            <span style={{ fontSize: '14px', fontWeight: 900, fontFamily: 'monospace', color: 'var(--color-on-surface,#1c1b1f)', marginTop: '3px', lineHeight: 1.1, maxWidth: '96px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {formatCurrency(totalSpendingForMonth)}
+                            </span>
+                            <span style={{ fontSize: '9px', fontWeight: 500, color: 'var(--color-on-surface-variant,#49454f)', marginTop: '4px', opacity: 0.75 }}>
+                              {chartData.length} {chartData.length === 1 ? 'category' : 'categories'}
+                            </span>
+                          </>
+                        )}
                       </div>
+                    </foreignObject>
+                  </svg>
+                </div>
 
-                      {/* Category Budget Progress Bar */}
-                      {hasLimit && hasBudget && (
-                        <div className="pl-6 space-y-0.5">
-                          <div className="flex items-center justify-between text-[9px] font-semibold leading-none">
-                            <span className={isOver ? "text-error" : "text-primary"}>
-                              {isOver 
-                                ? `Over Limit by ${formatCurrency(item.value - limitVal)}` 
-                                : `Within limit (${limitVal > 0 ? Math.round((item.value / limitVal) * 100) : 0}%)`
-                              }
-                            </span>
-                            <span className="font-mono text-on-surface-variant">
-                              Max: {formatCurrency(limitVal)}
-                            </span>
-                          </div>
-                          <div className="w-full h-1.5 bg-surface-container rounded-full overflow-hidden">
-                            <div 
-                              className={`h-full rounded-full transition-all duration-300 ${
-                                isOver ? "bg-error animate-pulse" : "bg-primary"
-                              }`}
-                              style={{ width: `${Math.min(100, (item.value / limitVal) * 100)}%` }}
+                {/* ── Category Legend ── */}
+                <div
+                  className="flex-1 w-full space-y-1 max-h-52 overflow-y-auto"
+                  onMouseLeave={() => setHoveredCategory(null)}
+                >
+                  {chartData.map((item) => {
+                    const percent = totalSpendingForMonth > 0
+                      ? ((item.value / totalSpendingForMonth) * 100).toFixed(1)
+                      : '0';
+                    const hasLimit = budget?.categoryLimits && budget.categoryLimits[item.name] !== undefined;
+                    const limitVal = hasLimit ? (budget.categoryLimits?.[item.name] || 0) : 0;
+                    const isOver = hasLimit && item.value > limitVal;
+                    const isSelected = activeCategoryFilter === item.name;
+                    const isHov = hoveredCategory === item.name;
+                    const isActive = isSelected || isHov;
+
+                    return (
+                      <div
+                        key={item.name}
+                        onMouseEnter={() => setHoveredCategory(item.name)}
+                        onMouseLeave={() => setHoveredCategory(null)}
+                        onClick={() => {
+                          triggerHaptic('light');
+                          const next = isSelected ? null : item.name;
+                          setActiveCategoryFilter(next);
+                          setHoveredCategory(next);
+                        }}
+                        style={{ transition: 'all 0.18s ease' }}
+                        className={`
+                          relative flex flex-col gap-1 pl-4 pr-3 py-2 rounded-xl cursor-pointer border
+                          ${isSelected
+                            ? 'border-primary/40 bg-primary/8 shadow-sm'
+                            : isHov
+                              ? 'border-outline-variant/40 bg-surface-container shadow-xs -translate-y-px'
+                              : 'border-transparent'
+                          }
+                        `}
+                      >
+                        {/* left accent bar */}
+                        <div
+                          className="absolute left-0 top-2 bottom-2 w-[3px] rounded-r-full"
+                          style={{
+                            backgroundColor: item.color,
+                            opacity: isActive ? 1 : 0.3,
+                            transform: isActive ? 'scaleY(1)' : 'scaleY(0.5)',
+                            transformOrigin: 'center',
+                            transition: 'all 0.18s ease',
+                          }}
+                        />
+
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <div
+                              className="w-2.5 h-2.5 rounded-full shrink-0"
+                              style={{
+                                backgroundColor: item.color,
+                                boxShadow: isActive ? `0 0 0 3px ${item.color}30` : 'none',
+                                transform: isActive ? 'scale(1.35)' : 'scale(1)',
+                                transition: 'all 0.18s ease',
+                              }}
                             />
+                            <span className={`text-xs truncate transition-all duration-150 ${isActive ? 'font-bold text-on-surface' : 'font-medium text-on-surface-variant'}`}>
+                              {item.name}
+                            </span>
+                            {isSelected && (
+                              <span className="shrink-0 text-[9px] font-bold px-1.5 py-0.5 rounded-md" style={{ background: `${item.color}20`, color: item.color }}>
+                                Active
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0">
+                            <span className={`font-mono text-xs transition-all duration-150 ${isActive ? 'font-black text-on-surface' : 'font-bold text-on-surface/60'}`}>
+                              {formatCurrency(item.value)}
+                            </span>
+                            <span
+                              className="text-[10px] font-bold px-1.5 py-0.5 rounded-md min-w-[36px] text-center transition-all duration-150"
+                              style={{
+                                background: isActive ? `${item.color}25` : 'var(--color-surface-container-high,#ece6f0)',
+                                color: isActive ? item.color : 'var(--color-on-surface-variant,#49454f)',
+                              }}
+                            >
+                              {percent}%
+                            </span>
                           </div>
                         </div>
-                      )}
-                    </div>
-                  );
-                })}
+
+                        {/* Budget bar */}
+                        {hasLimit && hasBudget && (
+                          <div className="space-y-0.5">
+                            <div className="flex items-center justify-between text-[9px] font-semibold">
+                              <span className={isOver ? 'text-error' : 'text-primary'}>
+                                {isOver ? `Over by ${formatCurrency(item.value - limitVal)}` : `${limitVal > 0 ? Math.round((item.value / limitVal) * 100) : 0}% of limit`}
+                              </span>
+                              <span className="font-mono text-on-surface-variant">{formatCurrency(limitVal)}</span>
+                            </div>
+                            <div className="w-full h-1 bg-surface-container rounded-full overflow-hidden">
+                              <div
+                                className={`h-full rounded-full transition-all duration-500 ${isOver ? 'bg-error animate-pulse' : 'bg-primary'}`}
+                                style={{ width: `${Math.min(100, (item.value / limitVal) * 100)}%` }}
+                              />
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+
               </div>
-            </div>
-          )}
+            );
+          })()}
         </div>
       </section>
 
