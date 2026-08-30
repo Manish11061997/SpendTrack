@@ -712,18 +712,18 @@ export default function DashboardTab({
     <div className="space-y-3.5 sm:space-y-5 pb-20 animate-fade-in">
       
       {/* Hero Section: Total Spending */}
-      <section className="bg-surface-container-low/40 p-3 sm:p-4 rounded-2xl border border-outline-variant/25 space-y-2 relative z-20">
+      <section className="bg-surface-container-low/40 p-3 sm:p-4 rounded-2xl border border-outline-variant/25 space-y-2 relative z-20 overflow-hidden">
+        {/* Row 1: Label + Toggle */}
         <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-1.5 flex-wrap">
+          <div className="flex items-center gap-1.5 flex-wrap min-w-0">
             <span className="text-[11px] font-bold text-on-surface-variant uppercase tracking-wider">
               {summaryMode === 'monthly' ? 'Monthly Spend' : 'Weekly Spend'}
             </span>
             {summaryMode === 'weekly' && getWeeklyPeriodRange() && (
-              <span className="text-[9px] font-bold text-primary bg-primary-container/40 px-1.5 py-0.5 rounded-full border border-primary/10">
+              <span className="text-[9px] font-bold text-primary bg-primary-container/40 px-1.5 py-0.5 rounded-full border border-primary/10 shrink-0">
                 {getWeeklyPeriodRange()}
               </span>
             )}
-
           </div>
 
           {/* Controls: Badges Icon + Segmented Toggle */}
@@ -770,134 +770,137 @@ export default function DashboardTab({
           </div>
         </div>
 
-        <div className="flex items-baseline justify-between gap-2">
-          <div className="relative inline-flex items-center">
-            <span className="font-headline-lg text-xl sm:text-2xl lg:text-3xl font-extrabold text-primary tracking-tight">
-              {formatCurrency(activeExpenses)}
-            </span>
-            <button 
-              type="button"
-              onClick={() => setShowCalcTooltip(!showCalcTooltip)}
-              className="p-1 text-on-surface-variant/60 hover:text-primary transition-colors cursor-pointer shrink-0"
-              title="Calculation breakdown"
-            >
-              <Info className="w-3.5 h-3.5 text-primary" />
-            </button>
+        {/* Row 2: Amount + info button */}
+        <div className="flex items-center gap-1.5 flex-wrap min-w-0">
+          <span className="font-headline-lg text-xl sm:text-2xl lg:text-3xl font-extrabold text-primary tracking-tight shrink-0">
+            {formatCurrency(activeExpenses)}
+          </span>
+          <button 
+            type="button"
+            onClick={() => setShowCalcTooltip(!showCalcTooltip)}
+            className="p-1 text-on-surface-variant/60 hover:text-primary transition-colors cursor-pointer shrink-0"
+            title="Calculation breakdown"
+          >
+            <Info className="w-3.5 h-3.5 text-primary" />
+          </button>
 
-            {/* MoM Comparison Pill */}
-            {summaryMode === 'monthly' && prevMonthExpenses > 0 && (
-              <span className={`ml-2 inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold border ${
-                monthlyDiffPercent <= 0 
-                  ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30' 
-                  : 'bg-rose-500/15 text-rose-400 border-rose-500/30'
-              }`}>
-                {monthlyDiffPercent <= 0 ? <TrendingDown className="w-3 h-3" /> : <TrendingUp className="w-3 h-3" />}
-                <span>{monthlyDiffPercent <= 0 ? `${Math.abs(Math.round(monthlyDiffPercent))}% vs last mo` : `+${Math.round(monthlyDiffPercent)}% vs last mo`}</span>
-              </span>
-            )}
-            
-            <AnimatePresence>
-              {showCalcTooltip && (
-                <div 
-                  className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fade-in"
-                  onClick={() => setShowCalcTooltip(false)}
+          {/* Calculation Breakdown Modal */}
+          <AnimatePresence>
+            {showCalcTooltip && (
+              <div 
+                className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fade-in"
+                onClick={() => setShowCalcTooltip(false)}
+              >
+                <motion.div 
+                  initial={{ opacity: 0, scale: 0.9, y: 10 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.9, y: 10 }}
+                  onClick={(e) => e.stopPropagation()}
+                  className="w-full max-w-sm bg-surface-container-lowest dark:bg-slate-900 border border-outline-variant/40 dark:border-slate-800 rounded-3xl p-5 shadow-2xl space-y-4"
                 >
-                  <motion.div 
-                    initial={{ opacity: 0, scale: 0.9, y: 10 }}
-                    animate={{ opacity: 1, scale: 1, y: 0 }}
-                    exit={{ opacity: 0, scale: 0.9, y: 10 }}
-                    onClick={(e) => e.stopPropagation()}
-                    className="w-full max-w-sm bg-surface-container-lowest dark:bg-slate-900 border border-outline-variant/40 dark:border-slate-800 rounded-3xl p-5 shadow-2xl space-y-4"
-                  >
-                    <div className="flex items-center justify-between border-b border-outline-variant/20 dark:border-slate-800 pb-3">
-                      <div className="flex items-center gap-2.5">
-                        <div className="p-2.5 bg-primary/10 rounded-2xl">
-                          <Info className="w-5 h-5 text-primary" />
-                        </div>
-                        <div>
-                          <h3 className="font-outfit font-black text-base text-on-surface dark:text-white">
-                            Calculation Breakdown
-                          </h3>
-                          <p className="text-[11px] text-on-surface-variant dark:text-slate-400 font-medium">
-                            {summaryMode === 'monthly' ? 'Total Monthly Spending Formula' : 'Total Weekly Spending Formula'}
-                          </p>
-                        </div>
+                  <div className="flex items-center justify-between border-b border-outline-variant/20 dark:border-slate-800 pb-3">
+                    <div className="flex items-center gap-2.5">
+                      <div className="p-2.5 bg-primary/10 rounded-2xl">
+                        <Info className="w-5 h-5 text-primary" />
                       </div>
-                      <button 
-                        type="button"
-                        onClick={() => setShowCalcTooltip(false)}
-                        className="w-8 h-8 rounded-full bg-surface-container-high dark:bg-slate-800 text-on-surface-variant dark:text-slate-300 hover:text-on-surface flex items-center justify-center font-bold text-xs cursor-pointer transition-colors"
-                      >
-                        ✕
-                      </button>
-                    </div>
-
-                    <div className="space-y-2.5 text-xs">
-                      <div className="flex justify-between items-center p-3 rounded-2xl bg-surface-container-low dark:bg-slate-800/60 border border-outline-variant/20">
-                        <span className="text-on-surface-variant dark:text-slate-300 font-medium">Logged Purchases</span>
-                        <span className="font-mono font-extrabold text-on-surface dark:text-white text-sm">
-                          {formatCurrency(Math.abs(currentMonthTxs.filter(t => t.amount < 0).reduce((sum, t) => sum + t.amount, 0)))}
-                        </span>
-                      </div>
-
-                      <div className="flex justify-between items-center p-3 rounded-2xl bg-surface-container-low dark:bg-slate-800/60 border border-outline-variant/20">
-                        <span className="text-on-surface-variant dark:text-slate-300 font-medium">Active Subscriptions</span>
-                        <span className="font-mono font-extrabold text-on-surface dark:text-white text-sm">
-                          {formatCurrency(activeSubsTotal)}
-                        </span>
-                      </div>
-
-                      <div className="flex justify-between items-center p-3.5 rounded-2xl bg-primary/10 border border-primary/20">
-                        <span className="font-bold text-primary">Total Calculated Outflow</span>
-                        <span className="font-mono font-black text-primary text-base">
-                          {formatCurrency(totalExpenses)}
-                        </span>
+                      <div>
+                        <h3 className="font-outfit font-black text-base text-on-surface dark:text-white">
+                          Calculation Breakdown
+                        </h3>
+                        <p className="text-[11px] text-on-surface-variant dark:text-slate-400 font-medium">
+                          {summaryMode === 'monthly' ? 'Total Monthly Spending Formula' : 'Total Weekly Spending Formula'}
+                        </p>
                       </div>
                     </div>
-
-                    <button
+                    <button 
                       type="button"
                       onClick={() => setShowCalcTooltip(false)}
-                      className="w-full py-3 bg-primary hover:bg-primary/90 text-on-primary font-bold text-xs rounded-2xl shadow-xs transition-all cursor-pointer"
+                      className="w-8 h-8 rounded-full bg-surface-container-high dark:bg-slate-800 text-on-surface-variant dark:text-slate-300 hover:text-on-surface flex items-center justify-center font-bold text-xs cursor-pointer transition-colors"
                     >
-                      Got It
+                      ✕
                     </button>
-                  </motion.div>
-                </div>
-              )}
-            </AnimatePresence>
-          </div>
+                  </div>
 
-          <div className="flex items-center gap-1 shrink-0">
-            {(() => {
-              const comp = getComparisonInfo();
-              return (
-                <span className={`font-label-md text-[9px] sm:text-[10px] flex items-center gap-0.5 px-2 py-0.5 rounded-full border ${
-                  comp.label === 'No comparative data'
-                    ? 'bg-surface-container text-on-surface-variant border-outline-variant/30'
-                    : comp.isLess
-                    ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20'
-                    : 'bg-error/10 text-error border-error/20'
-                }`}>
-                  {comp.showIcon && (comp.isLess ? <TrendingDown className="w-2.5 h-2.5" /> : <TrendingUp className="w-2.5 h-2.5" />)}
-                  <span>{comp.label}</span>
-                </span>
-              );
-            })()}
+                  <div className="space-y-2.5 text-xs">
+                    <div className="flex justify-between items-center p-3 rounded-2xl bg-surface-container-low dark:bg-slate-800/60 border border-outline-variant/20">
+                      <span className="text-on-surface-variant dark:text-slate-300 font-medium">Logged Purchases</span>
+                      <span className="font-mono font-extrabold text-on-surface dark:text-white text-sm">
+                        {formatCurrency(Math.abs(currentMonthTxs.filter(t => t.amount < 0).reduce((sum, t) => sum + t.amount, 0)))}
+                      </span>
+                    </div>
 
-            {hasBudget && (
-              <span className={`font-label-md text-[9px] sm:text-[10px] flex items-center gap-1 px-2 py-0.5 rounded-full border ${budgetHealth.bgClass} ${budgetHealth.colorClass} ${budgetHealth.borderClass}`}>
-                <span className={`w-1.5 h-1.5 rounded-full ${
-                  budgetHealth.label === 'On Track' 
-                    ? 'bg-emerald-500' 
-                    : budgetHealth.label.includes('Caution') 
-                    ? 'bg-amber-500 animate-pulse' 
-                    : 'bg-error animate-pulse'
-                }`} />
-                <span>{budgetHealth.label}</span>
-              </span>
+                    <div className="flex justify-between items-center p-3 rounded-2xl bg-surface-container-low dark:bg-slate-800/60 border border-outline-variant/20">
+                      <span className="text-on-surface-variant dark:text-slate-300 font-medium">Active Subscriptions</span>
+                      <span className="font-mono font-extrabold text-on-surface dark:text-white text-sm">
+                        {formatCurrency(activeSubsTotal)}
+                      </span>
+                    </div>
+
+                    <div className="flex justify-between items-center p-3.5 rounded-2xl bg-primary/10 border border-primary/20">
+                      <span className="font-bold text-primary">Total Calculated Outflow</span>
+                      <span className="font-mono font-black text-primary text-base">
+                        {formatCurrency(totalExpenses)}
+                      </span>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setShowCalcTooltip(false)}
+                    className="w-full py-3 bg-primary hover:bg-primary/90 text-on-primary font-bold text-xs rounded-2xl shadow-xs transition-all cursor-pointer"
+                  >
+                    Got It
+                  </button>
+                </motion.div>
+              </div>
             )}
-          </div>
+          </AnimatePresence>
+        </div>
+
+        {/* Row 3: Pills — MoM + budget health */}
+        <div className="flex items-center gap-1.5 flex-wrap">
+          {/* MoM Comparison Pill */}
+          {summaryMode === 'monthly' && prevMonthExpenses > 0 && (
+            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-extrabold border shrink-0 ${
+              monthlyDiffPercent <= 0 
+                ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30' 
+                : 'bg-rose-500/15 text-rose-400 border-rose-500/30'
+            }`}>
+              {monthlyDiffPercent <= 0 ? <TrendingDown className="w-3 h-3" /> : <TrendingUp className="w-3 h-3" />}
+              <span>{monthlyDiffPercent <= 0 ? `${Math.abs(Math.round(monthlyDiffPercent))}% vs last mo` : `+${Math.round(monthlyDiffPercent)}% vs last mo`}</span>
+            </span>
+          )}
+
+          {/* Comparison info pill */}
+          {(() => {
+            const comp = getComparisonInfo();
+            return (
+              <span className={`font-label-md text-[9px] sm:text-[10px] flex items-center gap-0.5 px-2 py-0.5 rounded-full border shrink-0 ${
+                comp.label === 'No comparative data'
+                  ? 'bg-surface-container text-on-surface-variant border-outline-variant/30'
+                  : comp.isLess
+                  ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20'
+                  : 'bg-error/10 text-error border-error/20'
+              }`}>
+                {comp.showIcon && (comp.isLess ? <TrendingDown className="w-2.5 h-2.5" /> : <TrendingUp className="w-2.5 h-2.5" />)}
+                <span>{comp.label}</span>
+              </span>
+            );
+          })()}
+
+          {/* Budget health pill */}
+          {hasBudget && (
+            <span className={`font-label-md text-[9px] sm:text-[10px] flex items-center gap-1 px-2 py-0.5 rounded-full border shrink-0 ${budgetHealth.bgClass} ${budgetHealth.colorClass} ${budgetHealth.borderClass}`}>
+              <span className={`w-1.5 h-1.5 rounded-full ${
+                budgetHealth.label === 'On Track' 
+                  ? 'bg-emerald-500' 
+                  : budgetHealth.label.includes('Caution') 
+                  ? 'bg-amber-500 animate-pulse' 
+                  : 'bg-error animate-pulse'
+              }`} />
+              <span>{budgetHealth.label}</span>
+            </span>
+          )}
         </div>
       </section>
 
