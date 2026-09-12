@@ -1589,6 +1589,18 @@ export default function App() {
               </div>
 
               <div className="flex items-center gap-2">
+                {/* RizzEat-inspired Live Sync Indicator Badge */}
+                <div 
+                  title="Live Firestore Cloud Sync Active"
+                  className="rizzeat-pill bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 select-none cursor-default"
+                >
+                  <div className="rizzeat-pulse-dot">
+                    <span className="bg-emerald-400"></span>
+                    <span className="bg-emerald-500"></span>
+                  </div>
+                  <span className="hidden xs:inline">Live</span>
+                </div>
+
                 {/* 1-Tap Lock App Button (Available when PIN protection is configured) */}
                 {pinConfig.isEnabled && (
                   <button

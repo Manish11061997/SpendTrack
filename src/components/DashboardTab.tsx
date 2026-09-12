@@ -755,30 +755,50 @@ export default function DashboardTab({
                     </button>
                   )}
 
-                  {/* Segmented Toggle Control */}
-                  <div className="flex bg-surface-container rounded-lg p-0.5 border border-outline-variant/35 shrink-0">
+                  {/* Segmented Toggle Control with spring pill */}
+                  <div className="relative flex bg-surface-container rounded-lg p-0.5 border border-outline-variant/35 shrink-0">
                     <button
                       id="summary-mode-monthly-btn"
                       type="button"
-                      onClick={() => setSummaryMode('monthly')}
-                      className={`px-2 py-0.5 rounded-md font-bold text-[9px] sm:text-[10px] uppercase tracking-wider transition-all cursor-pointer ${
+                      onClick={() => {
+                        triggerHaptic('light');
+                        setSummaryMode('monthly');
+                      }}
+                      className={`relative z-10 px-2 py-0.5 rounded-md font-bold text-[9px] sm:text-[10px] uppercase tracking-wider transition-colors cursor-pointer ${
                         summaryMode === 'monthly'
-                          ? 'bg-primary text-on-primary shadow-2xs'
+                          ? 'text-on-primary'
                           : 'text-on-surface-variant hover:text-on-surface'
                       }`}
                     >
+                      {summaryMode === 'monthly' && (
+                        <motion.div
+                          layoutId="segmented-summary-pill"
+                          className="absolute inset-0 bg-primary rounded-md shadow-xs -z-10"
+                          transition={{ type: 'spring', stiffness: 500, damping: 35 }}
+                        />
+                      )}
                       Monthly
                     </button>
                     <button
                       id="summary-mode-weekly-btn"
                       type="button"
-                      onClick={() => setSummaryMode('weekly')}
-                      className={`px-2 py-0.5 rounded-md font-bold text-[9px] sm:text-[10px] uppercase tracking-wider transition-all cursor-pointer ${
+                      onClick={() => {
+                        triggerHaptic('light');
+                        setSummaryMode('weekly');
+                      }}
+                      className={`relative z-10 px-2 py-0.5 rounded-md font-bold text-[9px] sm:text-[10px] uppercase tracking-wider transition-colors cursor-pointer ${
                         summaryMode === 'weekly'
-                          ? 'bg-primary text-on-primary shadow-2xs'
+                          ? 'text-on-primary'
                           : 'text-on-surface-variant hover:text-on-surface'
                       }`}
                     >
+                      {summaryMode === 'weekly' && (
+                        <motion.div
+                          layoutId="segmented-summary-pill"
+                          className="absolute inset-0 bg-primary rounded-md shadow-xs -z-10"
+                          transition={{ type: 'spring', stiffness: 500, damping: 35 }}
+                        />
+                      )}
                       Weekly
                     </button>
                   </div>
@@ -876,14 +896,14 @@ export default function DashboardTab({
                 </AnimatePresence>
               </div>
 
-              {/* Row 3: Pills — MoM + budget health */}
+              {/* Row 3: Pills — MoM + budget health with RizzEat style */}
               <div className="flex items-center gap-1.5 flex-wrap">
                 {/* MoM Comparison Pill */}
                 {summaryMode === 'monthly' && prevMonthExpenses > 0 && (
-                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-extrabold border shrink-0 ${
+                  <span className={`rizzeat-pill border shrink-0 ${
                     monthlyDiffPercent <= 0 
-                      ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30' 
-                      : 'bg-rose-500/15 text-rose-400 border-rose-500/30'
+                      ? 'bg-emerald-500/15 text-emerald-500 dark:text-emerald-400 border-emerald-500/30' 
+                      : 'bg-rose-500/15 text-rose-500 dark:text-rose-400 border-rose-500/30'
                   }`}>
                     {monthlyDiffPercent <= 0 ? <TrendingDown className="w-3 h-3" /> : <TrendingUp className="w-3 h-3" />}
                     <span>{monthlyDiffPercent <= 0 ? `${Math.abs(Math.round(monthlyDiffPercent))}% vs last mo` : `+${Math.round(monthlyDiffPercent)}% vs last mo`}</span>
@@ -894,11 +914,11 @@ export default function DashboardTab({
                 {(() => {
                   const comp = getComparisonInfo();
                   return (
-                    <span className={`font-label-md text-[9px] sm:text-[10px] flex items-center gap-0.5 px-2 py-0.5 rounded-full border shrink-0 ${
+                    <span className={`rizzeat-pill border shrink-0 ${
                       comp.label === 'No comparative data'
                         ? 'bg-surface-container text-on-surface-variant border-outline-variant/30'
                         : comp.isLess
-                        ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20'
+                        ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20'
                         : 'bg-error/10 text-error border-error/20'
                     }`}>
                       {comp.showIcon && (comp.isLess ? <TrendingDown className="w-2.5 h-2.5" /> : <TrendingUp className="w-2.5 h-2.5" />)}
@@ -907,16 +927,25 @@ export default function DashboardTab({
                   );
                 })()}
 
-                {/* Budget health pill */}
+                {/* Budget health pill with pulsing live dot */}
                 {hasBudget && (
-                  <span className={`font-label-md text-[9px] sm:text-[10px] flex items-center gap-1 px-2 py-0.5 rounded-full border shrink-0 ${budgetHealth.bgClass} ${budgetHealth.colorClass} ${budgetHealth.borderClass}`}>
-                    <span className={`w-1.5 h-1.5 rounded-full ${
-                      budgetHealth.label === 'On Track' 
-                        ? 'bg-emerald-500' 
-                        : budgetHealth.label.includes('Caution') 
-                        ? 'bg-amber-500 animate-pulse' 
-                        : 'bg-error animate-pulse'
-                    }`} />
+                  <span className={`rizzeat-pill border shrink-0 ${budgetHealth.bgClass} ${budgetHealth.colorClass} ${budgetHealth.borderClass}`}>
+                    <div className="rizzeat-pulse-dot">
+                      <span className={
+                        budgetHealth.label === 'On Track' 
+                          ? 'bg-emerald-400' 
+                          : budgetHealth.label.includes('Caution') 
+                          ? 'bg-amber-400' 
+                          : 'bg-rose-400'
+                      } />
+                      <span className={
+                        budgetHealth.label === 'On Track' 
+                          ? 'bg-emerald-500' 
+                          : budgetHealth.label.includes('Caution') 
+                          ? 'bg-amber-500' 
+                          : 'bg-rose-500'
+                      } />
+                    </div>
                     <span>{budgetHealth.label}</span>
                   </span>
                 )}

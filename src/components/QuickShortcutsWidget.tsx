@@ -40,9 +40,13 @@ export const QuickShortcutsWidget: React.FC<QuickShortcutsWidgetProps> = ({
           <Sparkles className="w-3.5 h-3.5 text-primary" />
           Shortcuts
         </span>
-        <span className="text-[9px] font-mono text-on-surface-variant font-semibold px-2 py-0.5 bg-surface-container-high rounded-full border border-outline-variant/20">
-          Cockpit
-        </span>
+        <div className="rizzeat-pill bg-primary/10 text-primary border border-primary/20">
+          <div className="rizzeat-pulse-dot">
+            <span className="bg-primary/50"></span>
+            <span className="bg-primary"></span>
+          </div>
+          <span>Cockpit</span>
+        </div>
       </div>
 
       <div className="grid grid-cols-6 gap-1 sm:gap-2">
