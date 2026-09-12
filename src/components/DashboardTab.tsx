@@ -707,25 +707,20 @@ export default function DashboardTab({
     <div className="space-y-3.5 sm:space-y-5 pb-20 animate-fade-in">
       
       {/* Hero Section: Interactive 3D Tilt & Flip Card */}
-      {/* Hero Section: Interactive 3D Tilt & Flip Card */}
       <TiltCard3D maxTilt={6} className="z-20">
         <FlipCard3D
           isFlipped={isHeroFlipped}
           onFlipChange={setIsHeroFlipped}
           front={
-            <section className="glass-card-metallic p-4 sm:p-5 rounded-3xl space-y-3 relative overflow-hidden group">
-              {/* Subtle ambient light sheen in card corner */}
-              <div className="absolute -top-16 -right-16 w-40 h-40 bg-primary/20 dark:bg-primary/30 rounded-full blur-2xl pointer-events-none" />
-
+            <section className="bg-surface-container-low/80 dark:bg-surface-container-low/60 backdrop-blur-md p-3.5 sm:p-4 rounded-2xl border border-outline-variant/30 shadow-3d space-y-2.5 relative overflow-hidden">
               {/* Row 1: Label + Controls */}
-              <div className="flex items-center justify-between gap-2 relative z-10">
-                <div className="flex items-center gap-2 flex-wrap min-w-0">
-                  <span className="text-[11px] font-black uppercase tracking-wider text-on-surface-variant flex items-center gap-1.5">
-                    <Sparkles className="w-3.5 h-3.5 text-primary" />
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-1.5 flex-wrap min-w-0">
+                  <span className="text-[11px] font-bold text-on-surface-variant uppercase tracking-wider">
                     {summaryMode === 'monthly' ? 'Monthly Spend' : 'Weekly Spend'}
                   </span>
                   {summaryMode === 'weekly' && getWeeklyPeriodRange() && (
-                    <span className="text-[9px] font-bold text-primary bg-primary-container/50 px-2 py-0.5 rounded-full border border-primary/20 shrink-0">
+                    <span className="text-[9px] font-bold text-primary bg-primary-container/40 px-1.5 py-0.5 rounded-full border border-primary/10 shrink-0">
                       {getWeeklyPeriodRange()}
                     </span>
                   )}
@@ -742,7 +737,7 @@ export default function DashboardTab({
                     }}
                     title="Flip for Spending Analytics"
                     aria-label="Flip card for statistics"
-                    className="flex items-center gap-1 px-2 py-1 rounded-xl bg-surface-container-high/70 hover:bg-surface-container-highest text-on-surface hover:text-primary transition-all text-[10px] font-bold border border-outline-variant/40 cursor-pointer active:scale-95 shadow-2xs"
+                    className="flex items-center gap-1 px-1.5 py-1 rounded-lg bg-surface-container-high/60 hover:bg-surface-container-highest text-on-surface-variant hover:text-primary transition-all text-[9px] font-bold border border-outline-variant/30 cursor-pointer active:scale-95"
                   >
                     <RotateCw className="w-3 h-3 text-primary animate-spin-slow" />
                     <span className="hidden xs:inline">Stats</span>
@@ -754,21 +749,21 @@ export default function DashboardTab({
                       onClick={onOpenBadges}
                       aria-label="Financial Discipline Badges"
                       title={`Financial Discipline Badges (${unlockedBadgesCount}/6 Mastered)`}
-                      className="w-7 h-7 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-500 flex items-center justify-center transition-all active:scale-90 cursor-pointer shrink-0 shadow-2xs"
+                      className="w-6 h-6 rounded-md bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/25 text-amber-600 dark:text-amber-400 flex items-center justify-center transition-all active:scale-90 cursor-pointer shrink-0"
                     >
-                      <Award className="w-4 h-4" />
+                      <Award className="w-3.5 h-3.5" />
                     </button>
                   )}
 
                   {/* Segmented Toggle Control */}
-                  <div className="flex bg-surface-container/90 dark:bg-slate-900/80 rounded-xl p-1 border border-outline-variant/40 shrink-0 shadow-inner">
+                  <div className="flex bg-surface-container rounded-lg p-0.5 border border-outline-variant/35 shrink-0">
                     <button
                       id="summary-mode-monthly-btn"
                       type="button"
                       onClick={() => setSummaryMode('monthly')}
-                      className={`px-2.5 py-1 rounded-lg font-bold text-[9px] sm:text-[10px] uppercase tracking-wider transition-all cursor-pointer ${
+                      className={`px-2 py-0.5 rounded-md font-bold text-[9px] sm:text-[10px] uppercase tracking-wider transition-all cursor-pointer ${
                         summaryMode === 'monthly'
-                          ? 'bg-primary text-on-primary shadow-xs'
+                          ? 'bg-primary text-on-primary shadow-2xs'
                           : 'text-on-surface-variant hover:text-on-surface'
                       }`}
                     >
@@ -778,9 +773,9 @@ export default function DashboardTab({
                       id="summary-mode-weekly-btn"
                       type="button"
                       onClick={() => setSummaryMode('weekly')}
-                      className={`px-2.5 py-1 rounded-lg font-bold text-[9px] sm:text-[10px] uppercase tracking-wider transition-all cursor-pointer ${
+                      className={`px-2 py-0.5 rounded-md font-bold text-[9px] sm:text-[10px] uppercase tracking-wider transition-all cursor-pointer ${
                         summaryMode === 'weekly'
-                          ? 'bg-primary text-on-primary shadow-xs'
+                          ? 'bg-primary text-on-primary shadow-2xs'
                           : 'text-on-surface-variant hover:text-on-surface'
                       }`}
                     >
@@ -791,8 +786,8 @@ export default function DashboardTab({
               </div>
 
               {/* Row 2: Amount + info button */}
-              <div className="flex items-baseline gap-2 flex-wrap min-w-0 relative z-10">
-                <span className="text-2xl sm:text-3xl lg:text-4xl font-black font-outfit text-gradient-hero tracking-tight shrink-0">
+              <div className="flex items-center gap-1.5 flex-wrap min-w-0">
+                <span className="font-headline-lg text-xl sm:text-2xl lg:text-3xl font-extrabold text-primary tracking-tight shrink-0">
                   <RollingNumber
                     value={activeExpenses}
                     prefix={getCurrencySymbol(budget?.currency || 'INR')}
@@ -802,10 +797,10 @@ export default function DashboardTab({
                 <button 
                   type="button"
                   onClick={() => setShowCalcTooltip(!showCalcTooltip)}
-                  className="p-1 rounded-full text-on-surface-variant/60 hover:text-primary hover:bg-primary/10 transition-colors cursor-pointer shrink-0"
+                  className="p-1 text-on-surface-variant/60 hover:text-primary transition-colors cursor-pointer shrink-0"
                   title="Calculation breakdown"
                 >
-                  <Info className="w-4 h-4 text-primary" />
+                  <Info className="w-3.5 h-3.5 text-primary" />
                 </button>
 
                 {/* Calculation Breakdown Modal */}
@@ -881,16 +876,16 @@ export default function DashboardTab({
                 </AnimatePresence>
               </div>
 
-              {/* Row 3: High-impact status pills */}
-              <div className="flex items-center gap-2 flex-wrap relative z-10">
+              {/* Row 3: Pills — MoM + budget health */}
+              <div className="flex items-center gap-1.5 flex-wrap">
                 {/* MoM Comparison Pill */}
                 {summaryMode === 'monthly' && prevMonthExpenses > 0 && (
-                  <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-extrabold border shrink-0 ${
+                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-extrabold border shrink-0 ${
                     monthlyDiffPercent <= 0 
                       ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30' 
                       : 'bg-rose-500/15 text-rose-400 border-rose-500/30'
                   }`}>
-                    {monthlyDiffPercent <= 0 ? <TrendingDown className="w-3 h-3 text-emerald-400" /> : <TrendingUp className="w-3 h-3 text-rose-400" />}
+                    {monthlyDiffPercent <= 0 ? <TrendingDown className="w-3 h-3" /> : <TrendingUp className="w-3 h-3" />}
                     <span>{monthlyDiffPercent <= 0 ? `${Math.abs(Math.round(monthlyDiffPercent))}% vs last mo` : `+${Math.round(monthlyDiffPercent)}% vs last mo`}</span>
                   </span>
                 )}
@@ -899,25 +894,23 @@ export default function DashboardTab({
                 {(() => {
                   const comp = getComparisonInfo();
                   return (
-                    <span className={`text-[10px] font-bold flex items-center gap-1 px-2.5 py-1 rounded-full border shrink-0 ${
+                    <span className={`font-label-md text-[9px] sm:text-[10px] flex items-center gap-0.5 px-2 py-0.5 rounded-full border shrink-0 ${
                       comp.label === 'No comparative data'
                         ? 'bg-surface-container text-on-surface-variant border-outline-variant/30'
                         : comp.isLess
-                        ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/25'
-                        : 'bg-error/10 text-error border-error/25'
+                        ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20'
+                        : 'bg-error/10 text-error border-error/20'
                     }`}>
-                      {comp.showIcon && (comp.isLess ? <TrendingDown className="w-3 h-3" /> : <TrendingUp className="w-3 h-3" />)}
+                      {comp.showIcon && (comp.isLess ? <TrendingDown className="w-2.5 h-2.5" /> : <TrendingUp className="w-2.5 h-2.5" />)}
                       <span>{comp.label}</span>
                     </span>
                   );
                 })()}
 
-                {/* Budget health pill with glowing badge */}
+                {/* Budget health pill */}
                 {hasBudget && (
-                  <span className={`text-[10px] font-extrabold flex items-center gap-1.5 px-3 py-1 rounded-full border shrink-0 ${budgetHealth.bgClass} ${budgetHealth.colorClass} ${budgetHealth.borderClass} ${
-                    budgetHealth.label === 'On Track' ? 'glow-emerald' : budgetHealth.label.includes('Caution') ? 'glow-amber' : 'glow-rose'
-                  }`}>
-                    <span className={`w-2 h-2 rounded-full ${
+                  <span className={`font-label-md text-[9px] sm:text-[10px] flex items-center gap-1 px-2 py-0.5 rounded-full border shrink-0 ${budgetHealth.bgClass} ${budgetHealth.colorClass} ${budgetHealth.borderClass}`}>
+                    <span className={`w-1.5 h-1.5 rounded-full ${
                       budgetHealth.label === 'On Track' 
                         ? 'bg-emerald-500' 
                         : budgetHealth.label.includes('Caution') 
@@ -931,13 +924,11 @@ export default function DashboardTab({
             </section>
           }
           back={
-            <section className="glass-card-metallic p-4 sm:p-5 rounded-3xl border border-primary/40 flex flex-col justify-between h-full relative overflow-hidden">
-              <div className="absolute -top-16 -left-16 w-36 h-36 bg-indigo-500/20 rounded-full blur-2xl pointer-events-none" />
-
-              <div className="flex items-center justify-between border-b border-outline-variant/30 pb-2.5 relative z-10">
-                <div className="flex items-center gap-2">
+            <section className="bg-surface-container-high/90 dark:bg-surface-container/90 backdrop-blur-md p-3.5 sm:p-4 rounded-2xl border border-primary/30 shadow-3d flex flex-col justify-between h-full relative overflow-hidden">
+              <div className="flex items-center justify-between border-b border-outline-variant/20 pb-2">
+                <div className="flex items-center gap-1.5">
                   <Sparkles className="w-4 h-4 text-primary" />
-                  <span className="text-[11px] font-black text-on-surface uppercase tracking-wider">
+                  <span className="text-[11px] font-bold text-on-surface uppercase tracking-wider">
                     Spending Velocity & Health
                   </span>
                 </div>
@@ -947,7 +938,7 @@ export default function DashboardTab({
                     triggerHaptic('light');
                     setIsHeroFlipped(false);
                   }}
-                  className="flex items-center gap-1 px-2.5 py-1 rounded-xl bg-primary text-on-primary text-[10px] font-bold shadow-xs hover:bg-primary/90 transition-all cursor-pointer"
+                  className="flex items-center gap-1 px-2 py-0.5 rounded-lg bg-primary text-on-primary text-[9px] font-bold shadow-2xs hover:bg-primary/90 transition-all cursor-pointer"
                 >
                   <RotateCw className="w-3 h-3" />
                   <span>Done</span>
@@ -955,47 +946,47 @@ export default function DashboardTab({
               </div>
 
               {/* Micro Analytics Metrics */}
-              <div className="grid grid-cols-3 gap-2.5 py-2 relative z-10">
+              <div className="grid grid-cols-3 gap-2 py-2">
                 {/* 1. Daily Average */}
-                <div className="p-2.5 bg-surface-container-low/90 dark:bg-slate-900/70 rounded-2xl text-center border border-outline-variant/30 shadow-2xs">
-                  <span className="text-[9px] font-extrabold text-on-surface-variant uppercase tracking-wider block">Daily Pace</span>
-                  <p className="font-mono text-xs sm:text-sm font-black text-primary mt-1">
+                <div className="p-2 bg-surface-container-low rounded-xl text-center border border-outline-variant/20">
+                  <span className="text-[8px] font-bold text-on-surface-variant uppercase tracking-wider block">Daily Pace</span>
+                  <p className="font-mono text-xs font-black text-primary mt-0.5">
                     {(() => {
                       const today = new Date().getDate();
                       const avg = today > 0 ? Math.round(activeExpenses / today) : activeExpenses;
                       return formatCurrency(avg);
                     })()}
                   </p>
-                  <span className="text-[8px] text-on-surface-variant font-medium block">per day</span>
+                  <span className="text-[7px] text-on-surface-variant font-medium block">per day</span>
                 </div>
 
                 {/* 2. Top Outflow Category */}
-                <div className="p-2.5 bg-surface-container-low/90 dark:bg-slate-900/70 rounded-2xl text-center border border-outline-variant/30 shadow-2xs">
-                  <span className="text-[9px] font-extrabold text-on-surface-variant uppercase tracking-wider block">Top Category</span>
-                  <p className="font-title-md text-xs sm:text-sm font-black text-on-surface truncate mt-1">
+                <div className="p-2 bg-surface-container-low rounded-xl text-center border border-outline-variant/20">
+                  <span className="text-[8px] font-bold text-on-surface-variant uppercase tracking-wider block">Top Category</span>
+                  <p className="font-title-md text-xs font-black text-on-surface truncate mt-0.5">
                     {chartData.length > 0 ? chartData[0].name : 'None'}
                   </p>
-                  <span className="text-[8px] text-on-surface-variant font-medium block">
+                  <span className="text-[7px] text-on-surface-variant font-medium block">
                     {chartData.length > 0 ? formatCurrency(chartData[0].value) : '₹0'}
                   </span>
                 </div>
 
                 {/* 3. Runway Left */}
-                <div className="p-2.5 bg-surface-container-low/90 dark:bg-slate-900/70 rounded-2xl text-center border border-outline-variant/30 shadow-2xs">
-                  <span className="text-[9px] font-extrabold text-on-surface-variant uppercase tracking-wider block">Remaining</span>
-                  <p className={`font-mono text-xs sm:text-sm font-black mt-1 ${
-                    activeLimit - activeExpenses < 0 ? 'text-error' : 'text-emerald-500'
+                <div className="p-2 bg-surface-container-low rounded-xl text-center border border-outline-variant/20">
+                  <span className="text-[8px] font-bold text-on-surface-variant uppercase tracking-wider block">Remaining</span>
+                  <p className={`font-mono text-xs font-black mt-0.5 ${
+                    activeLimit - activeExpenses < 0 ? 'text-error' : 'text-emerald-600 dark:text-emerald-400'
                   }`}>
                     {formatCurrency(activeLimit - activeExpenses)}
                   </p>
-                  <span className="text-[8px] text-on-surface-variant font-medium block">
+                  <span className="text-[7px] text-on-surface-variant font-medium block">
                     {activeLimit - activeExpenses < 0 ? 'over limit' : 'buffer'}
                   </span>
                 </div>
               </div>
 
-              <div className="flex items-center justify-between text-[9px] text-on-surface-variant font-medium pt-1.5 border-t border-outline-variant/20 relative z-10">
-                <span>Tap anywhere or Done to return</span>
+              <div className="flex items-center justify-between text-[9px] text-on-surface-variant/80 pt-1 border-t border-outline-variant/15">
+                <span>Tap anywhere or Done to return to card view</span>
                 <span className="font-mono font-bold text-primary">SpendTrack 3D</span>
               </div>
             </section>
@@ -1099,26 +1090,26 @@ export default function DashboardTab({
                   >
                     <div 
                       id={`transaction-row-${tx.id}`}
-                      className="flex items-center justify-between p-3 sm:p-3.5 glass-card-punchy rounded-2xl border border-outline-variant/30 hover:border-primary/40 transition-all duration-200 cursor-pointer group active:scale-[0.98]"
+                      className="flex items-center justify-between p-2.5 sm:p-3 bg-surface-container-lowest rounded-xl border border-outline-variant/30 transition-all cursor-pointer group active:bg-surface-container-high/50"
                     >
-                      <div className="flex items-center gap-3 min-w-0">
-                        <div className={`w-10 h-10 sm:w-11 sm:h-11 rounded-2xl flex items-center justify-center ${config.bg} shadow-2xs shrink-0 transition-transform duration-200 group-hover:scale-105`}>
-                          <IconComponent className="w-5 h-5 text-on-surface" />
+                      <div className="flex items-center gap-2.5">
+                        <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center ${config.bg} shadow-2xs shrink-0`}>
+                          <IconComponent className="w-4 h-4 text-on-surface" />
                         </div>
                         <div className="flex-1 min-w-0">
-                          <div className="font-outfit text-sm font-bold text-on-surface truncate group-hover:text-primary transition-colors">
+                          <div className="font-title-md text-xs sm:text-sm text-on-surface font-bold truncate group-hover:text-primary transition-colors">
                             {tx.title}
                           </div>
-                          <div className="text-[11px] text-on-surface-variant font-medium truncate mt-0.5">
+                          <div className="text-[11px] text-on-surface-variant font-medium truncate">
                             {tx.category} • {formatDateLabel(tx.date)}, {tx.time}
                           </div>
                         </div>
                       </div>
-                      <div className="text-right ml-2.5 flex flex-col items-end shrink-0">
-                        <div className={`font-mono text-xs sm:text-sm font-black ${isExpense ? 'text-on-surface' : 'text-emerald-500 font-extrabold'}`}>
-                          {isExpense ? '-' : '+'}{formatCurrency(Math.abs(tx.amount))}
+                      <div className="text-right ml-2 flex flex-col items-end shrink-0">
+                        <div className={`font-mono text-xs sm:text-sm font-bold ${isExpense ? 'text-on-surface' : 'text-emerald-600 dark:text-emerald-400'}`}>
+                          {isExpense ? '' : '+'}{formatCurrency(Math.abs(tx.amount))}
                         </div>
-                        <span className="inline-block px-2 py-0.5 mt-1 text-[9px] font-bold bg-surface-container-high/80 text-on-surface-variant rounded-md border border-outline-variant/20">
+                        <span className="inline-block px-1.5 py-0.5 mt-0.5 text-[9px] font-medium bg-surface-variant text-on-surface-variant rounded-md">
                           {tx.label}
                         </span>
                       </div>
@@ -1355,237 +1346,244 @@ export default function DashboardTab({
           )}
         </div>
         {/* Card */}
-        <Card3D depth={3} scaleOnHover={1.01} glare={false} className="rounded-3xl">
-          <div className="glass-card-punchy p-4 sm:p-5 rounded-3xl space-y-4">
-            {chartData.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-10 text-center space-y-2">
-                <div className="p-3.5 bg-surface-container-high rounded-full text-on-surface-variant shadow-inner">
-                  <Coins className="w-8 h-8 opacity-40" />
-                </div>
-                <p className="text-sm font-bold text-on-surface">No expenses logged yet</p>
-                <p className="text-xs text-on-surface-variant max-w-xs">
-                  Add your transactions for {formatMonthName(activeMonth)} to view category distribution.
-                </p>
+        <div className="p-4 sm:p-5 rounded-2xl bg-surface-container-low border border-outline-variant/30 shadow-sm">
+          {chartData.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-10 text-center space-y-2">
+              <div className="p-3 bg-surface-container-high rounded-full text-on-surface-variant">
+                <Coins className="w-8 h-8 opacity-40" />
               </div>
-            ) : (() => {
-              const CX = 110, CY = 110, R_OUTER = 88, R_INNER = 62;
-              const focusedName = hoveredCategory || activeCategoryFilter;
-              const focusedItem = focusedName ? chartData.find(d => d.name === focusedName) : null;
+              <p className="text-sm font-bold text-on-surface">No expenses logged yet</p>
+              <p className="text-xs text-on-surface-variant max-w-xs">
+                Add your transactions for the active month to view the category distribution.
+              </p>
+            </div>
+          ) : (() => {
+            const CX = 90, CY = 90, R_OUTER = 72, R_INNER = 50;
+            const focusedName = hoveredCategory || activeCategoryFilter;
+            const focusedItem = focusedName ? chartData.find(d => d.name === focusedName) : null;
 
-              const slicePath = (s: typeof donutSlices[0], outerR: number, innerR: number) => {
-                const toR = (d: number) => (d * Math.PI) / 180;
-                const ox1 = CX + outerR * Math.cos(toR(s.startAngle));
-                const oy1 = CY + outerR * Math.sin(toR(s.startAngle));
-                const ox2 = CX + outerR * Math.cos(toR(s.endAngle));
-                const oy2 = CY + outerR * Math.sin(toR(s.endAngle));
-                const ix1 = CX + innerR * Math.cos(toR(s.endAngle));
-                const iy1 = CY + innerR * Math.sin(toR(s.endAngle));
-                const ix2 = CX + innerR * Math.cos(toR(s.startAngle));
-                const iy2 = CY + innerR * Math.sin(toR(s.startAngle));
-                const lg = s.sweep > 180 ? 1 : 0;
-                return [
-                  `M ${ox1} ${oy1}`,
-                  `A ${outerR} ${outerR} 0 ${lg} 1 ${ox2} ${oy2}`,
-                  `L ${ix1} ${iy1}`,
-                  `A ${innerR} ${innerR} 0 ${lg} 0 ${ix2} ${iy2}`,
-                  'Z'
-                ].join(' ');
-              };
+            const slicePath = (s: typeof donutSlices[0], outerR: number, innerR: number) => {
+              const toR = (d: number) => (d * Math.PI) / 180;
+              const ox1 = CX + outerR * Math.cos(toR(s.startAngle));
+              const oy1 = CY + outerR * Math.sin(toR(s.startAngle));
+              const ox2 = CX + outerR * Math.cos(toR(s.endAngle));
+              const oy2 = CY + outerR * Math.sin(toR(s.endAngle));
+              const ix1 = CX + innerR * Math.cos(toR(s.endAngle));
+              const iy1 = CY + innerR * Math.sin(toR(s.endAngle));
+              const ix2 = CX + innerR * Math.cos(toR(s.startAngle));
+              const iy2 = CY + innerR * Math.sin(toR(s.startAngle));
+              const lg = s.sweep > 180 ? 1 : 0;
+              return [
+                `M ${ox1} ${oy1}`,
+                `A ${outerR} ${outerR} 0 ${lg} 1 ${ox2} ${oy2}`,
+                `L ${ix1} ${iy1}`,
+                `A ${innerR} ${innerR} 0 ${lg} 0 ${ix2} ${iy2}`,
+                'Z'
+              ].join(' ');
+            };
 
-              return (
-                <div className="flex flex-col md:flex-row gap-5 md:gap-6 items-center">
+            return (
+              <div className="flex flex-col sm:flex-row gap-5 sm:gap-6 items-center">
 
-                  {/* ── Glowing Pure SVG Donut ── */}
-                  <div className="shrink-0 flex items-center justify-center relative">
-                    <svg
-                      width="200" height="200"
-                      viewBox="0 0 220 220"
-                      className="overflow-visible"
-                      onMouseLeave={() => setHoveredCategory(null)}
-                    >
-                      <defs>
-                        {donutSlices.map((s) => (
-                          <filter key={`glow-${s.name}`} id={`glow-${s.name.replace(/\s+/g, '-')}`} x="-30%" y="-30%" width="160%" height="160%">
-                            <feDropShadow dx="0" dy="2" stdDeviation="6" floodColor={s.color} floodOpacity="0.55" />
-                          </filter>
-                        ))}
-                      </defs>
-
-                      {donutSlices.map((s) => {
-                        const isActive = s.name === focusedName;
-                        const anyFocused = Boolean(focusedName);
-                        const outerR = isActive ? R_OUTER + 8 : R_OUTER;
-                        const innerR = isActive ? R_INNER - 2 : R_INNER;
-                        return (
-                          <path
-                            key={s.name}
-                            d={slicePath(s, outerR, innerR)}
-                            fill={s.color}
-                            stroke="rgba(0,0,0,0.15)"
-                            strokeWidth="1.5"
-                            opacity={anyFocused ? (isActive ? 1 : 0.3) : 0.95}
-                            filter={isActive ? `url(#glow-${s.name.replace(/\s+/g, '-')})` : undefined}
-                            style={{
-                              transition: 'all 0.22s cubic-bezier(0.34, 1.56, 0.64, 1)',
-                              cursor: 'pointer',
-                            }}
-                            onMouseEnter={() => setHoveredCategory(s.name)}
-                            onMouseLeave={() => setHoveredCategory(null)}
-                            onClick={() => {
-                              triggerHaptic('light');
-                              const next = activeCategoryFilter === s.name ? null : s.name;
-                              setActiveCategoryFilter(next);
-                              setHoveredCategory(next);
-                            }}
-                          />
-                        );
-                      })}
-
-                      {/* Center Glass Disc */}
-                      <foreignObject x="46" y="46" width="128" height="128">
-                        <div className="w-[128px] h-[128px] rounded-full bg-surface/90 dark:bg-slate-900/90 backdrop-blur-md border border-outline-variant/30 flex flex-col items-center justify-center p-2 text-center pointer-events-none select-none shadow-sm">
-                          {focusedItem ? (
-                            <>
-                              <span 
-                                className="text-[9px] font-black uppercase tracking-wider truncate max-w-[110px]"
-                                style={{ color: focusedItem.color }}
-                              >
-                                {focusedItem.name}
-                              </span>
-                              <span className="text-base font-black font-mono text-on-surface mt-0.5 leading-none truncate max-w-[110px]">
-                                <RollingNumber
-                                  value={focusedItem.value}
-                                  prefix={getCurrencySymbol(budget?.currency || 'INR')}
-                                  locale={getCurrencyLocale(budget?.currency || 'INR')}
-                                  duration={450}
-                                />
-                              </span>
-                              <span 
-                                className="text-[9px] font-extrabold px-2 py-0.5 rounded-full mt-1 leading-none shadow-2xs"
-                                style={{ background: `${focusedItem.color}25`, color: focusedItem.color }}
-                              >
-                                {totalSpendingForMonth > 0 ? ((focusedItem.value / totalSpendingForMonth) * 100).toFixed(1) : 0}%
-                              </span>
-                            </>
-                          ) : (
-                            <>
-                              <span className="text-[9px] font-bold text-on-surface-variant uppercase tracking-wider">
-                                Total Outflow
-                              </span>
-                              <span className="text-base font-black font-mono text-on-surface mt-0.5 leading-none truncate max-w-[110px]">
-                                <RollingNumber
-                                  value={totalSpendingForMonth}
-                                  prefix={getCurrencySymbol(budget?.currency || 'INR')}
-                                  locale={getCurrencyLocale(budget?.currency || 'INR')}
-                                  duration={550}
-                                />
-                              </span>
-                              <span className="text-[9px] font-semibold text-on-surface-variant/80 mt-1">
-                                {chartData.length} {chartData.length === 1 ? 'category' : 'categories'}
-                              </span>
-                            </>
-                          )}
-                        </div>
-                      </foreignObject>
-                    </svg>
-                  </div>
-
-                  {/* ── Interactive Category Tiles ── */}
-                  <div
-                    className="flex-1 w-full grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-72 sm:max-h-60 overflow-y-auto pr-1"
+                {/* ── Pure SVG Donut ── */}
+                <div className="shrink-0 flex items-center justify-center">
+                  <svg
+                    width="180" height="180"
+                    viewBox="0 0 180 180"
+                    className="overflow-visible"
                     onMouseLeave={() => setHoveredCategory(null)}
                   >
-                    {chartData.map((item) => {
-                      const percent = totalSpendingForMonth > 0
-                        ? ((item.value / totalSpendingForMonth) * 100).toFixed(1)
-                        : '0';
-                      const hasLimit = budget?.categoryLimits && budget.categoryLimits[item.name] !== undefined;
-                      const limitVal = hasLimit ? (budget.categoryLimits?.[item.name] || 0) : 0;
-                      const isOver = hasLimit && item.value > limitVal;
-                      const isSelected = activeCategoryFilter === item.name;
-                      const isHov = hoveredCategory === item.name;
-                      const isActive = isSelected || isHov;
-                      const catConfig = getCategoryConfig(item.name);
-                      const IconComp = catConfig.icon;
+                    <defs>
+                      {donutSlices.map((s) => (
+                        <filter key={`glow-${s.name}`} id={`glow-${s.name.replace(/\s+/g, '-')}`} x="-30%" y="-30%" width="160%" height="160%">
+                          <feDropShadow dx="0" dy="3" stdDeviation="5" floodColor={s.color} floodOpacity="0.45" />
+                        </filter>
+                      ))}
+                    </defs>
 
+                    {donutSlices.map((s) => {
+                      const isActive = s.name === focusedName;
+                      const anyFocused = Boolean(focusedName);
+                      const outerR = isActive ? R_OUTER + 9 : R_OUTER;
+                      const innerR = isActive ? R_INNER - 3 : R_INNER;
                       return (
-                        <div
-                          key={item.name}
-                          onMouseEnter={() => setHoveredCategory(item.name)}
+                        <path
+                          key={s.name}
+                          d={slicePath(s, outerR, innerR)}
+                          fill={s.color}
+                          opacity={anyFocused ? (isActive ? 1 : 0.28) : 1}
+                          filter={isActive ? `url(#glow-${s.name.replace(/\s+/g, '-')})` : undefined}
+                          style={{
+                            transition: 'all 0.22s cubic-bezier(0.34, 1.56, 0.64, 1)',
+                            cursor: 'pointer',
+                          }}
+                          onMouseEnter={() => setHoveredCategory(s.name)}
                           onMouseLeave={() => setHoveredCategory(null)}
                           onClick={() => {
                             triggerHaptic('light');
-                            const next = isSelected ? null : item.name;
+                            const next = activeCategoryFilter === s.name ? null : s.name;
                             setActiveCategoryFilter(next);
                             setHoveredCategory(next);
                           }}
-                          className={`
-                            relative flex flex-col justify-between p-2.5 sm:p-3 rounded-2xl cursor-pointer border transition-all duration-200 active:scale-97
-                            ${isSelected
-                              ? 'border-primary bg-primary/10 shadow-sm'
-                              : isHov
-                                ? 'border-outline-variant/60 bg-surface-container-high/60 shadow-2xs -translate-y-0.5'
-                                : 'border-outline-variant/25 bg-surface-container-low/60 hover:bg-surface-container-high/40'
-                            }
-                          `}
-                        >
-                          <div className="flex items-center justify-between gap-2">
-                            <div className="flex items-center gap-2 min-w-0">
-                              <span 
-                                className="w-7 h-7 rounded-xl flex items-center justify-center shrink-0 shadow-2xs"
-                                style={{ background: `${item.color}20`, color: item.color }}
-                              >
-                                <IconComp className="w-3.5 h-3.5" />
-                              </span>
-                              <div className="min-w-0">
-                                <span className={`text-xs block truncate ${isActive ? 'font-black text-on-surface' : 'font-bold text-on-surface'}`}>
-                                  {item.name}
-                                </span>
-                                {isSelected ? (
-                                  <span className="text-[8px] font-black text-primary uppercase tracking-wider block">
-                                    Filtered ✓
-                                  </span>
-                                ) : (
-                                  <span className="text-[9px] font-medium text-on-surface-variant block">
-                                    {percent}% of total
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-
-                            <div className="text-right shrink-0">
-                              <span className="font-mono text-xs font-black text-on-surface block">
-                                {formatCurrency(item.value)}
-                              </span>
-                              {hasLimit && (
-                                <span className={`text-[8px] font-bold block ${isOver ? 'text-error' : 'text-on-surface-variant'}`}>
-                                  {isOver ? 'Over cap' : `Cap: ${formatCurrency(limitVal)}`}
-                                </span>
-                              )}
-                            </div>
-                          </div>
-
-                          {/* Progress Track */}
-                          <div className="w-full bg-surface-container-highest/50 h-1.5 rounded-full overflow-hidden mt-2">
-                            <div 
-                              className="h-full rounded-full transition-all duration-300"
-                              style={{ 
-                                width: `${Math.min(100, parseFloat(percent))}%`,
-                                backgroundColor: item.color,
-                                boxShadow: isActive ? `0 0 8px ${item.color}` : 'none'
-                              }}
-                            />
-                          </div>
-                        </div>
+                        />
                       );
                     })}
-                  </div>
 
+                    {/* Center content via foreignObject */}
+                    <foreignObject x="36" y="36" width="108" height="108">
+                      <div style={{ width: '108px', height: '108px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none', userSelect: 'none', textAlign: 'center', padding: '4px' }}>
+                        {focusedItem ? (
+                          <>
+                            <span style={{ fontSize: '9px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.06em', color: focusedItem.color, lineHeight: 1.2, maxWidth: '96px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {focusedItem.name}
+                            </span>
+                            <span style={{ fontSize: '14px', fontWeight: 900, fontFamily: 'monospace', color: 'var(--color-on-surface,#1c1b1f)', marginTop: '3px', lineHeight: 1.1, maxWidth: '96px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              <RollingNumber
+                                value={focusedItem.value}
+                                prefix={getCurrencySymbol(budget?.currency || 'INR')}
+                                locale={getCurrencyLocale(budget?.currency || 'INR')}
+                                duration={500}
+                              />
+                            </span>
+                            <span style={{ fontSize: '10px', fontWeight: 700, color: focusedItem.color, marginTop: '4px', background: `${focusedItem.color}22`, padding: '1px 6px', borderRadius: '99px', lineHeight: 1.6 }}>
+                              {totalSpendingForMonth > 0 ? ((focusedItem.value / totalSpendingForMonth) * 100).toFixed(1) : 0}%
+                            </span>
+                          </>
+                        ) : (
+                          <>
+                            <span style={{ fontSize: '9px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--color-on-surface-variant,#49454f)', lineHeight: 1.2 }}>
+                              Total
+                            </span>
+                            <span style={{ fontSize: '14px', fontWeight: 900, fontFamily: 'monospace', color: 'var(--color-on-surface,#1c1b1f)', marginTop: '3px', lineHeight: 1.1, maxWidth: '96px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              <RollingNumber
+                                value={totalSpendingForMonth}
+                                prefix={getCurrencySymbol(budget?.currency || 'INR')}
+                                locale={getCurrencyLocale(budget?.currency || 'INR')}
+                                duration={600}
+                              />
+                            </span>
+                            <span style={{ fontSize: '9px', fontWeight: 500, color: 'var(--color-on-surface-variant,#49454f)', marginTop: '4px', opacity: 0.75 }}>
+                              {chartData.length} {chartData.length === 1 ? 'category' : 'categories'}
+                            </span>
+                          </>
+                        )}
+                      </div>
+                    </foreignObject>
+                  </svg>
                 </div>
-              );
-            })()}
-          </div>
-        </Card3D>
+
+                {/* ── Category Legend ── */}
+                <div
+                  className="flex-1 w-full space-y-1 max-h-52 overflow-y-auto"
+                  onMouseLeave={() => setHoveredCategory(null)}
+                >
+                  {chartData.map((item) => {
+                    const percent = totalSpendingForMonth > 0
+                      ? ((item.value / totalSpendingForMonth) * 100).toFixed(1)
+                      : '0';
+                    const hasLimit = budget?.categoryLimits && budget.categoryLimits[item.name] !== undefined;
+                    const limitVal = hasLimit ? (budget.categoryLimits?.[item.name] || 0) : 0;
+                    const isOver = hasLimit && item.value > limitVal;
+                    const isSelected = activeCategoryFilter === item.name;
+                    const isHov = hoveredCategory === item.name;
+                    const isActive = isSelected || isHov;
+
+                    return (
+                      <div
+                        key={item.name}
+                        onMouseEnter={() => setHoveredCategory(item.name)}
+                        onMouseLeave={() => setHoveredCategory(null)}
+                        onClick={() => {
+                          triggerHaptic('light');
+                          const next = isSelected ? null : item.name;
+                          setActiveCategoryFilter(next);
+                          setHoveredCategory(next);
+                        }}
+                        style={{ transition: 'all 0.18s ease' }}
+                        className={`
+                          relative flex flex-col gap-1 pl-4 pr-3 py-2 rounded-xl cursor-pointer border
+                          ${isSelected
+                            ? 'border-primary/40 bg-primary/8 shadow-sm'
+                            : isHov
+                              ? 'border-outline-variant/40 bg-surface-container shadow-xs -translate-y-px'
+                              : 'border-transparent'
+                          }
+                        `}
+                      >
+                        {/* left accent bar */}
+                        <div
+                          className="absolute left-0 top-2 bottom-2 w-[3px] rounded-r-full"
+                          style={{
+                            backgroundColor: item.color,
+                            opacity: isActive ? 1 : 0.3,
+                            transform: isActive ? 'scaleY(1)' : 'scaleY(0.5)',
+                            transformOrigin: 'center',
+                            transition: 'all 0.18s ease',
+                          }}
+                        />
+
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <div
+                              className="w-2.5 h-2.5 rounded-full shrink-0"
+                              style={{
+                                backgroundColor: item.color,
+                                boxShadow: isActive ? `0 0 0 3px ${item.color}30` : 'none',
+                                transform: isActive ? 'scale(1.35)' : 'scale(1)',
+                                transition: 'all 0.18s ease',
+                              }}
+                            />
+                            <span className={`text-xs truncate transition-all duration-150 ${isActive ? 'font-bold text-on-surface' : 'font-medium text-on-surface-variant'}`}>
+                              {item.name}
+                            </span>
+                            {isSelected && (
+                              <span className="shrink-0 text-[9px] font-bold px-1.5 py-0.5 rounded-md" style={{ background: `${item.color}20`, color: item.color }}>
+                                Active
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0">
+                            <span className={`font-mono text-xs transition-all duration-150 ${isActive ? 'font-black text-on-surface' : 'font-bold text-on-surface/60'}`}>
+                              {formatCurrency(item.value)}
+                            </span>
+                            <span
+                              className="text-[10px] font-bold px-1.5 py-0.5 rounded-md min-w-[36px] text-center transition-all duration-150"
+                              style={{
+                                background: isActive ? `${item.color}25` : 'var(--color-surface-container-high,#ece6f0)',
+                                color: isActive ? item.color : 'var(--color-on-surface-variant,#49454f)',
+                              }}
+                            >
+                              {percent}%
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Budget bar */}
+                        {hasLimit && hasBudget && (
+                          <div className="space-y-0.5">
+                            <div className="flex items-center justify-between text-[9px] font-semibold">
+                              <span className={isOver ? 'text-error' : 'text-primary'}>
+                                {isOver ? `Over by ${formatCurrency(item.value - limitVal)}` : `${limitVal > 0 ? Math.round((item.value / limitVal) * 100) : 0}% of limit`}
+                              </span>
+                              <span className="font-mono text-on-surface-variant">{formatCurrency(limitVal)}</span>
+                            </div>
+                            <AnimatedProgressBar
+                              percentage={limitVal > 0 ? (item.value / limitVal) * 100 : 0}
+                              heightClassName="h-1"
+                              showThresholdColors={false}
+                              barClassName={isOver ? 'bg-error animate-pulse' : 'bg-primary'}
+                            />
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+
+              </div>
+            );
+          })()}
+        </div>
       </section>
 
       {/* Subscriptions Section (Collapsible for Clean UX) */}
