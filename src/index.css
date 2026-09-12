@@ -327,5 +327,27 @@ header.sticky-form-header {
   transition: filter 0.2s ease;
 }
 
+/* ── 3D & Depth Utilities ─────────────────────────────────────────────────── */
+.perspective-800 {
+  perspective: 800px;
+}
+.perspective-1000 {
+  perspective: 1000px;
+}
+.transform-style-3d {
+  transform-style: preserve-3d;
+}
+.backface-hidden {
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+.shadow-3d {
+  box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.12), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+}
+.dark .shadow-3d {
+  box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.45), 0 4px 10px -2px rgba(0, 0, 0, 0.3);
+}
+
+
 
 

@@ -5,7 +5,7 @@ import { Transaction, UserProfile, BudgetConfig, Subscription } from '../types';
 import { formatCurrency as formatCustomCurrency, getCurrencySymbol, getCurrencyLocale, isSubscriptionDoubleCounted, parseRawAmount } from '../utils/currency';
 import { COLOR_PRESETS } from '../theme';
 import { triggerHaptic } from '../utils/haptics';
-import { RollingNumber, PressSlideText, RevealOnScroll, AnimatedProgressBar } from './animated';
+import { RollingNumber, PressSlideText, RevealOnScroll, AnimatedProgressBar, TiltCard3D, FlipCard3D } from './animated';
 import { QuickShortcutsWidget } from './QuickShortcutsWidget';
 import { FinancialHealthRadarCard } from './FinancialHealthRadarCard';
 import { NoSpendHeatmapCard } from './NoSpendHeatmapCard';
@@ -38,7 +38,8 @@ import {
   Info,
   ShieldAlert,
   Sparkles,
-  Award
+  Award,
+  RotateCw
 } from 'lucide-react';
 
 interface DashboardTabProps {
@@ -124,6 +125,7 @@ export default function DashboardTab({
   const [isBankSmsOpen, setIsBankSmsOpen] = useState(false);
   const [isSubsExpanded, setIsSubsExpanded] = useState<boolean>(false);
   const [isGoalsExpanded, setIsGoalsExpanded] = useState<boolean>(false);
+  const [isHeroFlipped, setIsHeroFlipped] = useState<boolean>(false);
 
   // Subscription inline form states
   const [isAddSubOpen, setIsAddSubOpen] = useState(false);
@@ -703,202 +705,293 @@ export default function DashboardTab({
   return (
     <div className="space-y-3.5 sm:space-y-5 pb-20 animate-fade-in">
       
-      {/* Hero Section: Total Spending */}
-      <section className="bg-surface-container-low/40 p-3 sm:p-4 rounded-2xl border border-outline-variant/25 space-y-2 relative z-20 overflow-hidden">
-        {/* Row 1: Label + Toggle */}
-        <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-1.5 flex-wrap min-w-0">
-            <span className="text-[11px] font-bold text-on-surface-variant uppercase tracking-wider">
-              {summaryMode === 'monthly' ? 'Monthly Spend' : 'Weekly Spend'}
-            </span>
-            {summaryMode === 'weekly' && getWeeklyPeriodRange() && (
-              <span className="text-[9px] font-bold text-primary bg-primary-container/40 px-1.5 py-0.5 rounded-full border border-primary/10 shrink-0">
-                {getWeeklyPeriodRange()}
-              </span>
-            )}
-          </div>
+      {/* Hero Section: Interactive 3D Tilt & Flip Card */}
+      <TiltCard3D maxTilt={6} className="z-20">
+        <FlipCard3D
+          isFlipped={isHeroFlipped}
+          onFlipChange={setIsHeroFlipped}
+          front={
+            <section className="bg-surface-container-low/80 dark:bg-surface-container-low/60 backdrop-blur-md p-3.5 sm:p-4 rounded-2xl border border-outline-variant/30 shadow-3d space-y-2.5 relative overflow-hidden">
+              {/* Row 1: Label + Controls */}
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-1.5 flex-wrap min-w-0">
+                  <span className="text-[11px] font-bold text-on-surface-variant uppercase tracking-wider">
+                    {summaryMode === 'monthly' ? 'Monthly Spend' : 'Weekly Spend'}
+                  </span>
+                  {summaryMode === 'weekly' && getWeeklyPeriodRange() && (
+                    <span className="text-[9px] font-bold text-primary bg-primary-container/40 px-1.5 py-0.5 rounded-full border border-primary/10 shrink-0">
+                      {getWeeklyPeriodRange()}
+                    </span>
+                  )}
+                </div>
 
-          {/* Controls: Badges Icon + Segmented Toggle */}
-          <div className="flex items-center gap-1.5 shrink-0">
-            {onOpenBadges && (
-              <button
-                type="button"
-                onClick={onOpenBadges}
-                aria-label="Financial Discipline Badges"
-                title={`Financial Discipline Badges (${unlockedBadgesCount}/6 Mastered)`}
-                className="w-6 h-6 rounded-md bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/25 text-amber-600 dark:text-amber-400 flex items-center justify-center transition-all active:scale-90 cursor-pointer shrink-0"
-              >
-                <Award className="w-3.5 h-3.5" />
-              </button>
-            )}
-
-            {/* Segmented Toggle Control */}
-            <div className="flex bg-surface-container rounded-lg p-0.5 border border-outline-variant/35 shrink-0">
-              <button
-                id="summary-mode-monthly-btn"
-                type="button"
-                onClick={() => setSummaryMode('monthly')}
-                className={`px-2 py-0.5 rounded-md font-bold text-[9px] sm:text-[10px] uppercase tracking-wider transition-all cursor-pointer ${
-                  summaryMode === 'monthly'
-                    ? 'bg-primary text-on-primary shadow-2xs'
-                    : 'text-on-surface-variant hover:text-on-surface'
-                }`}
-              >
-                Monthly
-              </button>
-              <button
-                id="summary-mode-weekly-btn"
-                type="button"
-                onClick={() => setSummaryMode('weekly')}
-                className={`px-2 py-0.5 rounded-md font-bold text-[9px] sm:text-[10px] uppercase tracking-wider transition-all cursor-pointer ${
-                  summaryMode === 'weekly'
-                    ? 'bg-primary text-on-primary shadow-2xs'
-                    : 'text-on-surface-variant hover:text-on-surface'
-                }`}
-              >
-                Weekly
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* Row 2: Amount + info button */}
-        <div className="flex items-center gap-1.5 flex-wrap min-w-0">
-          <span className="font-headline-lg text-xl sm:text-2xl lg:text-3xl font-extrabold text-primary tracking-tight shrink-0">
-            <RollingNumber
-              value={activeExpenses}
-              prefix={getCurrencySymbol(budget?.currency || 'INR')}
-              locale={getCurrencyLocale(budget?.currency || 'INR')}
-            />
-          </span>
-          <button 
-            type="button"
-            onClick={() => setShowCalcTooltip(!showCalcTooltip)}
-            className="p-1 text-on-surface-variant/60 hover:text-primary transition-colors cursor-pointer shrink-0"
-            title="Calculation breakdown"
-          >
-            <Info className="w-3.5 h-3.5 text-primary" />
-          </button>
-
-          {/* Calculation Breakdown Modal */}
-          <AnimatePresence>
-            {showCalcTooltip && (
-              <div 
-                className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fade-in"
-                onClick={() => setShowCalcTooltip(false)}
-              >
-                <motion.div 
-                  initial={{ opacity: 0, scale: 0.9, y: 10 }}
-                  animate={{ opacity: 1, scale: 1, y: 0 }}
-                  exit={{ opacity: 0, scale: 0.9, y: 10 }}
-                  onClick={(e) => e.stopPropagation()}
-                  className="w-full max-w-sm bg-surface-container-lowest dark:bg-slate-900 border border-outline-variant/40 dark:border-slate-800 rounded-3xl p-5 shadow-2xl space-y-4"
-                >
-                  <div className="flex items-center justify-between border-b border-outline-variant/20 dark:border-slate-800 pb-3">
-                    <div className="flex items-center gap-2.5">
-                      <div className="p-2.5 bg-primary/10 rounded-2xl">
-                        <Info className="w-5 h-5 text-primary" />
-                      </div>
-                      <div>
-                        <h3 className="font-outfit font-black text-base text-on-surface dark:text-white">
-                          Calculation Breakdown
-                        </h3>
-                        <p className="text-[11px] text-on-surface-variant dark:text-slate-400 font-medium">
-                          {summaryMode === 'monthly' ? 'Total Monthly Spending Formula' : 'Total Weekly Spending Formula'}
-                        </p>
-                      </div>
-                    </div>
-                    <button 
-                      type="button"
-                      onClick={() => setShowCalcTooltip(false)}
-                      className="w-8 h-8 rounded-full bg-surface-container-high dark:bg-slate-800 text-on-surface-variant dark:text-slate-300 hover:text-on-surface flex items-center justify-center font-bold text-xs cursor-pointer transition-colors"
-                    >
-                      ✕
-                    </button>
-                  </div>
-
-                  <div className="space-y-2.5 text-xs">
-                    <div className="flex justify-between items-center p-3 rounded-2xl bg-surface-container-low dark:bg-slate-800/60 border border-outline-variant/20">
-                      <span className="text-on-surface-variant dark:text-slate-300 font-medium">Logged Purchases</span>
-                      <span className="font-mono font-extrabold text-on-surface dark:text-white text-sm">
-                        {formatCurrency(Math.abs(currentMonthTxs.filter(t => t.amount < 0).reduce((sum, t) => sum + t.amount, 0)))}
-                      </span>
-                    </div>
-
-                    <div className="flex justify-between items-center p-3 rounded-2xl bg-surface-container-low dark:bg-slate-800/60 border border-outline-variant/20">
-                      <span className="text-on-surface-variant dark:text-slate-300 font-medium">Active Subscriptions</span>
-                      <span className="font-mono font-extrabold text-on-surface dark:text-white text-sm">
-                        {formatCurrency(activeSubsTotal)}
-                      </span>
-                    </div>
-
-                    <div className="flex justify-between items-center p-3.5 rounded-2xl bg-primary/10 border border-primary/20">
-                      <span className="font-bold text-primary">Total Calculated Outflow</span>
-                      <span className="font-mono font-black text-primary text-base">
-                        {formatCurrency(totalExpenses)}
-                      </span>
-                    </div>
-                  </div>
-
+                {/* Controls: Flip Card Button + Badges Icon + Segmented Toggle */}
+                <div className="flex items-center gap-1.5 shrink-0">
+                  {/* 3D Flip Action Trigger */}
                   <button
                     type="button"
-                    onClick={() => setShowCalcTooltip(false)}
-                    className="w-full py-3 bg-primary hover:bg-primary/90 text-on-primary font-bold text-xs rounded-2xl shadow-xs transition-all cursor-pointer"
+                    onClick={() => {
+                      triggerHaptic('light');
+                      setIsHeroFlipped(true);
+                    }}
+                    title="Flip for Spending Analytics"
+                    aria-label="Flip card for statistics"
+                    className="flex items-center gap-1 px-1.5 py-1 rounded-lg bg-surface-container-high/60 hover:bg-surface-container-highest text-on-surface-variant hover:text-primary transition-all text-[9px] font-bold border border-outline-variant/30 cursor-pointer active:scale-95"
                   >
-                    Got It
+                    <RotateCw className="w-3 h-3 text-primary animate-spin-slow" />
+                    <span className="hidden xs:inline">Stats</span>
                   </button>
-                </motion.div>
+
+                  {onOpenBadges && (
+                    <button
+                      type="button"
+                      onClick={onOpenBadges}
+                      aria-label="Financial Discipline Badges"
+                      title={`Financial Discipline Badges (${unlockedBadgesCount}/6 Mastered)`}
+                      className="w-6 h-6 rounded-md bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/25 text-amber-600 dark:text-amber-400 flex items-center justify-center transition-all active:scale-90 cursor-pointer shrink-0"
+                    >
+                      <Award className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+
+                  {/* Segmented Toggle Control */}
+                  <div className="flex bg-surface-container rounded-lg p-0.5 border border-outline-variant/35 shrink-0">
+                    <button
+                      id="summary-mode-monthly-btn"
+                      type="button"
+                      onClick={() => setSummaryMode('monthly')}
+                      className={`px-2 py-0.5 rounded-md font-bold text-[9px] sm:text-[10px] uppercase tracking-wider transition-all cursor-pointer ${
+                        summaryMode === 'monthly'
+                          ? 'bg-primary text-on-primary shadow-2xs'
+                          : 'text-on-surface-variant hover:text-on-surface'
+                      }`}
+                    >
+                      Monthly
+                    </button>
+                    <button
+                      id="summary-mode-weekly-btn"
+                      type="button"
+                      onClick={() => setSummaryMode('weekly')}
+                      className={`px-2 py-0.5 rounded-md font-bold text-[9px] sm:text-[10px] uppercase tracking-wider transition-all cursor-pointer ${
+                        summaryMode === 'weekly'
+                          ? 'bg-primary text-on-primary shadow-2xs'
+                          : 'text-on-surface-variant hover:text-on-surface'
+                      }`}
+                    >
+                      Weekly
+                    </button>
+                  </div>
+                </div>
               </div>
-            )}
-          </AnimatePresence>
-        </div>
 
-        {/* Row 3: Pills — MoM + budget health */}
-        <div className="flex items-center gap-1.5 flex-wrap">
-          {/* MoM Comparison Pill */}
-          {summaryMode === 'monthly' && prevMonthExpenses > 0 && (
-            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-extrabold border shrink-0 ${
-              monthlyDiffPercent <= 0 
-                ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30' 
-                : 'bg-rose-500/15 text-rose-400 border-rose-500/30'
-            }`}>
-              {monthlyDiffPercent <= 0 ? <TrendingDown className="w-3 h-3" /> : <TrendingUp className="w-3 h-3" />}
-              <span>{monthlyDiffPercent <= 0 ? `${Math.abs(Math.round(monthlyDiffPercent))}% vs last mo` : `+${Math.round(monthlyDiffPercent)}% vs last mo`}</span>
-            </span>
-          )}
+              {/* Row 2: Amount + info button */}
+              <div className="flex items-center gap-1.5 flex-wrap min-w-0">
+                <span className="font-headline-lg text-xl sm:text-2xl lg:text-3xl font-extrabold text-primary tracking-tight shrink-0">
+                  <RollingNumber
+                    value={activeExpenses}
+                    prefix={getCurrencySymbol(budget?.currency || 'INR')}
+                    locale={getCurrencyLocale(budget?.currency || 'INR')}
+                  />
+                </span>
+                <button 
+                  type="button"
+                  onClick={() => setShowCalcTooltip(!showCalcTooltip)}
+                  className="p-1 text-on-surface-variant/60 hover:text-primary transition-colors cursor-pointer shrink-0"
+                  title="Calculation breakdown"
+                >
+                  <Info className="w-3.5 h-3.5 text-primary" />
+                </button>
 
-          {/* Comparison info pill */}
-          {(() => {
-            const comp = getComparisonInfo();
-            return (
-              <span className={`font-label-md text-[9px] sm:text-[10px] flex items-center gap-0.5 px-2 py-0.5 rounded-full border shrink-0 ${
-                comp.label === 'No comparative data'
-                  ? 'bg-surface-container text-on-surface-variant border-outline-variant/30'
-                  : comp.isLess
-                  ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20'
-                  : 'bg-error/10 text-error border-error/20'
-              }`}>
-                {comp.showIcon && (comp.isLess ? <TrendingDown className="w-2.5 h-2.5" /> : <TrendingUp className="w-2.5 h-2.5" />)}
-                <span>{comp.label}</span>
-              </span>
-            );
-          })()}
+                {/* Calculation Breakdown Modal */}
+                <AnimatePresence>
+                  {showCalcTooltip && (
+                    <div 
+                      className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fade-in"
+                      onClick={() => setShowCalcTooltip(false)}
+                    >
+                      <motion.div 
+                        initial={{ opacity: 0, scale: 0.9, y: 10 }}
+                        animate={{ opacity: 1, scale: 1, y: 0 }}
+                        exit={{ opacity: 0, scale: 0.9, y: 10 }}
+                        onClick={(e) => e.stopPropagation()}
+                        className="w-full max-w-sm bg-surface-container-lowest dark:bg-slate-900 border border-outline-variant/40 dark:border-slate-800 rounded-3xl p-5 shadow-2xl space-y-4"
+                      >
+                        <div className="flex items-center justify-between border-b border-outline-variant/20 dark:border-slate-800 pb-3">
+                          <div className="flex items-center gap-2.5">
+                            <div className="p-2.5 bg-primary/10 rounded-2xl">
+                              <Info className="w-5 h-5 text-primary" />
+                            </div>
+                            <div>
+                              <h3 className="font-outfit font-black text-base text-on-surface dark:text-white">
+                                Calculation Breakdown
+                              </h3>
+                              <p className="text-[11px] text-on-surface-variant dark:text-slate-400 font-medium">
+                                {summaryMode === 'monthly' ? 'Total Monthly Spending Formula' : 'Total Weekly Spending Formula'}
+                              </p>
+                            </div>
+                          </div>
+                          <button 
+                            type="button"
+                            onClick={() => setShowCalcTooltip(false)}
+                            className="w-8 h-8 rounded-full bg-surface-container-high dark:bg-slate-800 text-on-surface-variant dark:text-slate-300 hover:text-on-surface flex items-center justify-center font-bold text-xs cursor-pointer transition-colors"
+                          >
+                            ✕
+                          </button>
+                        </div>
 
-          {/* Budget health pill */}
-          {hasBudget && (
-            <span className={`font-label-md text-[9px] sm:text-[10px] flex items-center gap-1 px-2 py-0.5 rounded-full border shrink-0 ${budgetHealth.bgClass} ${budgetHealth.colorClass} ${budgetHealth.borderClass}`}>
-              <span className={`w-1.5 h-1.5 rounded-full ${
-                budgetHealth.label === 'On Track' 
-                  ? 'bg-emerald-500' 
-                  : budgetHealth.label.includes('Caution') 
-                  ? 'bg-amber-500 animate-pulse' 
-                  : 'bg-error animate-pulse'
-              }`} />
-              <span>{budgetHealth.label}</span>
-            </span>
-          )}
-        </div>
-      </section>
+                        <div className="space-y-2.5 text-xs">
+                          <div className="flex justify-between items-center p-3 rounded-2xl bg-surface-container-low dark:bg-slate-800/60 border border-outline-variant/20">
+                            <span className="text-on-surface-variant dark:text-slate-300 font-medium">Logged Purchases</span>
+                            <span className="font-mono font-extrabold text-on-surface dark:text-white text-sm">
+                              {formatCurrency(Math.abs(currentMonthTxs.filter(t => t.amount < 0).reduce((sum, t) => sum + t.amount, 0)))}
+                            </span>
+                          </div>
+
+                          <div className="flex justify-between items-center p-3 rounded-2xl bg-surface-container-low dark:bg-slate-800/60 border border-outline-variant/20">
+                            <span className="text-on-surface-variant dark:text-slate-300 font-medium">Active Subscriptions</span>
+                            <span className="font-mono font-extrabold text-on-surface dark:text-white text-sm">
+                              {formatCurrency(activeSubsTotal)}
+                            </span>
+                          </div>
+
+                          <div className="flex justify-between items-center p-3.5 rounded-2xl bg-primary/10 border border-primary/20">
+                            <span className="font-bold text-primary">Total Calculated Outflow</span>
+                            <span className="font-mono font-black text-primary text-base">
+                              {formatCurrency(totalExpenses)}
+                            </span>
+                          </div>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => setShowCalcTooltip(false)}
+                          className="w-full py-3 bg-primary hover:bg-primary/90 text-on-primary font-bold text-xs rounded-2xl shadow-xs transition-all cursor-pointer"
+                        >
+                          Got It
+                        </button>
+                      </motion.div>
+                    </div>
+                  )}
+                </AnimatePresence>
+              </div>
+
+              {/* Row 3: Pills — MoM + budget health */}
+              <div className="flex items-center gap-1.5 flex-wrap">
+                {/* MoM Comparison Pill */}
+                {summaryMode === 'monthly' && prevMonthExpenses > 0 && (
+                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-extrabold border shrink-0 ${
+                    monthlyDiffPercent <= 0 
+                      ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30' 
+                      : 'bg-rose-500/15 text-rose-400 border-rose-500/30'
+                  }`}>
+                    {monthlyDiffPercent <= 0 ? <TrendingDown className="w-3 h-3" /> : <TrendingUp className="w-3 h-3" />}
+                    <span>{monthlyDiffPercent <= 0 ? `${Math.abs(Math.round(monthlyDiffPercent))}% vs last mo` : `+${Math.round(monthlyDiffPercent)}% vs last mo`}</span>
+                  </span>
+                )}
+
+                {/* Comparison info pill */}
+                {(() => {
+                  const comp = getComparisonInfo();
+                  return (
+                    <span className={`font-label-md text-[9px] sm:text-[10px] flex items-center gap-0.5 px-2 py-0.5 rounded-full border shrink-0 ${
+                      comp.label === 'No comparative data'
+                        ? 'bg-surface-container text-on-surface-variant border-outline-variant/30'
+                        : comp.isLess
+                        ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20'
+                        : 'bg-error/10 text-error border-error/20'
+                    }`}>
+                      {comp.showIcon && (comp.isLess ? <TrendingDown className="w-2.5 h-2.5" /> : <TrendingUp className="w-2.5 h-2.5" />)}
+                      <span>{comp.label}</span>
+                    </span>
+                  );
+                })()}
+
+                {/* Budget health pill */}
+                {hasBudget && (
+                  <span className={`font-label-md text-[9px] sm:text-[10px] flex items-center gap-1 px-2 py-0.5 rounded-full border shrink-0 ${budgetHealth.bgClass} ${budgetHealth.colorClass} ${budgetHealth.borderClass}`}>
+                    <span className={`w-1.5 h-1.5 rounded-full ${
+                      budgetHealth.label === 'On Track' 
+                        ? 'bg-emerald-500' 
+                        : budgetHealth.label.includes('Caution') 
+                        ? 'bg-amber-500 animate-pulse' 
+                        : 'bg-error animate-pulse'
+                    }`} />
+                    <span>{budgetHealth.label}</span>
+                  </span>
+                )}
+              </div>
+            </section>
+          }
+          back={
+            <section className="bg-surface-container-high/90 dark:bg-surface-container/90 backdrop-blur-md p-3.5 sm:p-4 rounded-2xl border border-primary/30 shadow-3d flex flex-col justify-between h-full relative overflow-hidden">
+              <div className="flex items-center justify-between border-b border-outline-variant/20 pb-2">
+                <div className="flex items-center gap-1.5">
+                  <Sparkles className="w-4 h-4 text-primary" />
+                  <span className="text-[11px] font-bold text-on-surface uppercase tracking-wider">
+                    Spending Velocity & Health
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    triggerHaptic('light');
+                    setIsHeroFlipped(false);
+                  }}
+                  className="flex items-center gap-1 px-2 py-0.5 rounded-lg bg-primary text-on-primary text-[9px] font-bold shadow-2xs hover:bg-primary/90 transition-all cursor-pointer"
+                >
+                  <RotateCw className="w-3 h-3" />
+                  <span>Done</span>
+                </button>
+              </div>
+
+              {/* Micro Analytics Metrics */}
+              <div className="grid grid-cols-3 gap-2 py-2">
+                {/* 1. Daily Average */}
+                <div className="p-2 bg-surface-container-low rounded-xl text-center border border-outline-variant/20">
+                  <span className="text-[8px] font-bold text-on-surface-variant uppercase tracking-wider block">Daily Pace</span>
+                  <p className="font-mono text-xs font-black text-primary mt-0.5">
+                    {(() => {
+                      const today = new Date().getDate();
+                      const avg = today > 0 ? Math.round(activeExpenses / today) : activeExpenses;
+                      return formatCurrency(avg);
+                    })()}
+                  </p>
+                  <span className="text-[7px] text-on-surface-variant font-medium block">per day</span>
+                </div>
+
+                {/* 2. Top Outflow Category */}
+                <div className="p-2 bg-surface-container-low rounded-xl text-center border border-outline-variant/20">
+                  <span className="text-[8px] font-bold text-on-surface-variant uppercase tracking-wider block">Top Category</span>
+                  <p className="font-title-md text-xs font-black text-on-surface truncate mt-0.5">
+                    {chartData.length > 0 ? chartData[0].name : 'None'}
+                  </p>
+                  <span className="text-[7px] text-on-surface-variant font-medium block">
+                    {chartData.length > 0 ? formatCurrency(chartData[0].value) : '₹0'}
+                  </span>
+                </div>
+
+                {/* 3. Runway Left */}
+                <div className="p-2 bg-surface-container-low rounded-xl text-center border border-outline-variant/20">
+                  <span className="text-[8px] font-bold text-on-surface-variant uppercase tracking-wider block">Remaining</span>
+                  <p className={`font-mono text-xs font-black mt-0.5 ${
+                    activeLimit - activeExpenses < 0 ? 'text-error' : 'text-emerald-600 dark:text-emerald-400'
+                  }`}>
+                    {formatCurrency(activeLimit - activeExpenses)}
+                  </p>
+                  <span className="text-[7px] text-on-surface-variant font-medium block">
+                    {activeLimit - activeExpenses < 0 ? 'over limit' : 'buffer'}
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between text-[9px] text-on-surface-variant/80 pt-1 border-t border-outline-variant/15">
+                <span>Tap anywhere or Done to return to card view</span>
+                <span className="font-mono font-bold text-primary">SpendTrack 3D</span>
+              </div>
+            </section>
+          }
+        />
+      </TiltCard3D>
 
 
 

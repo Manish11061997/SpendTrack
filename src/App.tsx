@@ -1516,8 +1516,17 @@ export default function App() {
             </div>
           </nav>
 
-          {/* Main Layout Area */}
-          <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
+          {/* Main Layout Area — with 3D tactile sheet perspective depth when drawer opens */}
+          <div
+            style={{
+              transform: isDrawerOpen ? 'scale(0.96) translateZ(-40px)' : 'none',
+              transformOrigin: 'center right',
+              borderRadius: isDrawerOpen ? '24px' : '0px',
+              transition: 'transform 0.32s cubic-bezier(0.16, 1, 0.3, 1), border-radius 0.32s cubic-bezier(0.16, 1, 0.3, 1)',
+              willChange: 'transform',
+            }}
+            className="flex-1 flex flex-col min-w-0 h-full overflow-hidden"
+          >
             {/* Main Layout Header App Bar — Original Glassmorphic Design */}
             <header className="fixed top-0 md:left-64 left-0 right-0 h-16 bg-surface/80 dark:bg-surface-container-low/80 backdrop-blur-xl border-b border-outline-variant/20 flex items-center justify-between px-3.5 sm:px-5 z-30 transition-all duration-200">
               <div className="flex items-center gap-2.5">
