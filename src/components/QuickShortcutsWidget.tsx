@@ -1,5 +1,7 @@
 import React from 'react';
+import { motion } from 'framer-motion';
 import { FileText, Mic, Calendar, Sparkles, Plus, Activity, Settings } from 'lucide-react';
+import { triggerHaptic } from '../utils/haptics';
 
 interface QuickShortcutsWidgetProps {
   onOpenExportAudit: () => void;
@@ -44,20 +46,26 @@ export const QuickShortcutsWidget: React.FC<QuickShortcutsWidgetProps> = ({
       </div>
 
       <div className="grid grid-cols-6 gap-1 sm:gap-2">
-        {shortcuts.map((sc) => {
+        {shortcuts.map((sc, idx) => {
           const IconComp = sc.icon;
           return (
-            <button
+            <motion.button
               key={sc.label}
               type="button"
-              onClick={sc.action}
-              className={`p-1.5 sm:p-2 rounded-xl border flex flex-col items-center justify-center gap-1 transition-all active:scale-95 cursor-pointer text-center group ${sc.color}`}
+              onClick={() => {
+                triggerHaptic('light');
+                sc.action();
+              }}
+              whileHover={{ scale: 1.08, y: -2 }}
+              whileTap={{ scale: 0.9, y: 1 }}
+              transition={{ type: 'spring', stiffness: 450, damping: 20 }}
+              className={`p-1.5 sm:p-2 rounded-xl border flex flex-col items-center justify-center gap-1 cursor-pointer text-center group ${sc.color} shadow-2xs hover:shadow-md transition-shadow`}
             >
-              <span className="p-1 rounded-md bg-surface-container-lowest/90 transition-transform group-active:scale-90">
+              <span className="p-1 rounded-md bg-surface-container-lowest/90 transition-transform group-hover:rotate-6">
                 <IconComp className="w-3.5 h-3.5" />
               </span>
               <span className="text-[9px] sm:text-[10px] font-bold tracking-tight leading-none text-on-surface truncate w-full">{sc.label}</span>
-            </button>
+            </motion.button>
           );
         })}
       </div>

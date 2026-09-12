@@ -5,7 +5,8 @@ import { Transaction, UserProfile, BudgetConfig, Subscription } from '../types';
 import { formatCurrency as formatCustomCurrency, getCurrencySymbol, getCurrencyLocale, isSubscriptionDoubleCounted, parseRawAmount } from '../utils/currency';
 import { COLOR_PRESETS } from '../theme';
 import { triggerHaptic } from '../utils/haptics';
-import { RollingNumber, PressSlideText, RevealOnScroll, AnimatedProgressBar, TiltCard3D, FlipCard3D } from './animated';
+import { triggerSuccessBurst } from '../utils/celebration';
+import { RollingNumber, PressSlideText, RevealOnScroll, AnimatedProgressBar, TiltCard3D, FlipCard3D, Card3D } from './animated';
 import { QuickShortcutsWidget } from './QuickShortcutsWidget';
 import { FinancialHealthRadarCard } from './FinancialHealthRadarCard';
 import { NoSpendHeatmapCard } from './NoSpendHeatmapCard';
@@ -1012,6 +1013,8 @@ export default function DashboardTab({
         templates={budget?.quickTemplates}
         currency={budget?.currency || 'INR'}
         onLogTemplate={(tpl) => {
+          triggerHaptic('medium');
+          triggerSuccessBurst();
           const now = new Date();
           const yyyy = now.getFullYear();
           const mm = String(now.getMonth() + 1).padStart(2, '0');
@@ -1078,33 +1081,40 @@ export default function DashboardTab({
 
               return (
                 <RevealOnScroll key={tx.id} stagger={idx}>
-                  <div 
-                    id={`transaction-row-${tx.id}`}
+                  <Card3D
+                    depth={4}
+                    scaleOnHover={1.012}
+                    glare={true}
                     onClick={() => setSelectedTx(tx)}
-                    className="flex items-center justify-between p-2.5 sm:p-3 bg-surface-container-lowest rounded-xl border border-outline-variant/30 transition-all cursor-pointer group active:scale-[0.98] active:bg-surface-container-high/50"
+                    className="rounded-xl"
                   >
-                    <div className="flex items-center gap-2.5">
-                      <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center ${config.bg} shadow-2xs shrink-0`}>
-                        <IconComponent className="w-4 h-4 text-on-surface" />
+                    <div 
+                      id={`transaction-row-${tx.id}`}
+                      className="flex items-center justify-between p-2.5 sm:p-3 bg-surface-container-lowest rounded-xl border border-outline-variant/30 transition-all cursor-pointer group active:bg-surface-container-high/50"
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center ${config.bg} shadow-2xs shrink-0`}>
+                          <IconComponent className="w-4 h-4 text-on-surface" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="font-title-md text-xs sm:text-sm text-on-surface font-bold truncate group-hover:text-primary transition-colors">
+                            {tx.title}
+                          </div>
+                          <div className="text-[11px] text-on-surface-variant font-medium truncate">
+                            {tx.category} • {formatDateLabel(tx.date)}, {tx.time}
+                          </div>
+                        </div>
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="font-title-md text-xs sm:text-sm text-on-surface font-bold truncate group-hover:text-primary transition-colors">
-                          {tx.title}
+                      <div className="text-right ml-2 flex flex-col items-end shrink-0">
+                        <div className={`font-mono text-xs sm:text-sm font-bold ${isExpense ? 'text-on-surface' : 'text-emerald-600 dark:text-emerald-400'}`}>
+                          {isExpense ? '' : '+'}{formatCurrency(Math.abs(tx.amount))}
                         </div>
-                        <div className="text-[11px] text-on-surface-variant font-medium truncate">
-                          {tx.category} • {formatDateLabel(tx.date)}, {tx.time}
-                        </div>
+                        <span className="inline-block px-1.5 py-0.5 mt-0.5 text-[9px] font-medium bg-surface-variant text-on-surface-variant rounded-md">
+                          {tx.label}
+                        </span>
                       </div>
                     </div>
-                    <div className="text-right ml-2 flex flex-col items-end shrink-0">
-                      <div className={`font-mono text-xs sm:text-sm font-bold ${isExpense ? 'text-on-surface' : 'text-emerald-600 dark:text-emerald-400'}`}>
-                        {isExpense ? '' : '+'}{formatCurrency(Math.abs(tx.amount))}
-                      </div>
-                      <span className="inline-block px-1.5 py-0.5 mt-0.5 text-[9px] font-medium bg-surface-variant text-on-surface-variant rounded-md">
-                        {tx.label}
-                      </span>
-                    </div>
-                  </div>
+                  </Card3D>
                 </RevealOnScroll>
               );
             })

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Transaction, BudgetConfig, Subscription } from '../types';
 import { formatCurrency, getCurrencySymbol, isSubscriptionDoubleCounted } from '../utils/currency';
+import { Card3D } from './animated';
 import { ShieldCheck, TrendingUp, Sparkles, ChevronDown, ChevronUp, AlertCircle, Award, Target, Activity } from 'lucide-react';
 
 interface FinancialHealthRadarCardProps {
@@ -145,7 +146,8 @@ export const FinancialHealthRadarCard: React.FC<FinancialHealthRadarCardProps> =
   const status = getScoreStatus(totalScore);
 
   return (
-    <div className="p-5 bg-surface-container-lowest border border-outline-variant/30 rounded-3xl space-y-4 shadow-sm backdrop-blur-xs">
+    <Card3D depth={6} scaleOnHover={1.015} glare={true} className="rounded-3xl">
+      <div className="p-5 bg-surface-container-lowest border border-outline-variant/30 rounded-3xl space-y-4 shadow-sm backdrop-blur-xs">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <span className="p-1.5 rounded-xl bg-primary/10 text-primary">
@@ -250,6 +252,7 @@ export const FinancialHealthRadarCard: React.FC<FinancialHealthRadarCardProps> =
           </motion.div>
         )}
       </AnimatePresence>
-    </div>
+      </div>
+    </Card3D>
   );
 };

@@ -39,7 +39,7 @@ export const AnimatedProgressBar: React.FC<AnimatedProgressBarProps> = ({
       aria-valuemax={100}
     >
       <motion.div
-        className={`h-full origin-left rounded-full ${getColorClass()} ${barClassName}`}
+        className={`h-full origin-left rounded-full relative overflow-hidden ${getColorClass()} ${barClassName}`}
         initial={shouldReduceMotion ? { scaleX: scaleRatio } : { scaleX: 0 }}
         animate={{ scaleX: scaleRatio }}
         transition={
@@ -51,7 +51,17 @@ export const AnimatedProgressBar: React.FC<AnimatedProgressBarProps> = ({
               }
         }
         style={{ willChange: 'transform' }}
-      />
+      >
+        {/* Shimmer light wave highlight */}
+        {!shouldReduceMotion && (
+          <div
+            className="absolute inset-0 bg-gradient-to-r from-transparent via-white/35 to-transparent animate-shimmer"
+            style={{
+              backgroundSize: '200% 100%',
+            }}
+          />
+        )}
+      </motion.div>
     </div>
   );
 };

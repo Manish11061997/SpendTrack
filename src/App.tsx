@@ -39,7 +39,7 @@ import {
   DEFAULT_BUDGET 
 } from './initialData';
 import { formatCurrency, getCurrencySymbol, getCurrencyLocale, isSubscriptionDoubleCounted } from './utils/currency';
-import { RollingNumber, PressSlideText, AnimatedProgressBar } from './components/animated';
+import { RollingNumber, PressSlideText, AnimatedProgressBar, AmbientMeshBackground } from './components/animated';
 
 // Modular Tab Views
 import DashboardTab from './components/DashboardTab';
@@ -56,6 +56,7 @@ import { PinLockModal } from './components/PinLockModal';
 import { INITIAL_ACHIEVEMENT_BADGES, evaluateBadges, calculateBudgetRollover } from './utils/budgetRollover';
 import { fetchLiveExchangeRates } from './utils/currencyConverter';
 import { checkAlertRulesOnSave } from './utils/alertRulesEngine';
+import { triggerMilestoneConfetti, triggerSuccessBurst } from './utils/celebration';
 
 import { VoiceInputModal } from './components/VoiceInputModal';
 
@@ -926,7 +927,13 @@ export default function App() {
     // 2. Close the form instantly
     setIsAddFormVisible(false);
 
-    // 3. Show success popup immediately
+    // 3. Show success popup immediately & trigger 3D confetti cannon
+    if (withinBudget) {
+      triggerMilestoneConfetti(0.5);
+    } else {
+      triggerSuccessBurst();
+    }
+
     if (isNewTxExpense) {
       setSuccessAnimation({
         isVisible: true,
@@ -1294,6 +1301,8 @@ export default function App() {
           className="h-screen w-screen overflow-hidden"
         >
           <div className={`h-screen overflow-hidden bg-background text-on-background flex flex-col md:flex-row font-sans relative antialiased selection:bg-primary-container selection:text-on-primary-container ${isPrivacyMode ? 'privacy-blur-mode' : ''}`}>
+            {/* Dynamic 3D ambient lighting orbs */}
+            <AmbientMeshBackground />
       
       {/* If Add Form is active, render it exclusively in full viewport view */}
       {isAddFormVisible ? (
