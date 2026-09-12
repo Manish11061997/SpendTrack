@@ -1537,7 +1537,7 @@ export default function App() {
             className="flex-1 flex flex-col min-w-0 h-full overflow-hidden"
           >
             {/* Main Layout Header App Bar — Original Glassmorphic Design */}
-            <header className="fixed top-0 md:left-64 left-0 right-0 h-16 bg-surface/85 dark:bg-slate-950/85 backdrop-blur-2xl border-b border-outline-variant/25 dark:border-white/10 flex items-center justify-between px-3.5 sm:px-5 z-30 transition-all duration-200 shadow-xs">
+            <header className="fixed top-0 md:left-64 left-0 right-0 h-16 bg-surface/80 dark:bg-surface-container-low/80 backdrop-blur-xl border-b border-outline-variant/20 flex items-center justify-between px-3.5 sm:px-5 z-30 transition-all duration-200">
               <div className="flex items-center gap-2.5">
                 {/* Drawer Hamburger Button */}
                 <button
@@ -1551,10 +1551,10 @@ export default function App() {
 
                 {/* Brand Logo & Name (Mobile) */}
                 <div className="flex items-center gap-2 md:hidden">
-                  <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-primary to-primary-container flex items-center justify-center shadow-xs glow-primary">
-                    <PiggyBank className="w-4.5 h-4.5 text-on-primary" />
+                  <div className="w-7 h-7 rounded-xl bg-gradient-to-br from-primary to-primary-container flex items-center justify-center shadow-xs">
+                    <PiggyBank className="w-4 h-4 text-on-primary" />
                   </div>
-                  <h1 className="text-lg font-black tracking-tight text-gradient-hero font-outfit select-none">
+                  <h1 className="text-lg font-black tracking-tight text-primary font-outfit select-none">
                     SpendTrack
                   </h1>
                 </div>
@@ -1862,8 +1862,8 @@ export default function App() {
 
             </main>
 
-            {/* Bottom Navigation Bar — Punchy Floating Frosted Glass Dock */}
-            <nav className="fixed bottom-0 left-0 right-0 h-20 bg-surface/85 dark:bg-slate-950/85 backdrop-blur-2xl border-t border-outline-variant/25 dark:border-white/10 flex items-center justify-around px-3 z-40 pb-safe pb-[env(safe-area-inset-bottom)] md:hidden shadow-lg">
+            {/* Bottom Navigation Bar — M3 with animated spring indicator */}
+            <nav className="fixed bottom-0 left-0 right-0 h-20 bg-surface/85 dark:bg-surface-container-low/85 backdrop-blur-xl border-t border-outline-variant/20 flex items-center justify-around px-2 z-40 pb-safe pb-[env(safe-area-inset-bottom)] md:hidden">
               
               {([
                 { id: 'dashboard', label: 'Dashboard', Icon: LayoutDashboard },
@@ -1876,27 +1876,24 @@ export default function App() {
                   <motion.button
                     key={id}
                     id={`nav-tab-${id}`}
-                    onClick={() => {
-                      triggerHaptic('light');
-                      setActiveTab(id as TabType);
-                    }}
-                    className="relative flex flex-col items-center justify-center flex-1 gap-1 py-2 cursor-pointer select-none"
-                    whileTap={{ scale: 0.92 }}
-                    transition={{ type: 'spring', stiffness: 500, damping: 28 }}
+                    onClick={() => setActiveTab(id as TabType)}
+                    className="relative flex flex-col items-center justify-center flex-1 gap-0.5 py-2 cursor-pointer select-none"
+                    whileTap={{ scale: 0.9 }}
+                    transition={{ type: 'spring', stiffness: 500, damping: 30 }}
                   >
                     {/* Animated pill — full button area, icon + label */}
                     {isActive && (
                       <motion.div
                         layoutId="nav-pill"
-                        className="absolute inset-x-1.5 inset-y-1 bg-primary/15 dark:bg-primary/20 border border-primary/25 rounded-2xl glow-primary"
-                        transition={{ type: 'spring', stiffness: 420, damping: 32, mass: 0.7 }}
+                        className="absolute inset-x-1 inset-y-1 bg-primary-container rounded-2xl"
+                        transition={{ type: 'spring', stiffness: 420, damping: 34, mass: 0.8 }}
                       />
                     )}
                     <Icon className={`relative z-10 w-5 h-5 transition-colors duration-150 ${
-                      isActive ? 'text-primary' : 'text-on-surface-variant/60'
+                      isActive ? 'text-on-primary-container' : 'text-on-surface-variant/60'
                     }`} />
-                    <span className={`relative z-10 text-[9px] font-extrabold select-none transition-colors duration-150 ${
-                      isActive ? 'text-primary font-black' : 'text-on-surface-variant/60'
+                    <span className={`relative z-10 text-[9px] font-bold select-none transition-colors duration-150 ${
+                      isActive ? 'text-on-primary-container font-black' : 'text-on-surface-variant/60'
                     }`}>
                       {label}
                     </span>

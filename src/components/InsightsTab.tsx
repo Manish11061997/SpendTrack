@@ -320,16 +320,16 @@ export default function InsightsTab({
       {/* Monthly Budget & Net Cashflow Intelligence Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* Remaining Budget & Cap Status */}
-        <div className="p-5 rounded-3xl glass-card-punchy space-y-3.5 shadow-sm hover:border-primary/40 transition-all duration-200">
+        <div className="p-4 rounded-3xl bg-surface-container-low border border-outline-variant/30 space-y-3 shadow-2xs">
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold text-on-surface-variant uppercase tracking-wider flex items-center gap-1.5">
               <Wallet className="w-4 h-4 text-primary" />
               Monthly Budget Status
             </span>
-            <span className={`text-[10px] font-extrabold px-2.5 py-0.5 rounded-full border ${
+            <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full border ${
               targetAverage - totalSpent >= 0
-                ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20 glow-emerald'
-                : 'bg-error/10 text-error border-error/20 glow-rose'
+                ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20'
+                : 'bg-error/10 text-error border-error/20'
             }`}>
               {targetAverage - totalSpent >= 0 ? 'Within Target' : 'Exceeded Limit'}
             </span>
@@ -338,7 +338,7 @@ export default function InsightsTab({
           <div className="flex items-baseline justify-between pt-1">
             <div>
               <span className="text-[10px] text-on-surface-variant font-medium block">Remaining Safe Cap</span>
-              <span className={`text-2xl sm:text-3xl font-black font-mono tracking-tight ${targetAverage - totalSpent >= 0 ? 'text-primary' : 'text-error'}`}>
+              <span className={`text-2xl font-black font-mono ${targetAverage - totalSpent >= 0 ? 'text-primary' : 'text-error'}`}>
                 {formatCurrency(targetAverage - totalSpent)}
               </span>
             </div>
@@ -351,29 +351,27 @@ export default function InsightsTab({
           </div>
 
           {/* Progress Bar */}
-          <div className="space-y-1.5">
+          <div className="space-y-1">
             <div className="h-2 w-full bg-surface-container-highest rounded-full overflow-hidden p-0.5">
               <div 
                 className={`h-full rounded-full transition-all duration-500 ${
-                  pctOfTarget > 100 ? 'bg-error shadow-[0_0_8px_rgba(239,68,68,0.5)]' : pctOfTarget > 80 ? 'bg-amber-500' : 'bg-primary'
+                  pctOfTarget > 100 ? 'bg-error' : pctOfTarget > 80 ? 'bg-amber-500' : 'bg-primary'
                 }`}
                 style={{ width: `${Math.min(100, pctOfTarget)}%` }}
               />
             </div>
-            <div className="flex justify-between text-[10px] text-on-surface-variant font-semibold">
+            <div className="flex justify-between text-[10px] text-on-surface-variant font-medium">
               <span>Spent {pctOfTarget}% of monthly cap</span>
-              <span className={targetAverage - totalSpent < 0 ? 'text-error font-bold' : 'text-emerald-500'}>
-                {targetAverage - totalSpent < 0 ? `${formatCurrency(Math.abs(targetAverage - totalSpent))} over` : 'On track ✓'}
-              </span>
+              <span>{targetAverage - totalSpent < 0 ? `${formatCurrency(Math.abs(targetAverage - totalSpent))} over` : 'On track'}</span>
             </div>
           </div>
         </div>
 
         {/* Net Cashflow & Monthly Savings */}
-        <div className="p-5 rounded-3xl glass-card-punchy space-y-3.5 shadow-sm hover:border-primary/40 transition-all duration-200">
+        <div className="p-4 rounded-3xl bg-surface-container-low border border-outline-variant/30 space-y-3 shadow-2xs">
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold text-on-surface-variant uppercase tracking-wider flex items-center gap-1.5">
-              <TrendingUp className="w-4 h-4 text-emerald-500" />
+              <TrendingUp className="w-4 h-4 text-emerald-600" />
               Net Monthly Cashflow
             </span>
             <span className="text-[10px] font-bold text-on-surface-variant">
@@ -384,19 +382,19 @@ export default function InsightsTab({
           <div className="flex items-baseline justify-between pt-1">
             <div>
               <span className="text-[10px] text-on-surface-variant font-medium block">Net Saved / Surplus</span>
-              <span className={`text-2xl sm:text-3xl font-black font-mono tracking-tight ${customIncome - totalSpent >= 0 ? 'text-emerald-500' : 'text-error'}`}>
+              <span className={`text-2xl font-black font-mono ${customIncome - totalSpent >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-error'}`}>
                 {customIncome - totalSpent >= 0 ? '+' : ''}{formatCurrency(customIncome - totalSpent)}
               </span>
             </div>
             <div className="text-right">
               <span className="text-[10px] text-on-surface-variant font-medium block">Monthly Income</span>
-              <span className="text-sm font-bold text-emerald-500 font-mono">
+              <span className="text-sm font-bold text-emerald-600 dark:text-emerald-400 font-mono">
                 +{formatCurrency(customIncome)}
               </span>
             </div>
           </div>
 
-          <div className="p-3 rounded-2xl bg-surface-container-high/60 border border-outline-variant/20 flex justify-between items-center text-xs shadow-2xs">
+          <div className="p-2.5 rounded-2xl bg-surface-container-high/60 flex justify-between items-center text-xs">
             <span className="text-[11px] text-on-surface-variant font-medium">End-of-Month Projection</span>
             <span className="font-mono font-bold text-on-surface">
               {formatCurrency(Math.round((totalSpent / Math.max(1, today.getDate())) * 30))} est.
@@ -404,6 +402,10 @@ export default function InsightsTab({
           </div>
         </div>
       </div>
+
+
+
+
 
       {/* Category Comparison List */}
       <section className="space-y-3">
@@ -421,7 +423,7 @@ export default function InsightsTab({
               <div 
                 id={`insights-category-card-${cat.name.toLowerCase()}`}
                 key={idx} 
-                className="glass-card-punchy p-4 sm:p-5 rounded-3xl border border-outline-variant/30 flex flex-col gap-3.5 shadow-2xs hover:border-primary/40 transition-all duration-200"
+                className="bg-surface-container-lowest p-4 rounded-2xl border border-outline-variant/35 flex flex-col gap-4 shadow-xs"
               >
                 <div className="flex justify-between items-center">
                   <div className="flex items-center gap-3">
