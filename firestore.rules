@@ -16,7 +16,7 @@ service cloud.firestore {
     }
 
     function isValidNumber(val) {
-      return val is number && !math.isNaN(val) && !math.isInfinite(val);
+      return val is number && !math.isNaN(val);
     }
 
     // Explicit deny for top-level queries or unmatched collections
