@@ -1144,6 +1144,32 @@ export default function App() {
     };
   }, [isAddFormVisible, isDrawerOpen, showLogoutConfirm, activeTab]);
 
+  // Desktop keyboard shortcuts (Cmd/Ctrl + 1..4, Cmd/Ctrl + N or K for quick add)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && !e.shiftKey && !e.altKey) {
+        if (e.key === '1') {
+          e.preventDefault();
+          setActiveTab('dashboard');
+        } else if (e.key === '2') {
+          e.preventDefault();
+          setActiveTab('history');
+        } else if (e.key === '3') {
+          e.preventDefault();
+          setActiveTab('insights');
+        } else if (e.key === '4') {
+          e.preventDefault();
+          setActiveTab('settings');
+        } else if (e.key.toLowerCase() === 'k' || e.key.toLowerCase() === 'n') {
+          e.preventDefault();
+          setIsAddFormVisible(prev => !prev);
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
   useEffect(() => {
     if (!Capacitor.isNativePlatform()) return;
 
@@ -1346,79 +1372,50 @@ export default function App() {
               </div>
               
               {/* Navigation links (Styled lists with icons) */}
-              <div className="flex flex-col space-y-1 w-full">
-                {/* Dashboard Tab */}
-                <button
-                  id="rail-tab-dashboard"
-                  onClick={() => setActiveTab('dashboard')}
-                  className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all cursor-pointer w-full text-left group ${
-                    activeTab === 'dashboard'
-                      ? 'bg-primary-container text-on-primary-container font-bold shadow-xs scale-101'
-                      : 'text-on-surface-variant hover:bg-surface-variant/40 hover:text-on-surface'
-                  }`}
-                >
-                  <LayoutDashboard className={`w-4.5 h-4.5 transition-transform group-hover:scale-105 ${
-                    activeTab === 'dashboard' ? 'text-primary' : 'text-on-surface-variant/80'
-                  }`} />
-                  <span className="text-xs font-semibold tracking-tight select-none">
-                    Dashboard
-                  </span>
-                </button>
-
-                {/* History Tab */}
-                <button
-                  id="rail-tab-history"
-                  onClick={() => setActiveTab('history')}
-                  className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all cursor-pointer w-full text-left group ${
-                    activeTab === 'history'
-                      ? 'bg-primary-container text-on-primary-container font-bold shadow-xs scale-101'
-                      : 'text-on-surface-variant hover:bg-surface-variant/40 hover:text-on-surface'
-                  }`}
-                >
-                  <HistoryIcon className={`w-4.5 h-4.5 transition-transform group-hover:scale-105 ${
-                    activeTab === 'history' ? 'text-primary' : 'text-on-surface-variant/80'
-                  }`} />
-                  <span className="text-xs font-semibold tracking-tight select-none">
-                    Transactions
-                  </span>
-                </button>
-
-                {/* Insights Tab */}
-                <button
-                  id="rail-tab-insights"
-                  onClick={() => setActiveTab('insights')}
-                  className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all cursor-pointer w-full text-left group ${
-                    activeTab === 'insights'
-                      ? 'bg-primary-container text-on-primary-container font-bold shadow-xs scale-101'
-                      : 'text-on-surface-variant hover:bg-surface-variant/40 hover:text-on-surface'
-                  }`}
-                >
-                  <TrendingUp className={`w-4.5 h-4.5 transition-transform group-hover:scale-105 ${
-                    activeTab === 'insights' ? 'text-primary' : 'text-on-surface-variant/80'
-                  }`} />
-                  <span className="text-xs font-semibold tracking-tight select-none">
-                    Insights
-                  </span>
-                </button>
-
-
-                {/* Settings Tab */}
-                <button
-                  id="rail-tab-settings"
-                  onClick={() => setActiveTab('settings')}
-                  className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all cursor-pointer w-full text-left group ${
-                    activeTab === 'settings'
-                      ? 'bg-primary-container text-on-primary-container font-bold shadow-xs scale-101'
-                      : 'text-on-surface-variant hover:bg-surface-variant/40 hover:text-on-surface'
-                  }`}
-                >
-                  <SettingsIcon className={`w-4.5 h-4.5 transition-transform group-hover:scale-105 ${
-                    activeTab === 'settings' ? 'text-primary' : 'text-on-surface-variant/80'
-                  }`} />
-                  <span className="text-xs font-semibold tracking-tight select-none">
-                    Settings
-                  </span>
-                </button>
+              <div className="flex flex-col space-y-1 w-full relative">
+                {([
+                  { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, shortcut: '⌘1' },
+                  { id: 'history', label: 'Transactions', icon: HistoryIcon, shortcut: '⌘2' },
+                  { id: 'insights', label: 'Insights', icon: TrendingUp, shortcut: '⌘3' },
+                  { id: 'settings', label: 'Settings', icon: SettingsIcon, shortcut: '⌘4' },
+                ] as const).map(({ id, label, icon: IconComp, shortcut }) => {
+                  const isActive = activeTab === id;
+                  return (
+                    <button
+                      key={id}
+                      id={`rail-tab-${id}`}
+                      onClick={() => setActiveTab(id as TabType)}
+                      className={`relative flex items-center justify-between px-3.5 py-2.5 rounded-xl transition-all cursor-pointer w-full text-left group select-none ${
+                        isActive
+                          ? 'text-on-primary-container font-bold'
+                          : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-variant/30'
+                      }`}
+                    >
+                      {isActive && (
+                        <motion.div
+                          layoutId="desktop-rail-pill"
+                          className="absolute inset-0 bg-primary-container rounded-xl shadow-xs -z-10"
+                          transition={{ type: 'spring', stiffness: 450, damping: 32 }}
+                        />
+                      )}
+                      <div className="flex items-center gap-3">
+                        <IconComp className={`w-4.5 h-4.5 transition-transform group-hover:scale-110 ${
+                          isActive ? 'text-primary' : 'text-on-surface-variant/80'
+                        }`} />
+                        <span className="text-xs font-semibold tracking-tight">
+                          {label}
+                        </span>
+                      </div>
+                      <span className={`text-[9px] font-mono px-1.5 py-0.5 rounded border transition-colors ${
+                        isActive
+                          ? 'bg-primary/10 border-primary/25 text-primary'
+                          : 'bg-surface-container-high/40 border-outline-variant/20 text-on-surface-variant/60 group-hover:text-on-surface-variant'
+                      }`}>
+                        {shortcut}
+                      </span>
+                    </button>
+                  );
+                })}
 
                 {/* Quick Add Log Shortcut Button */}
                 <div className="pt-2 px-1">
@@ -1651,6 +1648,22 @@ export default function App() {
 
 
 
+                {/* Desktop User Profile Chip */}
+                <div className="hidden md:flex items-center gap-2 pl-2 border-l border-outline-variant/30">
+                  <div className="flex items-center gap-2 py-1 px-2.5 rounded-xl bg-surface-container border border-outline-variant/30 select-none shadow-2xs">
+                    <img
+                      src={profile.avatarUrl || `https://api.dicebear.com/7.x/adventurer/svg?seed=${encodeURIComponent(profile.name || 'User')}`}
+                      alt="Profile"
+                      className="w-5 h-5 rounded-full border border-primary/30 object-cover"
+                      referrerPolicy="no-referrer"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src = `https://api.dicebear.com/7.x/adventurer/svg?seed=${encodeURIComponent(profile.name || 'User')}`;
+                      }}
+                    />
+                    <span className="text-xs font-bold text-on-surface max-w-[110px] truncate">{profile.name?.split(' ')[0] || 'User'}</span>
+                  </div>
+                </div>
+
                 {/* Profile Avatar (Mobile) */}
                 <div
                   id="avatar-trigger"
@@ -1672,7 +1685,7 @@ export default function App() {
             {/* Core Content Layout Area — only this area scrolls, like a native app */}
             <main
               ref={mainScrollRef}
-              className="flex-1 overflow-y-auto overflow-x-hidden px-3 sm:px-4 pt-20 pb-36 md:pb-12"
+              className="flex-1 overflow-y-auto overflow-x-hidden px-3 sm:px-6 lg:px-8 pt-20 pb-36 md:pb-12 desktop-subtle-grid"
               style={{ WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain' } as React.CSSProperties}
             >
 

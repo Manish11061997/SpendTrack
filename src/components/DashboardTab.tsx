@@ -704,7 +704,7 @@ export default function DashboardTab({
   };
 
   return (
-    <div className="space-y-3.5 sm:space-y-5 pb-20 animate-fade-in">
+    <div className="w-full max-w-5xl mx-auto space-y-4 sm:space-y-6 pb-20 animate-fade-in">
       
       {/* Hero Section: Interactive 3D Tilt & Flip Card */}
       <TiltCard3D maxTilt={6} className="z-20">
