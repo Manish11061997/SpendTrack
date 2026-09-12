@@ -30,7 +30,9 @@ import {
   ShieldCheck,
   FileText,
   ExternalLink,
-  Download
+  Download,
+  Lock,
+  KeyRound
 } from 'lucide-react';
 import { QuickLogTemplate, Transaction } from '../types';
 import { LegalModal } from './LegalModal';
@@ -55,6 +57,8 @@ interface SettingsTabProps {
   onSelectThemePreset: (id: string) => void;
   onOpenCsvImport?: () => void;
   onOpenBadges?: () => void;
+  pinConfig?: { isEnabled: boolean; pin: string };
+  onUpdatePinConfig?: (config: { isEnabled: boolean; pin: string }) => void;
 }
 
 export default function SettingsTab({
@@ -75,7 +79,9 @@ export default function SettingsTab({
   themePresetId,
   onSelectThemePreset,
   onOpenCsvImport,
-  onOpenBadges
+  onOpenBadges,
+  pinConfig = { isEnabled: false, pin: '' },
+  onUpdatePinConfig
 }: SettingsTabProps) {
   const [profileName, setProfileName] = useState<string>(profile.name);
   const [profileEmail, setProfileEmail] = useState<string>(profile.email);
@@ -152,6 +158,12 @@ export default function SettingsTab({
   const [isQuickPresetsOpen, setIsQuickPresetsOpen] = useState<boolean>(false);
   const [isLegalOpen, setIsLegalOpen] = useState<boolean>(false);
   const [legalModalTab, setLegalModalTab] = useState<'privacy' | 'terms' | null>(null);
+
+  // Security & App Lock State
+  const [isSecurityOpen, setIsSecurityOpen] = useState<boolean>(false);
+  const [newPin, setNewPin] = useState<string>('');
+  const [confirmPin, setConfirmPin] = useState<string>('');
+  const [pinMessage, setPinMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   const [enableRollover, setEnableRollover] = useState<boolean>(budget?.enableCategoryRollover ?? false);
   const [recurringSalaryTitle, setRecurringSalaryTitle] = useState<string>(budget?.recurringIncome?.title || 'Monthly Salary');
@@ -1318,6 +1330,147 @@ export default function SettingsTab({
                 Done
               </button>
             </div>
+          </div>
+        )}
+      </section>
+
+      {/* Security & App Protection Section */}
+      <section className="bg-surface-container-low rounded-2xl p-5 border border-outline-variant/30 space-y-4 shadow-sm">
+        <button
+          onClick={() => setIsSecurityOpen(!isSecurityOpen)}
+          className="w-full flex items-center justify-between text-left cursor-pointer group"
+        >
+          <div className="flex items-center gap-2.5">
+            <span className="p-2 rounded-xl bg-purple-500/15 text-purple-600 dark:text-purple-400 border border-purple-500/25">
+              <Lock className="w-5 h-5" />
+            </span>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="font-outfit text-sm font-black text-on-surface">Security & App Protection</h3>
+                {pinConfig.isEnabled && (
+                  <span className="px-2 py-0.5 bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/25 rounded-full text-[9px] font-extrabold uppercase tracking-wider">
+                    PIN Enabled
+                  </span>
+                )}
+              </div>
+              <p className="text-[11px] text-on-surface-variant">Biometric PIN lock, background privacy & protection</p>
+            </div>
+          </div>
+          <ChevronDown className={`w-4 h-4 text-on-surface-variant transition-transform ${isSecurityOpen ? 'rotate-180 text-primary' : ''}`} />
+        </button>
+
+        {isSecurityOpen && (
+          <div className="pt-3 border-t border-outline-variant/20 space-y-4 animate-fade-in">
+            {pinMessage && (
+              <div className={`p-3 rounded-xl text-xs font-bold border ${
+                pinMessage.type === 'success'
+                  ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30'
+                  : 'bg-rose-500/15 text-rose-600 dark:text-rose-400 border-rose-500/30'
+              }`}>
+                {pinMessage.text}
+              </div>
+            )}
+
+            <div className="flex items-center justify-between p-3.5 bg-surface-container-lowest rounded-xl border border-outline-variant/25">
+              <div className="space-y-0.5">
+                <span className="font-bold text-xs text-on-surface">4-Digit PIN Security Lock</span>
+                <p className="text-[10px] text-on-surface-variant leading-tight">
+                  Require PIN on startup and whenever switching apps.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  if (pinConfig.isEnabled) {
+                    if (onUpdatePinConfig) {
+                      onUpdatePinConfig({ isEnabled: false, pin: '' });
+                    }
+                    setPinMessage({ type: 'success', text: 'PIN lock has been disabled.' });
+                  } else {
+                    setPinMessage(null);
+                  }
+                }}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                  pinConfig.isEnabled
+                    ? 'bg-rose-500/15 text-rose-500 hover:bg-rose-500/25 border border-rose-500/30'
+                    : 'bg-primary text-on-primary shadow-xs'
+                }`}
+              >
+                {pinConfig.isEnabled ? 'Disable PIN' : 'Set Up PIN'}
+              </button>
+            </div>
+
+            {/* PIN Setup / Change Inputs */}
+            {(!pinConfig.isEnabled || isSecurityOpen) && (
+              <div className="p-4 bg-surface-container-lowest rounded-xl border border-outline-variant/25 space-y-3">
+                <h4 className="text-xs font-bold text-on-surface flex items-center gap-1.5">
+                  <KeyRound className="w-3.5 h-3.5 text-primary" />
+                  <span>{pinConfig.isEnabled ? 'Change Existing PIN' : 'Create 4-Digit Security PIN'}</span>
+                </h4>
+                
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">New PIN</label>
+                    <input
+                      type="password"
+                      inputMode="numeric"
+                      maxLength={4}
+                      placeholder="••••"
+                      value={newPin}
+                      onChange={(e) => {
+                        const val = e.target.value.replace(/\D/g, '').slice(0, 4);
+                        setNewPin(val);
+                        setPinMessage(null);
+                      }}
+                      className="w-full bg-surface-container-low border border-outline-variant/40 rounded-xl px-3 py-2 text-center text-sm font-mono font-black tracking-widest text-on-surface focus:border-primary outline-none"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">Confirm PIN</label>
+                    <input
+                      type="password"
+                      inputMode="numeric"
+                      maxLength={4}
+                      placeholder="••••"
+                      value={confirmPin}
+                      onChange={(e) => {
+                        const val = e.target.value.replace(/\D/g, '').slice(0, 4);
+                        setConfirmPin(val);
+                        setPinMessage(null);
+                      }}
+                      className="w-full bg-surface-container-low border border-outline-variant/40 rounded-xl px-3 py-2 text-center text-sm font-mono font-black tracking-widest text-on-surface focus:border-primary outline-none"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex justify-end pt-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (newPin.length !== 4) {
+                        setPinMessage({ type: 'error', text: 'PIN must be exactly 4 numeric digits.' });
+                        return;
+                      }
+                      if (newPin !== confirmPin) {
+                        setPinMessage({ type: 'error', text: 'PINs do not match. Please re-enter.' });
+                        return;
+                      }
+                      if (onUpdatePinConfig) {
+                        onUpdatePinConfig({ isEnabled: true, pin: newPin });
+                      }
+                      setNewPin('');
+                      setConfirmPin('');
+                      setPinMessage({ type: 'success', text: 'Security PIN successfully saved and enabled!' });
+                    }}
+                    disabled={newPin.length !== 4 || confirmPin.length !== 4}
+                    className="px-4 py-2 bg-primary disabled:opacity-40 text-on-primary font-bold text-xs rounded-xl shadow-xs transition-all cursor-pointer"
+                  >
+                    Save & Activate PIN
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </section>

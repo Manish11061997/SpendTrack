@@ -1,8 +1,79 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /users/{userId}/{document=**} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+
+    // Helper functions for security validation
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isNonEmptyString(val, maxLen) {
+      return val is string && val.size() > 0 && val.size() <= maxLen;
+    }
+
+    function isValidNumber(val) {
+      return val is number && !math.isNaN(val) && !math.isInfinite(val);
+    }
+
+    // Explicit deny for top-level queries or unmatched collections
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // User scope: every user document and subcollection is strictly isolated
+    match /users/{userId} {
+      // User Profile Document
+      allow read: if isOwner(userId);
+      allow create, update: if isOwner(userId)
+        && request.resource.data.name is string
+        && request.resource.data.name.size() <= 100
+        && request.resource.data.email is string
+        && request.resource.data.email.size() <= 200
+        && (request.resource.data.avatarUrl == null || (request.resource.data.avatarUrl is string && request.resource.data.avatarUrl.size() <= 1000000));
+      allow delete: if isOwner(userId);
+
+      // Transactions subcollection
+      match /transactions/{txId} {
+        allow read: if isOwner(userId);
+        allow create, update: if isOwner(userId)
+          && isNonEmptyString(request.resource.data.title, 200)
+          && isValidNumber(request.resource.data.amount)
+          && isNonEmptyString(request.resource.data.category, 50)
+          && isNonEmptyString(request.resource.data.date, 30);
+        allow delete: if isOwner(userId);
+      }
+
+      // Subscriptions subcollection
+      match /subscriptions/{subId} {
+        allow read: if isOwner(userId);
+        allow create, update: if isOwner(userId)
+          && isNonEmptyString(request.resource.data.title, 200)
+          && isValidNumber(request.resource.data.amount)
+          && request.resource.data.amount >= 0;
+        allow delete: if isOwner(userId);
+      }
+
+      // Savings Goals subcollection
+      match /savingsGoals/{goalId} {
+        allow read: if isOwner(userId);
+        allow create, update: if isOwner(userId)
+          && isNonEmptyString(request.resource.data.title, 200)
+          && isValidNumber(request.resource.data.targetAmount)
+          && isValidNumber(request.resource.data.currentAmount);
+        allow delete: if isOwner(userId);
+      }
+
+      // User Configuration subcollection (e.g. config/budget)
+      match /config/{configDoc} {
+        allow read: if isOwner(userId);
+        allow create, update: if isOwner(userId);
+        allow delete: if isOwner(userId);
+      }
     }
   }
 }
+

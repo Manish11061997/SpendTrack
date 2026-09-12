@@ -28,7 +28,8 @@ import {
   Smartphone,
   Eye,
   EyeOff,
-  Users
+  Users,
+  Lock
 } from 'lucide-react';
 import { Transaction, UserProfile, BudgetConfig, Subscription } from './types';
 import { COLOR_PRESETS } from './theme';
@@ -141,6 +142,19 @@ export default function App() {
   });
 
   const [isPinUnlocked, setIsPinUnlocked] = useState<boolean>(true);
+
+  // Auto-lock when user backgrounds the app or locks screen if PIN protection is enabled
+  useEffect(() => {
+    if (!pinConfig.isEnabled) return;
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        setIsPinUnlocked(false);
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [pinConfig.isEnabled]);
+
   const [isCalendarOpen, setIsCalendarOpen] = useState<boolean>(false);
   const [isAlertRulesOpen, setIsAlertRulesOpen] = useState<boolean>(false);
   const [isPdfExportOpen, setIsPdfExportOpen] = useState<boolean>(false);
@@ -1552,6 +1566,21 @@ export default function App() {
               </div>
 
               <div className="flex items-center gap-2">
+                {/* 1-Tap Lock App Button (Available when PIN protection is configured) */}
+                {pinConfig.isEnabled && (
+                  <button
+                    id="manual-pin-lock-toggle"
+                    onClick={() => {
+                      setIsPinUnlocked(false);
+                      showToast('App locked.', 'info');
+                    }}
+                    aria-label="Lock App"
+                    title="Lock App with PIN"
+                    className="p-2 rounded-xl transition-all active:scale-95 duration-100 cursor-pointer border bg-surface-container-high/60 border-outline-variant/30 text-on-surface-variant hover:text-primary"
+                  >
+                    <Lock className="w-4.5 h-4.5" />
+                  </button>
+                )}
 
                 {/* Privacy Blur Mode Toggle */}
                 <button
@@ -1791,6 +1820,16 @@ export default function App() {
                         onSelectThemePreset={setThemePresetId}
                         onOpenCsvImport={() => setIsCsvImportOpen(true)}
                         onOpenBadges={() => setIsBadgesModalOpen(true)}
+                        pinConfig={pinConfig}
+                        onUpdatePinConfig={(newConfig) => {
+                          setPinConfig(newConfig);
+                          localStorage.setItem('spendtrack_pin_config', JSON.stringify(newConfig));
+                          if (newConfig.isEnabled) {
+                            showToast('Security PIN successfully enabled!', 'success');
+                          } else {
+                            showToast('Security PIN disabled.', 'info');
+                          }
+                        }}
                       />
                     )}
                   </motion.div>
