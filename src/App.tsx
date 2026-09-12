@@ -38,7 +38,8 @@ import {
   DEFAULT_PROFILE, 
   DEFAULT_BUDGET 
 } from './initialData';
-import { formatCurrency, isSubscriptionDoubleCounted } from './utils/currency';
+import { formatCurrency, getCurrencySymbol, getCurrencyLocale, isSubscriptionDoubleCounted } from './utils/currency';
+import { RollingNumber, PressSlideText, AnimatedProgressBar } from './components/animated';
 
 // Modular Tab Views
 import DashboardTab from './components/DashboardTab';
@@ -1417,7 +1418,7 @@ export default function App() {
                     className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-primary text-on-primary font-bold text-xs rounded-xl shadow-xs hover:bg-primary/95 transition-all hover:scale-[1.02] active:scale-95 cursor-pointer"
                   >
                     <Plus className="w-4 h-4" />
-                    <span>Quick Add Log</span>
+                    <PressSlideText>Quick Add Log</PressSlideText>
                   </button>
                 </div>
               </div>
@@ -1441,16 +1442,20 @@ export default function App() {
                       <div className="flex justify-between items-center text-[10px] font-bold text-on-surface-variant">
                         <span>Safe Left:</span>
                         <span className={remaining < 0 ? "text-error" : "text-primary font-mono"}>
-                          {formatCurrency(remaining, budget?.currency || 'INR')}
+                          <RollingNumber
+                            value={remaining}
+                            prefix={getCurrencySymbol(budget?.currency || 'INR')}
+                            locale={getCurrencyLocale(budget?.currency || 'INR')}
+                            duration={600}
+                          />
                         </span>
                       </div>
                       
-                      <div className="w-full h-1.5 bg-surface-container-highest rounded-full overflow-hidden">
-                        <div 
-                          className={`h-full rounded-full transition-all duration-300 ${remaining < 0 ? 'bg-error' : usagePct > 85 ? 'bg-amber-500' : 'bg-primary'}`} 
-                          style={{ width: `${Math.min(100, usagePct)}%` }}
-                        />
-                      </div>
+                      <AnimatedProgressBar
+                        percentage={usagePct}
+                        heightClassName="h-1.5"
+                        showThresholdColors={true}
+                      />
                       <div className="flex justify-between text-[8px] font-mono font-bold text-on-surface-variant/75">
                         <span>{usagePct}% spent</span>
                         <span>Cap: {formatCurrency(limit, budget?.currency || 'INR')}</span>
@@ -1713,7 +1718,7 @@ export default function App() {
                       className="px-2.5 py-0.5 bg-primary text-on-primary font-bold text-[10px] rounded-md shadow-xs hover:bg-primary/95 transition-colors flex items-center gap-0.5 cursor-pointer"
                     >
                       <Plus className="w-3 h-3" />
-                      Add Log
+                      <PressSlideText>Add Log</PressSlideText>
                     </button>
                   </div>
                 </div>
@@ -1990,18 +1995,31 @@ export default function App() {
                             {spentPct}%
                           </span>
                         </div>
-                        <div className="w-full h-2 bg-surface-container-highest rounded-full overflow-hidden">
-                          <div 
-                            className={`h-full rounded-full transition-all duration-300 ${isOver ? 'bg-error animate-pulse' : 'bg-primary'}`} 
-                            style={{ width: `${Math.min(100, spentPct)}%` }}
-                          />
-                        </div>
+                        <AnimatedProgressBar
+                          percentage={spentPct}
+                          heightClassName="h-2"
+                          showThresholdColors={true}
+                        />
                         <div className="flex justify-between items-center text-[10px] font-mono font-semibold">
                           <div className="text-on-surface-variant/80">
-                            Spent: <span className="font-bold text-on-surface">{formatCurrency(monthSpent, budget?.currency || 'INR')}</span>
+                            Spent: <span className="font-bold text-on-surface">
+                              <RollingNumber
+                                value={monthSpent}
+                                prefix={getCurrencySymbol(budget?.currency || 'INR')}
+                                locale={getCurrencyLocale(budget?.currency || 'INR')}
+                                duration={600}
+                              />
+                            </span>
                           </div>
                           <div className="text-right">
-                            Remaining: <span className={`font-bold ${isOver ? 'text-error' : 'text-emerald-600'}`}>{formatCurrency(remaining, budget?.currency || 'INR')}</span>
+                            Remaining: <span className={`font-bold ${isOver ? 'text-error' : 'text-emerald-600'}`}>
+                              <RollingNumber
+                                value={remaining}
+                                prefix={getCurrencySymbol(budget?.currency || 'INR')}
+                                locale={getCurrencyLocale(budget?.currency || 'INR')}
+                                duration={600}
+                              />
+                            </span>
                           </div>
                         </div>
                       </>

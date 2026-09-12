@@ -2,9 +2,10 @@ import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Sector, RadialBarChart, RadialBar, PolarAngleAxis } from 'recharts';
 import { Transaction, UserProfile, BudgetConfig, Subscription } from '../types';
-import { formatCurrency as formatCustomCurrency, isSubscriptionDoubleCounted, parseRawAmount } from '../utils/currency';
+import { formatCurrency as formatCustomCurrency, getCurrencySymbol, getCurrencyLocale, isSubscriptionDoubleCounted, parseRawAmount } from '../utils/currency';
 import { COLOR_PRESETS } from '../theme';
 import { triggerHaptic } from '../utils/haptics';
+import { RollingNumber, PressSlideText, RevealOnScroll, AnimatedProgressBar } from './animated';
 import { QuickShortcutsWidget } from './QuickShortcutsWidget';
 import { FinancialHealthRadarCard } from './FinancialHealthRadarCard';
 import { NoSpendHeatmapCard } from './NoSpendHeatmapCard';
@@ -764,7 +765,11 @@ export default function DashboardTab({
         {/* Row 2: Amount + info button */}
         <div className="flex items-center gap-1.5 flex-wrap min-w-0">
           <span className="font-headline-lg text-xl sm:text-2xl lg:text-3xl font-extrabold text-primary tracking-tight shrink-0">
-            {formatCurrency(activeExpenses)}
+            <RollingNumber
+              value={activeExpenses}
+              prefix={getCurrencySymbol(budget?.currency || 'INR')}
+              locale={getCurrencyLocale(budget?.currency || 'INR')}
+            />
           </span>
           <button 
             type="button"
@@ -969,44 +974,45 @@ export default function DashboardTab({
                 onClick={onAddTransactionClick}
                 className="px-3.5 py-1.5 bg-primary text-on-primary text-xs font-bold rounded-xl shadow-xs"
               >
-                + Log First Expense
+                <PressSlideText>+ Log First Expense</PressSlideText>
               </button>
             </div>
           ) : (
-            recentTransactions.map((tx) => {
+            recentTransactions.map((tx, idx) => {
               const config = getCategoryConfig(tx.category);
               const IconComponent = config.icon;
               const isExpense = tx.amount < 0;
 
               return (
-                <div 
-                  id={`transaction-row-${tx.id}`}
-                  key={tx.id}
-                  onClick={() => setSelectedTx(tx)}
-                  className="flex items-center justify-between p-2.5 sm:p-3 bg-surface-container-lowest rounded-xl border border-outline-variant/30 transition-all cursor-pointer group active:scale-[0.98] active:bg-surface-container-high/50"
-                >
-                  <div className="flex items-center gap-2.5">
-                    <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center ${config.bg} shadow-2xs shrink-0`}>
-                      <IconComponent className="w-4 h-4 text-on-surface" />
+                <RevealOnScroll key={tx.id} stagger={idx}>
+                  <div 
+                    id={`transaction-row-${tx.id}`}
+                    onClick={() => setSelectedTx(tx)}
+                    className="flex items-center justify-between p-2.5 sm:p-3 bg-surface-container-lowest rounded-xl border border-outline-variant/30 transition-all cursor-pointer group active:scale-[0.98] active:bg-surface-container-high/50"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center ${config.bg} shadow-2xs shrink-0`}>
+                        <IconComponent className="w-4 h-4 text-on-surface" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="font-title-md text-xs sm:text-sm text-on-surface font-bold truncate group-hover:text-primary transition-colors">
+                          {tx.title}
+                        </div>
+                        <div className="text-[11px] text-on-surface-variant font-medium truncate">
+                          {tx.category} • {formatDateLabel(tx.date)}, {tx.time}
+                        </div>
+                      </div>
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="font-title-md text-xs sm:text-sm text-on-surface font-bold truncate group-hover:text-primary transition-colors">
-                        {tx.title}
+                    <div className="text-right ml-2 flex flex-col items-end shrink-0">
+                      <div className={`font-mono text-xs sm:text-sm font-bold ${isExpense ? 'text-on-surface' : 'text-emerald-600 dark:text-emerald-400'}`}>
+                        {isExpense ? '' : '+'}{formatCurrency(Math.abs(tx.amount))}
                       </div>
-                      <div className="text-[11px] text-on-surface-variant font-medium truncate">
-                        {tx.category} • {formatDateLabel(tx.date)}, {tx.time}
-                      </div>
+                      <span className="inline-block px-1.5 py-0.5 mt-0.5 text-[9px] font-medium bg-surface-variant text-on-surface-variant rounded-md">
+                        {tx.label}
+                      </span>
                     </div>
                   </div>
-                  <div className="text-right ml-2 flex flex-col items-end shrink-0">
-                    <div className={`font-mono text-xs sm:text-sm font-bold ${isExpense ? 'text-on-surface' : 'text-emerald-600 dark:text-emerald-400'}`}>
-                      {isExpense ? '' : '+'}{formatCurrency(Math.abs(tx.amount))}
-                    </div>
-                    <span className="inline-block px-1.5 py-0.5 mt-0.5 text-[9px] font-medium bg-surface-variant text-on-surface-variant rounded-md">
-                      {tx.label}
-                    </span>
-                  </div>
-                </div>
+                </RevealOnScroll>
               );
             })
           )}
@@ -1329,7 +1335,12 @@ export default function DashboardTab({
                               {focusedItem.name}
                             </span>
                             <span style={{ fontSize: '14px', fontWeight: 900, fontFamily: 'monospace', color: 'var(--color-on-surface,#1c1b1f)', marginTop: '3px', lineHeight: 1.1, maxWidth: '96px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                              {formatCurrency(focusedItem.value)}
+                              <RollingNumber
+                                value={focusedItem.value}
+                                prefix={getCurrencySymbol(budget?.currency || 'INR')}
+                                locale={getCurrencyLocale(budget?.currency || 'INR')}
+                                duration={500}
+                              />
                             </span>
                             <span style={{ fontSize: '10px', fontWeight: 700, color: focusedItem.color, marginTop: '4px', background: `${focusedItem.color}22`, padding: '1px 6px', borderRadius: '99px', lineHeight: 1.6 }}>
                               {totalSpendingForMonth > 0 ? ((focusedItem.value / totalSpendingForMonth) * 100).toFixed(1) : 0}%
@@ -1341,7 +1352,12 @@ export default function DashboardTab({
                               Total
                             </span>
                             <span style={{ fontSize: '14px', fontWeight: 900, fontFamily: 'monospace', color: 'var(--color-on-surface,#1c1b1f)', marginTop: '3px', lineHeight: 1.1, maxWidth: '96px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                              {formatCurrency(totalSpendingForMonth)}
+                              <RollingNumber
+                                value={totalSpendingForMonth}
+                                prefix={getCurrencySymbol(budget?.currency || 'INR')}
+                                locale={getCurrencyLocale(budget?.currency || 'INR')}
+                                duration={600}
+                              />
                             </span>
                             <span style={{ fontSize: '9px', fontWeight: 500, color: 'var(--color-on-surface-variant,#49454f)', marginTop: '4px', opacity: 0.75 }}>
                               {chartData.length} {chartData.length === 1 ? 'category' : 'categories'}
@@ -1448,12 +1464,12 @@ export default function DashboardTab({
                               </span>
                               <span className="font-mono text-on-surface-variant">{formatCurrency(limitVal)}</span>
                             </div>
-                            <div className="w-full h-1 bg-surface-container rounded-full overflow-hidden">
-                              <div
-                                className={`h-full rounded-full transition-all duration-500 ${isOver ? 'bg-error animate-pulse' : 'bg-primary'}`}
-                                style={{ width: `${Math.min(100, (item.value / limitVal) * 100)}%` }}
-                              />
-                            </div>
+                            <AnimatedProgressBar
+                              percentage={limitVal > 0 ? (item.value / limitVal) * 100 : 0}
+                              heightClassName="h-1"
+                              showThresholdColors={false}
+                              barClassName={isOver ? 'bg-error animate-pulse' : 'bg-primary'}
+                            />
                           </div>
                         )}
                       </div>
@@ -1620,7 +1636,7 @@ export default function DashboardTab({
                   type="submit"
                   className="px-4 py-1.5 bg-primary text-on-primary rounded-lg text-xs font-bold hover:bg-primary/95 transition-colors shadow-xs cursor-pointer"
                 >
-                  Save Subscription
+                  <PressSlideText>Save Subscription</PressSlideText>
                 </button>
               </div>
             </form>
