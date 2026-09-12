@@ -192,24 +192,29 @@ export default function HistoryTab({
 
         {/* Summary Card */}
         <section>
-          <div className="bg-primary text-on-primary p-5 rounded-2xl shadow-md relative overflow-hidden">
+          <div className="glass-card-metallic p-5 sm:p-6 rounded-3xl relative overflow-hidden shadow-lg border border-primary/25 group">
             {/* Abstract Decorative Ornaments */}
-            <div className="absolute -right-10 -top-10 w-40 h-40 bg-white/10 rounded-full blur-2xl"></div>
-            <div className="absolute -left-10 -bottom-10 w-32 h-32 bg-primary-container/20 rounded-full blur-xl"></div>
+            <div className="absolute -right-10 -top-10 w-40 h-40 bg-primary/20 rounded-full blur-2xl pointer-events-none"></div>
+            <div className="absolute -left-10 -bottom-10 w-32 h-32 bg-indigo-500/15 rounded-full blur-xl pointer-events-none"></div>
             
             <div className="relative z-10 space-y-4">
               <div>
-                <p className="text-xs font-semibold opacity-80 uppercase tracking-wider">Total Year Outflow</p>
+                <p className="text-xs font-black uppercase tracking-wider text-on-surface-variant flex items-center gap-1.5">
+                  <Sparkles className="w-3.5 h-3.5 text-primary" />
+                  Total Year Outflow
+                </p>
                 <div className="flex items-baseline gap-2 mt-1 flex-wrap">
-                  <span className="text-3xl font-extrabold">{formatCurrency(totalYearOutflow)}</span>
-                  <span className="text-[10px] font-bold bg-white/25 px-2 py-0.5 rounded-full uppercase tracking-wider">
+                  <span className="text-3xl sm:text-4xl font-black font-outfit text-gradient-hero tracking-tight">
+                    {formatCurrency(totalYearOutflow)}
+                  </span>
+                  <span className="text-[10px] font-black bg-primary/10 text-primary border border-primary/25 px-2.5 py-0.5 rounded-full uppercase tracking-wider">
                     Dynamic YTD
                   </span>
                 </div>
               </div>
 
-              <div className="flex items-center gap-2 text-xs opacity-90 border-t border-white/15 pt-3">
-                <Calendar className="w-3.5 h-3.5" />
+              <div className="flex items-center gap-2 text-xs font-semibold text-on-surface-variant border-t border-outline-variant/20 pt-3">
+                <Calendar className="w-3.5 h-3.5 text-primary" />
                 <span>{getTransactionDateRangeLabel()}</span>
               </div>
             </div>
@@ -235,30 +240,30 @@ export default function HistoryTab({
                     id={`archive-month-card-${rec.monthKey}`}
                     key={rec.monthKey}
                     onClick={() => setSelectedMonthKey(rec.monthKey)}
-                    className="bg-surface-container-low hover:bg-surface-container-high transition-all p-4 rounded-2xl flex items-center justify-between group cursor-pointer border border-outline-variant/30 hover:shadow-sm"
+                    className="glass-card-punchy p-4 rounded-2xl flex items-center justify-between group cursor-pointer border border-outline-variant/30 hover:border-primary/40 hover:scale-[1.01] transition-all duration-200 active:scale-98 shadow-2xs"
                   >
-                    <div className="flex items-center gap-4">
-                      <div className={`w-12 h-12 rounded-xl flex items-center justify-center font-bold text-xs ${
+                    <div className="flex items-center gap-3.5">
+                      <div className={`w-11 h-11 rounded-2xl flex items-center justify-center font-black text-xs shadow-2xs ${
                         isLatestMonth 
-                          ? 'bg-secondary-container text-on-secondary-container' 
+                          ? 'bg-primary text-on-primary shadow-xs' 
                           : 'bg-surface-variant text-on-surface-variant'
                       }`}>
                         {rec.shortLabel}
                       </div>
                       <div>
-                        <p className="font-title-md text-sm font-bold text-on-surface group-hover:text-primary transition-colors">
+                        <p className="font-outfit text-sm font-bold text-on-surface group-hover:text-primary transition-colors">
                           {rec.label}
                         </p>
-                        <p className="text-xs text-on-surface-variant">
+                        <p className="text-[11px] text-on-surface-variant font-medium">
                           {rec.transactionCount} Transactions
                         </p>
                       </div>
                     </div>
                     <div className="text-right flex items-center gap-2">
-                      <p className="font-title-lg text-sm md:text-base font-bold text-primary">
+                      <p className="font-mono text-sm md:text-base font-black text-on-surface">
                         {formatCurrency(rec.totalOutflow)}
                       </p>
-                      <ChevronRight className="w-4 h-4 text-outline group-hover:translate-x-1 transition-transform" />
+                      <ChevronRight className="w-4 h-4 text-on-surface-variant group-hover:translate-x-1 transition-transform group-hover:text-primary" />
                     </div>
                   </div>
                 );
@@ -273,13 +278,13 @@ export default function HistoryTab({
             <h3 className="font-outfit text-sm font-bold text-on-surface px-1 tracking-tight">Historical Insight</h3>
             <span 
               onClick={onNavigateToInsights} 
-              className="text-xs text-primary cursor-pointer hover:underline"
+              className="text-xs text-primary cursor-pointer hover:underline font-bold"
             >
               Full Report
             </span>
           </div>
 
-          <div className="bg-surface-container-high/60 p-5 rounded-2xl border border-outline-variant/20 space-y-4">
+          <div className="glass-card-punchy p-5 rounded-3xl border border-outline-variant/30 space-y-4 shadow-sm">
             {(() => {
               const getLast6MonthsInsight = () => {
                 const today = new Date();
@@ -456,17 +461,17 @@ export default function HistoryTab({
 
       {/* Budget Status Card (Screenshot 3) */}
       {activeBudgetLimit > 0 && (
-        <div className="bg-surface-container-low rounded-2xl p-5 border border-outline-variant/30 shadow-sm space-y-4">
+        <div className="glass-card-punchy rounded-3xl p-5 border border-outline-variant/30 shadow-sm space-y-4">
           <div className="flex justify-between items-center">
             <div className="flex items-center gap-2">
-              <Wallet className="w-5 h-5 text-secondary" />
+              <Wallet className="w-5 h-5 text-primary" />
               <span className="font-outfit text-sm font-bold text-on-surface tracking-tight">Monthly Budget</span>
             </div>
-            <span className="font-label-lg text-sm font-bold text-secondary">{formatCurrency(activeBudgetLimit)}</span>
+            <span className="font-mono text-sm font-black text-on-surface">{formatCurrency(activeBudgetLimit)}</span>
           </div>
           
           <div className="space-y-2">
-            <div className="w-full bg-surface-variant rounded-full h-2.5 overflow-hidden">
+            <div className="w-full bg-surface-container-highest rounded-full h-2.5 overflow-hidden">
               <div 
                 style={{ width: `${usedPercent}%` }}
                 className="bg-primary h-full rounded-full transition-all duration-1000"
@@ -481,7 +486,7 @@ export default function HistoryTab({
       )}
 
       {/* Polished real-time Search and Category Filter section */}
-      <div className="space-y-3.5 bg-surface-container-low p-4 rounded-3xl border border-outline-variant/20 shadow-2xs">
+      <div className="space-y-3.5 glass-card-punchy p-4 rounded-3xl border border-outline-variant/30 shadow-2xs">
         <div className="relative flex items-center">
           <Search className="absolute left-3.5 w-4 h-4 text-on-surface-variant/75" />
           <input
@@ -577,7 +582,7 @@ export default function HistoryTab({
                 {formatGroupHeaderDate(dateKey)}
               </h3>
               
-              <div className="bg-surface-container-lowest rounded-2xl overflow-hidden border border-outline-variant/35 divide-y divide-outline-variant/20 shadow-xs">
+              <div className="glass-card-punchy rounded-3xl overflow-hidden border border-outline-variant/30 divide-y divide-outline-variant/20 shadow-xs">
                 <AnimatePresence initial={false}>
                   {groupedTransactions[dateKey].map((tx) => {
                     const cfg = getCategoryIcon(tx.category);
@@ -606,8 +611,8 @@ export default function HistoryTab({
                             setSelectedTx(tx);
                           }
                         }}
-                        className={`relative z-10 flex flex-col p-4 bg-surface-container-lowest hover:bg-surface-container-high transition-colors cursor-pointer group active:bg-surface-container-highest no-parent-drag ${
-                          isEditing ? 'bg-surface-container/60 ring-2 ring-primary/20 rounded-xl' : ''
+                        className={`relative z-10 flex flex-col p-4 bg-transparent hover:bg-surface-container-high/50 transition-colors cursor-pointer group active:bg-surface-container-highest no-parent-drag ${
+                          isEditing ? 'bg-surface-container/70 ring-2 ring-primary/20 rounded-xl' : ''
                         }`}
                       >
                         {isEditing ? (

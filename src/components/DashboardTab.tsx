@@ -1589,10 +1589,10 @@ export default function DashboardTab({
       </section>
 
       {/* Subscriptions Section (Collapsible for Clean UX) */}
-      <section className="space-y-3 bg-surface-container-low/60 rounded-3xl p-4 border border-outline-variant/25">
+      <section className="space-y-3 glass-card-punchy rounded-3xl p-4 sm:p-5 border border-outline-variant/30 shadow-xs">
         <div className="flex items-center justify-between cursor-pointer" onClick={() => setIsSubsExpanded(!isSubsExpanded)}>
           <div className="flex items-center gap-2.5">
-            <div className="p-2 rounded-2xl bg-primary/10 text-primary">
+            <div className="p-2.5 rounded-2xl bg-primary/10 text-primary shadow-2xs">
               <CreditCard className="w-5 h-5" />
             </div>
             <div className="flex flex-col">
@@ -1912,16 +1912,16 @@ export default function DashboardTab({
 </section>
 
       {/* Savings Goals Tracker Section (Collapsible for Clean UX) */}
-      <section className="space-y-3 bg-surface-container-low/60 rounded-3xl p-4 border border-outline-variant/25">
+      <section className="space-y-3 glass-card-punchy rounded-3xl p-4 sm:p-5 border border-outline-variant/30 shadow-xs">
         <div className="flex items-center justify-between cursor-pointer" onClick={() => setIsGoalsExpanded(!isGoalsExpanded)}>
           <div className="flex items-center gap-2.5">
-            <div className="p-2 rounded-2xl bg-primary/10 text-primary">
+            <div className="p-2.5 rounded-2xl bg-emerald-500/10 text-emerald-500 shadow-2xs">
               <PiggyBank className="w-5 h-5" />
             </div>
             <div className="flex flex-col">
               <h3 className="font-outfit text-base text-on-surface font-black tracking-tight flex items-center gap-2">
                 Savings Goals
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
                   {savingsGoals.length} Targets
                 </span>
               </h3>
