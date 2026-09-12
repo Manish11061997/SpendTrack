@@ -675,24 +675,15 @@ export default function DashboardTab({
 
   const totalSpendingForMonth = chartData.reduce((sum, item) => sum + item.value, 0);
 
-  // Pure-SVG donut: compute arc path descriptor
-  const describeArc = (cx: number, cy: number, r: number, startAngle: number, endAngle: number): string => {
-    const toRad = (deg: number) => (deg * Math.PI) / 180;
-    const x1 = cx + r * Math.cos(toRad(startAngle));
-    const y1 = cy + r * Math.sin(toRad(startAngle));
-    const x2 = cx + r * Math.cos(toRad(endAngle));
-    const y2 = cy + r * Math.sin(toRad(endAngle));
-    const largeArc = endAngle - startAngle > 180 ? 1 : 0;
-    return `M ${x1} ${y1} A ${r} ${r} 0 ${largeArc} 1 ${x2} ${y2}`;
-  };
-
   const buildDonutSlices = () => {
     if (totalSpendingForMonth === 0 || chartData.length === 0) return [];
     const GAP_DEG = chartData.length > 1 ? 3 : 0;
     const total = totalSpendingForMonth;
     let cursor = -90; // start from top
     return chartData.map((item) => {
-      const sweep = (item.value / total) * 360 - GAP_DEG;
+      const rawSweep = (item.value / total) * 360 - GAP_DEG;
+      // If single category, clamp to 359.99 so SVG arc endpoints do not coincide
+      const sweep = chartData.length === 1 ? Math.min(rawSweep, 359.99) : rawSweep;
       const start = cursor + GAP_DEG / 2;
       const end = start + sweep;
       cursor += (item.value / total) * 360;
