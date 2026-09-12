@@ -94,8 +94,11 @@ export const NoSpendHeatmapCard: React.FC<NoSpendHeatmapCardProps> = ({
           </div>
         </div>
 
-        <div className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 text-[10px] font-black font-mono">
-          <Flame className="w-3.5 h-3.5 text-emerald-500 animate-pulse" />
+        <div className="rizzeat-pill bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 font-mono">
+          <div className="rizzeat-pulse-dot">
+            <span className="bg-emerald-400"></span>
+            <span className="bg-emerald-500"></span>
+          </div>
           <span>{currentStreak} Day Streak</span>
         </div>
       </div>

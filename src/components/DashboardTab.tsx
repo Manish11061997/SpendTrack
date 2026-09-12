@@ -1153,65 +1153,101 @@ export default function DashboardTab({
 
 
 
-      {/* AI Spending Insights (Nudges) */}
+      {/* AI Spending Insights (Nudges) - RizzEat SpiceBot inspired */}
       {(() => {
         const nudges = getSpenderNudges();
         if (nudges.length === 0) return null;
         return (
-          <div className="grid grid-cols-1 gap-2.5">
-            {nudges.map((nudge, idx) => (
-              <div 
-                key={idx}
-                className={`p-3.5 rounded-2xl border text-xs flex items-start gap-2.5 shadow-2xs animate-fade-in ${
-                  nudge.type === 'warning' 
-                    ? 'bg-error/5 text-error border-error/15 dark:bg-error/10 dark:text-error-container' 
-                    : nudge.type === 'success'
-                    ? 'bg-emerald-500/5 text-emerald-700 border-emerald-500/15 dark:bg-emerald-500/10 dark:text-emerald-400'
-                    : 'bg-primary/5 text-primary border-primary/15 dark:bg-primary/10 dark:text-primary-container'
-                }`}
-              >
-                <span className="p-1 rounded-full bg-surface-container-lowest shrink-0">
-                  {nudge.type === 'warning' ? (
-                    <ShieldAlert className="w-3.5 h-3.5 text-error" />
-                  ) : nudge.type === 'success' ? (
-                    <TrendingDown className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-                  ) : (
-                    <Sparkles className="w-3.5 h-3.5 text-primary" />
-                  )}
-                </span>
-                <div className="flex-1 leading-normal font-medium">
-                  {nudge.text}
-                </div>
+          <section className="space-y-2.5">
+            <div className="flex items-center justify-between px-0.5">
+              <div className="flex items-center gap-1.5">
+                <Sparkles className="w-4 h-4 text-primary" />
+                <h3 className="font-outfit text-sm text-on-surface font-black tracking-tight uppercase">
+                  AI Financial Insights
+                </h3>
               </div>
-            ))}
-          </div>
+              <div className="rizzeat-pill bg-primary/10 text-primary border border-primary/20 select-none">
+                <div className="rizzeat-pulse-dot">
+                  <span className="bg-primary/50"></span>
+                  <span className="bg-primary"></span>
+                </div>
+                <span>Autonomous</span>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-2.5">
+              {nudges.map((nudge, idx) => (
+                <div 
+                  key={idx}
+                  className={`p-3 sm:p-3.5 rounded-2xl border text-xs flex items-start gap-2.5 shadow-2xs animate-fade-in rizzeat-bento-card ${
+                    nudge.type === 'warning' 
+                      ? 'bg-error/5 text-error border-error/15 dark:bg-error/10 dark:text-error-container' 
+                      : nudge.type === 'success'
+                      ? 'bg-emerald-500/5 text-emerald-700 border-emerald-500/15 dark:bg-emerald-500/10 dark:text-emerald-400'
+                      : 'bg-primary/5 text-primary border-primary/15 dark:bg-primary/10 dark:text-primary-container'
+                  }`}
+                >
+                  <span className="p-1.5 rounded-xl bg-surface-container-lowest shadow-2xs shrink-0">
+                    {nudge.type === 'warning' ? (
+                      <ShieldAlert className="w-3.5 h-3.5 text-error" />
+                    ) : nudge.type === 'success' ? (
+                      <TrendingDown className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                    ) : (
+                      <Sparkles className="w-3.5 h-3.5 text-primary" />
+                    )}
+                  </span>
+                  <div className="flex-1 leading-normal font-medium pt-0.5">
+                    {nudge.text}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
         );
       })()}
 
 
 
-      {/* Budget Health Radial Progress Section */}
+      {/* Budget Health Radial Progress Section - RizzEat Bento Aesthetic */}
       {hasBudget && (
         <section className="space-y-3">
           <div className="flex items-center justify-between">
             <h3 className="font-outfit text-lg text-on-surface font-black tracking-tight">Budget Health</h3>
-            <span className={`text-xs font-semibold px-2.5 py-1 rounded-full border ${
+            <span className={`rizzeat-pill border ${
               (activeExpenses / (activeLimit || 3000)) * 100 > 100 
                 ? 'bg-error/10 text-error border-error/20' 
                 : (activeExpenses / (activeLimit || 3000)) * 100 > 85 
-                  ? 'bg-amber-500/10 text-amber-600 border-amber-500/20'
-                  : 'bg-primary/10 text-primary border-primary/20'
+                  ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20' 
+                  : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20'
             }`}>
-              {(activeExpenses / (activeLimit || 3000)) * 100 > 100 
-                ? 'Over Budget' 
-                : (activeExpenses / (activeLimit || 3000)) * 100 > 85 
-                  ? 'Approaching Limit' 
-                  : 'Healthy Budget'
-              }
+              <div className="rizzeat-pulse-dot">
+                <span className={
+                  (activeExpenses / (activeLimit || 3000)) * 100 > 100
+                    ? 'bg-error'
+                    : (activeExpenses / (activeLimit || 3000)) * 100 > 85
+                    ? 'bg-amber-400'
+                    : 'bg-emerald-400'
+                } />
+                <span className={
+                  (activeExpenses / (activeLimit || 3000)) * 100 > 100
+                    ? 'bg-error'
+                    : (activeExpenses / (activeLimit || 3000)) * 100 > 85
+                    ? 'bg-amber-500'
+                    : 'bg-emerald-500'
+                } />
+              </div>
+              <span>
+                {(activeExpenses / (activeLimit || 3000)) * 100 > 100 
+                  ? 'Over Budget' 
+                  : (activeExpenses / (activeLimit || 3000)) * 100 > 85 
+                    ? 'Approaching Limit' 
+                    : 'Healthy Budget'
+                }
+              </span>
             </span>
           </div>
 
-          <div className="p-5 rounded-2xl bg-surface-container-low border border-outline-variant/30 shadow-sm grid grid-cols-1 md:grid-cols-12 gap-6 items-center">
+          <div className="p-5 rounded-2xl bg-surface-container-low border border-outline-variant/30 shadow-sm rizzeat-bento-card grid grid-cols-1 md:grid-cols-12 gap-6 items-center">
             {/* Radial Chart Area */}
             <div className="md:col-span-5 h-44 relative flex items-center justify-center">
               <div className="w-40 h-40 relative">
@@ -1374,8 +1410,8 @@ export default function DashboardTab({
             </span>
           )}
         </div>
-        {/* Card */}
-        <div className="p-4 sm:p-5 rounded-2xl bg-surface-container-low border border-outline-variant/30 shadow-sm">
+        {/* Card - RizzEat Bento Aesthetic */}
+        <div className="p-4 sm:p-5 rounded-2xl bg-surface-container-low border border-outline-variant/30 shadow-sm rizzeat-bento-card">
           {chartData.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-10 text-center space-y-2">
               <div className="p-3 bg-surface-container-high rounded-full text-on-surface-variant">
@@ -2213,9 +2249,24 @@ export default function DashboardTab({
     )}
   </section>
 
+      {/* Financial Health Radar & Discipline Analysis */}
+      <div ref={healthRadarRef} className="space-y-3">
+        <FinancialHealthRadarCard
+          transactions={transactions}
+          budget={budget}
+          subscriptions={subscriptions}
+          currency={budget?.currency || 'INR'}
+          onNavigateToSettings={onNavigateToSettings}
+        />
+      </div>
 
-
-
+      {/* No-Spend Days & Consistency Heatmap */}
+      <div ref={noSpendRef} className="space-y-3">
+        <NoSpendHeatmapCard
+          transactions={transactions}
+          budget={budget}
+        />
+      </div>
 
       {/* Transaction Detail Bottom Sheet Modal */}
       {selectedTx && (

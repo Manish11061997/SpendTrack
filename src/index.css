@@ -394,6 +394,21 @@ header.sticky-form-header {
   width: 0.45rem;
 }
 
+/* Bento card styling: obsidian background with 1px border highlight and soft shadow */
+.rizzeat-bento-card {
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.25s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.25s ease;
+}
+@media (min-width: 1024px) {
+  .rizzeat-bento-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 32px -8px rgba(0, 0, 0, 0.15), 0 0 0 1px rgba(37, 99, 235, 0.2);
+  }
+  .dark .rizzeat-bento-card:hover {
+    box-shadow: 0 12px 32px -8px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(96, 165, 250, 0.25);
+  }
+}
+
+
 
 
 

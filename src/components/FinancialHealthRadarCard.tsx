@@ -161,8 +161,12 @@ export const FinancialHealthRadarCard: React.FC<FinancialHealthRadarCardProps> =
           </div>
         </div>
 
-        <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold border ${status.colorClass}`}>
-          {status.label}
+        <span className={`rizzeat-pill border ${status.colorClass}`}>
+          <div className="rizzeat-pulse-dot">
+            <span className={status.strokeColor === '#10B981' ? 'bg-emerald-400' : status.strokeColor === '#6366F1' ? 'bg-indigo-400' : status.strokeColor === '#F59E0B' ? 'bg-amber-400' : 'bg-rose-400'} />
+            <span className={status.strokeColor === '#10B981' ? 'bg-emerald-500' : status.strokeColor === '#6366F1' ? 'bg-indigo-500' : status.strokeColor === '#F59E0B' ? 'bg-amber-500' : 'bg-rose-500'} />
+          </div>
+          <span>{status.label}</span>
         </span>
       </div>
 
