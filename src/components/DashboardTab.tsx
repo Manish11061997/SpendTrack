@@ -706,324 +706,515 @@ export default function DashboardTab({
   return (
     <div className="w-full max-w-5xl mx-auto space-y-4 sm:space-y-6 pb-20 animate-fade-in">
       
-      {/* Hero Section: Interactive 3D Tilt & Flip Card */}
-      <TiltCard3D maxTilt={6} className="z-20">
-        <FlipCard3D
-          isFlipped={isHeroFlipped}
-          onFlipChange={setIsHeroFlipped}
-          front={
-            <section className="bg-surface-container-low/80 dark:bg-surface-container-low/60 backdrop-blur-md p-3.5 sm:p-4 rounded-2xl border border-outline-variant/30 shadow-3d space-y-2.5 relative overflow-hidden">
-              {/* Row 1: Label + Controls */}
-              <div className="flex items-center justify-between gap-2">
-                <div className="flex items-center gap-1.5 flex-wrap min-w-0">
-                  <span className="text-[11px] font-bold text-on-surface-variant uppercase tracking-wider">
-                    {summaryMode === 'monthly' ? 'Monthly Spend' : 'Weekly Spend'}
-                  </span>
-                  {summaryMode === 'weekly' && getWeeklyPeriodRange() && (
-                    <span className="text-[9px] font-bold text-primary bg-primary-container/40 px-1.5 py-0.5 rounded-full border border-primary/10 shrink-0">
-                      {getWeeklyPeriodRange()}
+      {/* ── BENTO ROW 1 (Desktop Bento Grid / Mobile Vertical Stack) ── */}
+      <div className="flex flex-col lg:grid lg:grid-cols-12 gap-4 sm:gap-6 items-stretch">
+        
+        {/* Bento Cell 1: Hero Spending Card (Span 5 on Desktop) */}
+        <div className="lg:col-span-5 flex flex-col">
+          <TiltCard3D maxTilt={6} className="z-20 h-full flex flex-col">
+            <FlipCard3D
+              isFlipped={isHeroFlipped}
+              onFlipChange={setIsHeroFlipped}
+              front={
+                <section className="bg-surface-container-low/80 dark:bg-surface-container-low/60 backdrop-blur-md p-3.5 sm:p-4 rounded-2xl border border-outline-variant/30 shadow-3d space-y-2.5 relative overflow-hidden h-full flex flex-col justify-between">
+                  {/* Row 1: Label + Controls */}
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-1.5 flex-wrap min-w-0">
+                      <span className="text-[11px] font-bold text-on-surface-variant uppercase tracking-wider">
+                        {summaryMode === 'monthly' ? 'Monthly Spend' : 'Weekly Spend'}
+                      </span>
+                      {summaryMode === 'weekly' && getWeeklyPeriodRange() && (
+                        <span className="text-[9px] font-bold text-primary bg-primary-container/40 px-1.5 py-0.5 rounded-full border border-primary/10 shrink-0">
+                          {getWeeklyPeriodRange()}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Controls: Flip Card Button + Badges Icon + Segmented Toggle */}
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          triggerHaptic('light');
+                          setIsHeroFlipped(true);
+                        }}
+                        title="Flip for Spending Analytics"
+                        aria-label="Flip card for statistics"
+                        className="flex items-center gap-1 px-1.5 py-1 rounded-lg bg-surface-container-high/60 hover:bg-surface-container-highest text-on-surface-variant hover:text-primary transition-all text-[9px] font-bold border border-outline-variant/30 cursor-pointer active:scale-95"
+                      >
+                        <RotateCw className="w-3 h-3 text-primary animate-spin-slow" />
+                        <span className="hidden xs:inline">Stats</span>
+                      </button>
+
+                      {onOpenBadges && (
+                        <button
+                          type="button"
+                          onClick={onOpenBadges}
+                          aria-label="Financial Discipline Badges"
+                          title={`Financial Discipline Badges (${unlockedBadgesCount}/6 Mastered)`}
+                          className="w-6 h-6 rounded-md bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/25 text-amber-600 dark:text-amber-400 flex items-center justify-center transition-all active:scale-90 cursor-pointer shrink-0"
+                        >
+                          <Award className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+
+                      {/* Segmented Toggle Control with spring pill */}
+                      <div className="relative flex bg-surface-container rounded-lg p-0.5 border border-outline-variant/35 shrink-0">
+                        <button
+                          id="summary-mode-monthly-btn"
+                          type="button"
+                          onClick={() => {
+                            triggerHaptic('light');
+                            setSummaryMode('monthly');
+                          }}
+                          className={`relative z-10 px-2 py-0.5 rounded-md font-bold text-[9px] sm:text-[10px] uppercase tracking-wider transition-colors cursor-pointer ${
+                            summaryMode === 'monthly'
+                              ? 'text-on-primary'
+                              : 'text-on-surface-variant hover:text-on-surface'
+                          }`}
+                        >
+                          {summaryMode === 'monthly' && (
+                            <motion.div
+                              layoutId="segmented-summary-pill"
+                              className="absolute inset-0 bg-primary rounded-md shadow-xs -z-10"
+                              transition={{ type: 'spring', stiffness: 500, damping: 35 }}
+                            />
+                          )}
+                          Monthly
+                        </button>
+                        <button
+                          id="summary-mode-weekly-btn"
+                          type="button"
+                          onClick={() => {
+                            triggerHaptic('light');
+                            setSummaryMode('weekly');
+                          }}
+                          className={`relative z-10 px-2 py-0.5 rounded-md font-bold text-[9px] sm:text-[10px] uppercase tracking-wider transition-colors cursor-pointer ${
+                            summaryMode === 'weekly'
+                              ? 'text-on-primary'
+                              : 'text-on-surface-variant hover:text-on-surface'
+                          }`}
+                        >
+                          {summaryMode === 'weekly' && (
+                            <motion.div
+                              layoutId="segmented-summary-pill"
+                              className="absolute inset-0 bg-primary rounded-md shadow-xs -z-10"
+                              transition={{ type: 'spring', stiffness: 500, damping: 35 }}
+                            />
+                          )}
+                          Weekly
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Row 2: Amount + info button */}
+                  <div className="flex items-center gap-1.5 flex-wrap min-w-0 my-auto">
+                    <span className="font-headline-lg text-2xl sm:text-3xl lg:text-4xl font-extrabold text-primary tracking-tight shrink-0">
+                      <RollingNumber
+                        value={activeExpenses}
+                        prefix={getCurrencySymbol(budget?.currency || 'INR')}
+                        locale={getCurrencyLocale(budget?.currency || 'INR')}
+                      />
                     </span>
-                  )}
+                    <button 
+                      type="button"
+                      onClick={() => setShowCalcTooltip(!showCalcTooltip)}
+                      className="p-1 text-on-surface-variant/60 hover:text-primary transition-colors cursor-pointer shrink-0"
+                      title="Calculation breakdown"
+                    >
+                      <Info className="w-3.5 h-3.5 text-primary" />
+                    </button>
+
+                    {/* Calculation Breakdown Modal */}
+                    <AnimatePresence>
+                      {showCalcTooltip && (
+                        <div 
+                          className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fade-in"
+                          onClick={() => setShowCalcTooltip(false)}
+                        >
+                          <motion.div 
+                            initial={{ opacity: 0, scale: 0.9, y: 10 }}
+                            animate={{ opacity: 1, scale: 1, y: 0 }}
+                            exit={{ opacity: 0, scale: 0.9, y: 10 }}
+                            onClick={(e) => e.stopPropagation()}
+                            className="w-full max-w-sm bg-surface-container-lowest dark:bg-slate-900 border border-outline-variant/40 dark:border-slate-800 rounded-3xl p-5 shadow-2xl space-y-4"
+                          >
+                            <div className="flex items-center justify-between border-b border-outline-variant/20 dark:border-slate-800 pb-3">
+                              <div className="flex items-center gap-2.5">
+                                <div className="p-2.5 bg-primary/10 rounded-2xl">
+                                  <Info className="w-5 h-5 text-primary" />
+                                </div>
+                                <div>
+                                  <h3 className="font-outfit font-black text-base text-on-surface dark:text-white">
+                                    Calculation Breakdown
+                                  </h3>
+                                  <p className="text-[11px] text-on-surface-variant dark:text-slate-400 font-medium">
+                                    {summaryMode === 'monthly' ? 'Total Monthly Spending Formula' : 'Total Weekly Spending Formula'}
+                                  </p>
+                                </div>
+                              </div>
+                              <button 
+                                type="button"
+                                onClick={() => setShowCalcTooltip(false)}
+                                className="w-8 h-8 rounded-full bg-surface-container-high dark:bg-slate-800 text-on-surface-variant dark:text-slate-300 hover:text-on-surface flex items-center justify-center font-bold text-xs cursor-pointer transition-colors"
+                              >
+                                ✕
+                              </button>
+                            </div>
+
+                            <div className="space-y-2.5 text-xs">
+                              <div className="flex justify-between items-center p-3 rounded-2xl bg-surface-container-low dark:bg-slate-800/60 border border-outline-variant/20">
+                                <span className="text-on-surface-variant dark:text-slate-300 font-medium">Logged Purchases</span>
+                                <span className="font-mono font-extrabold text-on-surface dark:text-white text-sm">
+                                  {formatCurrency(Math.abs(currentMonthTxs.filter(t => t.amount < 0).reduce((sum, t) => sum + t.amount, 0)))}
+                                </span>
+                              </div>
+
+                              <div className="flex justify-between items-center p-3 rounded-2xl bg-surface-container-low dark:bg-slate-800/60 border border-outline-variant/20">
+                                <span className="text-on-surface-variant dark:text-slate-300 font-medium">Active Subscriptions</span>
+                                <span className="font-mono font-extrabold text-on-surface dark:text-white text-sm">
+                                  {formatCurrency(activeSubsTotal)}
+                                </span>
+                              </div>
+
+                              <div className="flex justify-between items-center p-3.5 rounded-2xl bg-primary/10 border border-primary/20">
+                                <span className="font-bold text-primary">Total Calculated Outflow</span>
+                                <span className="font-mono font-black text-primary text-base">
+                                  {formatCurrency(totalExpenses)}
+                                </span>
+                              </div>
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={() => setShowCalcTooltip(false)}
+                              className="w-full py-3 bg-primary hover:bg-primary/90 text-on-primary font-bold text-xs rounded-2xl shadow-xs transition-all cursor-pointer"
+                            >
+                              Got It
+                            </button>
+                          </motion.div>
+                        </div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+
+                  {/* Row 3: Pills — MoM + budget health with RizzEat style */}
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    {/* MoM Comparison Pill */}
+                    {summaryMode === 'monthly' && prevMonthExpenses > 0 && (
+                      <span className={`rizzeat-pill border shrink-0 ${
+                        monthlyDiffPercent <= 0 
+                          ? 'bg-emerald-500/15 text-emerald-500 dark:text-emerald-400 border-emerald-500/30' 
+                          : 'bg-rose-500/15 text-rose-500 dark:text-rose-400 border-rose-500/30'
+                      }`}>
+                        {monthlyDiffPercent <= 0 ? <TrendingDown className="w-3 h-3" /> : <TrendingUp className="w-3 h-3" />}
+                        <span>{monthlyDiffPercent <= 0 ? `${Math.abs(Math.round(monthlyDiffPercent))}% vs last mo` : `+${Math.round(monthlyDiffPercent)}% vs last mo`}</span>
+                      </span>
+                    )}
+
+                    {/* Comparison info pill */}
+                    {(() => {
+                      const comp = getComparisonInfo();
+                      return (
+                        <span className={`rizzeat-pill border shrink-0 ${
+                          comp.label === 'No comparative data'
+                            ? 'bg-surface-container text-on-surface-variant border-outline-variant/30'
+                            : comp.isLess
+                            ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20'
+                            : 'bg-error/10 text-error border-error/20'
+                        }`}>
+                          {comp.showIcon && (comp.isLess ? <TrendingDown className="w-2.5 h-2.5" /> : <TrendingUp className="w-2.5 h-2.5" />)}
+                          <span>{comp.label}</span>
+                        </span>
+                      );
+                    })()}
+
+                    {/* Budget health pill with pulsing live dot */}
+                    {hasBudget && (
+                      <span className={`rizzeat-pill border shrink-0 ${budgetHealth.bgClass} ${budgetHealth.colorClass} ${budgetHealth.borderClass}`}>
+                        <div className="rizzeat-pulse-dot">
+                          <span className={
+                            budgetHealth.label === 'On Track' 
+                              ? 'bg-emerald-400' 
+                              : budgetHealth.label.includes('Caution') 
+                              ? 'bg-amber-400' 
+                              : 'bg-rose-400'
+                          } />
+                          <span className={
+                            budgetHealth.label === 'On Track' 
+                              ? 'bg-emerald-500' 
+                              : budgetHealth.label.includes('Caution') 
+                              ? 'bg-amber-500' 
+                              : 'bg-rose-500'
+                          } />
+                        </div>
+                        <span>{budgetHealth.label}</span>
+                      </span>
+                    )}
+                  </div>
+                </section>
+              }
+              back={
+                <section className="bg-surface-container-high/90 dark:bg-surface-container/90 backdrop-blur-md p-3.5 sm:p-4 rounded-2xl border border-primary/30 shadow-3d flex flex-col justify-between h-full relative overflow-hidden">
+                  <div className="flex items-center justify-between border-b border-outline-variant/20 pb-2">
+                    <div className="flex items-center gap-1.5">
+                      <Sparkles className="w-4 h-4 text-primary" />
+                      <span className="text-[11px] font-bold text-on-surface uppercase tracking-wider">
+                        Spending Velocity & Health
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        triggerHaptic('light');
+                        setIsHeroFlipped(false);
+                      }}
+                      className="flex items-center gap-1 px-2 py-0.5 rounded-lg bg-primary text-on-primary text-[9px] font-bold shadow-2xs hover:bg-primary/90 transition-all cursor-pointer"
+                    >
+                      <RotateCw className="w-3 h-3" />
+                      <span>Done</span>
+                    </button>
+                  </div>
+
+                  {/* Micro Analytics Metrics */}
+                  <div className="grid grid-cols-3 gap-2 py-2">
+                    <div className="p-2 bg-surface-container-low rounded-xl text-center border border-outline-variant/20">
+                      <span className="text-[8px] font-bold text-on-surface-variant uppercase tracking-wider block">Daily Pace</span>
+                      <p className="font-mono text-xs font-black text-primary mt-0.5">
+                        {(() => {
+                          const today = new Date().getDate();
+                          const avg = today > 0 ? Math.round(activeExpenses / today) : activeExpenses;
+                          return formatCurrency(avg);
+                        })()}
+                      </p>
+                      <span className="text-[7px] text-on-surface-variant font-medium block">per day</span>
+                    </div>
+
+                    <div className="p-2 bg-surface-container-low rounded-xl text-center border border-outline-variant/20">
+                      <span className="text-[8px] font-bold text-on-surface-variant uppercase tracking-wider block">Top Category</span>
+                      <p className="font-title-md text-xs font-black text-on-surface truncate mt-0.5">
+                        {chartData.length > 0 ? chartData[0].name : 'None'}
+                      </p>
+                      <span className="text-[7px] text-on-surface-variant font-medium block">
+                        {chartData.length > 0 ? formatCurrency(chartData[0].value) : '₹0'}
+                      </span>
+                    </div>
+
+                    <div className="p-2 bg-surface-container-low rounded-xl text-center border border-outline-variant/20">
+                      <span className="text-[8px] font-bold text-on-surface-variant uppercase tracking-wider block">Remaining</span>
+                      <p className={`font-mono text-xs font-black mt-0.5 ${
+                        activeLimit - activeExpenses < 0 ? 'text-error' : 'text-emerald-600 dark:text-emerald-400'
+                      }`}>
+                        {formatCurrency(activeLimit - activeExpenses)}
+                      </p>
+                      <span className="text-[7px] text-on-surface-variant font-medium block">
+                        {activeLimit - activeExpenses < 0 ? 'over limit' : 'buffer'}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between text-[9px] text-on-surface-variant/80 pt-1 border-t border-outline-variant/15">
+                    <span>Tap anywhere or Done to return to card view</span>
+                    <span className="font-mono font-bold text-primary">SpendTrack 3D</span>
+                  </div>
+                </section>
+              }
+            />
+          </TiltCard3D>
+        </div>
+
+        {/* Bento Cell 2: Budget Health Radial Progress Section (Span 4 on Desktop) */}
+        {hasBudget && (
+          <div className="lg:col-span-4 flex flex-col">
+            <section className="p-4 sm:p-5 rounded-2xl bg-surface-container-low/90 backdrop-blur-md border border-outline-variant/30 shadow-sm rizzeat-bento-card flex flex-col justify-between h-full space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1.5">
+                  <PieChartIcon className="w-4 h-4 text-primary" />
+                  <h3 className="font-outfit text-sm text-on-surface font-black tracking-tight uppercase">Budget Health</h3>
+                </div>
+                <span className={`rizzeat-pill border ${
+                  (activeExpenses / (activeLimit || 3000)) * 100 > 100 
+                    ? 'bg-error/10 text-error border-error/20' 
+                    : (activeExpenses / (activeLimit || 3000)) * 100 > 85 
+                      ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20' 
+                      : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20'
+                }`}>
+                  <div className="rizzeat-pulse-dot">
+                    <span className={
+                      (activeExpenses / (activeLimit || 3000)) * 100 > 100
+                        ? 'bg-error'
+                        : (activeExpenses / (activeLimit || 3000)) * 100 > 85
+                        ? 'bg-amber-400'
+                        : 'bg-emerald-400'
+                    } />
+                    <span className={
+                      (activeExpenses / (activeLimit || 3000)) * 100 > 100
+                        ? 'bg-error'
+                        : (activeExpenses / (activeLimit || 3000)) * 100 > 85
+                        ? 'bg-amber-500'
+                        : 'bg-emerald-500'
+                    } />
+                  </div>
+                  <span>
+                    {(activeExpenses / (activeLimit || 3000)) * 100 > 100 
+                      ? 'Over Budget' 
+                      : (activeExpenses / (activeLimit || 3000)) * 100 > 85 
+                        ? 'Approaching' 
+                        : 'Healthy'
+                    }
+                  </span>
+                </span>
+              </div>
+
+              {/* Radial Chart & Stats side-by-side or stacked cleanly */}
+              <div className="flex items-center justify-around gap-2 py-1">
+                <div className="w-32 h-32 relative shrink-0">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <RadialBarChart 
+                      cx="50%" 
+                      cy="50%" 
+                      innerRadius="75%" 
+                      outerRadius="100%" 
+                      barSize={10} 
+                      data={[
+                        {
+                          name: 'Spent',
+                          value: Math.min(100, (activeExpenses / (activeLimit || 3000)) * 100),
+                          fill: (activeExpenses / (activeLimit || 3000)) * 100 > 100 
+                            ? themeError 
+                            : (activeExpenses / (activeLimit || 3000)) * 100 > 85 
+                              ? '#D97706' 
+                              : themeColors.primary
+                        }
+                      ]} 
+                      startAngle={90} 
+                      endAngle={-270}
+                    >
+                      <PolarAngleAxis
+                        type="number"
+                        domain={[0, 100]}
+                        angleAxisId={0}
+                        tick={false}
+                      />
+                      <RadialBar
+                        background={{ fill: 'rgba(0, 0, 0, 0.05)', stroke: 'none', strokeWidth: 0 }}
+                        dataKey="value"
+                        cornerRadius={6}
+                        stroke="none"
+                        strokeWidth={0}
+                        activeShape={false}
+                      />
+                    </RadialBarChart>
+                  </ResponsiveContainer>
+                  
+                  {/* Inner Center Text overlay */}
+                  <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                    <span className="text-[9px] uppercase font-bold text-on-surface-variant tracking-wider leading-none">
+                      Spent
+                    </span>
+                    <span className={`text-xl font-black font-mono mt-0.5 leading-none ${
+                      (activeExpenses / (activeLimit || 3000)) * 100 > 100 ? 'text-error animate-pulse' : 'text-on-surface'
+                    }`}>
+                      {Math.round((activeExpenses / (activeLimit || 3000)) * 100)}%
+                    </span>
+                    <span className="text-[8px] text-on-surface-variant font-medium mt-0.5 leading-none">
+                      of {formatCurrency(activeLimit || 3000)}
+                    </span>
+                  </div>
                 </div>
 
-                {/* Controls: Flip Card Button + Badges Icon + Segmented Toggle */}
-                <div className="flex items-center gap-1.5 shrink-0">
-                  {/* 3D Flip Action Trigger */}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      triggerHaptic('light');
-                      setIsHeroFlipped(true);
-                    }}
-                    title="Flip for Spending Analytics"
-                    aria-label="Flip card for statistics"
-                    className="flex items-center gap-1 px-1.5 py-1 rounded-lg bg-surface-container-high/60 hover:bg-surface-container-highest text-on-surface-variant hover:text-primary transition-all text-[9px] font-bold border border-outline-variant/30 cursor-pointer active:scale-95"
-                  >
-                    <RotateCw className="w-3 h-3 text-primary animate-spin-slow" />
-                    <span className="hidden xs:inline">Stats</span>
-                  </button>
-
-                  {onOpenBadges && (
-                    <button
-                      type="button"
-                      onClick={onOpenBadges}
-                      aria-label="Financial Discipline Badges"
-                      title={`Financial Discipline Badges (${unlockedBadgesCount}/6 Mastered)`}
-                      className="w-6 h-6 rounded-md bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/25 text-amber-600 dark:text-amber-400 flex items-center justify-center transition-all active:scale-90 cursor-pointer shrink-0"
-                    >
-                      <Award className="w-3.5 h-3.5" />
-                    </button>
-                  )}
-
-                  {/* Segmented Toggle Control with spring pill */}
-                  <div className="relative flex bg-surface-container rounded-lg p-0.5 border border-outline-variant/35 shrink-0">
-                    <button
-                      id="summary-mode-monthly-btn"
-                      type="button"
-                      onClick={() => {
-                        triggerHaptic('light');
-                        setSummaryMode('monthly');
-                      }}
-                      className={`relative z-10 px-2 py-0.5 rounded-md font-bold text-[9px] sm:text-[10px] uppercase tracking-wider transition-colors cursor-pointer ${
-                        summaryMode === 'monthly'
-                          ? 'text-on-primary'
-                          : 'text-on-surface-variant hover:text-on-surface'
-                      }`}
-                    >
-                      {summaryMode === 'monthly' && (
-                        <motion.div
-                          layoutId="segmented-summary-pill"
-                          className="absolute inset-0 bg-primary rounded-md shadow-xs -z-10"
-                          transition={{ type: 'spring', stiffness: 500, damping: 35 }}
-                        />
-                      )}
-                      Monthly
-                    </button>
-                    <button
-                      id="summary-mode-weekly-btn"
-                      type="button"
-                      onClick={() => {
-                        triggerHaptic('light');
-                        setSummaryMode('weekly');
-                      }}
-                      className={`relative z-10 px-2 py-0.5 rounded-md font-bold text-[9px] sm:text-[10px] uppercase tracking-wider transition-colors cursor-pointer ${
-                        summaryMode === 'weekly'
-                          ? 'text-on-primary'
-                          : 'text-on-surface-variant hover:text-on-surface'
-                      }`}
-                    >
-                      {summaryMode === 'weekly' && (
-                        <motion.div
-                          layoutId="segmented-summary-pill"
-                          className="absolute inset-0 bg-primary rounded-md shadow-xs -z-10"
-                          transition={{ type: 'spring', stiffness: 500, damping: 35 }}
-                        />
-                      )}
-                      Weekly
-                    </button>
+                <div className="space-y-2 flex-1 min-w-0">
+                  <div className="p-2 bg-surface-container-high/60 rounded-xl">
+                    <span className="text-[9px] font-bold text-on-surface-variant uppercase tracking-wider block">Limit</span>
+                    <p className="text-xs font-black text-on-surface font-mono">{formatCurrency(activeLimit || 3000)}</p>
+                  </div>
+                  <div className="p-2 bg-surface-container-high/60 rounded-xl">
+                    <span className="text-[9px] font-bold text-on-surface-variant uppercase tracking-wider block">Runway</span>
+                    <p className={`text-xs font-black font-mono ${
+                      activeLimit - activeExpenses < 0 ? 'text-error' : 'text-emerald-600 dark:text-emerald-400'
+                    }`}>
+                      {formatCurrency(activeLimit - activeExpenses)}
+                    </p>
                   </div>
                 </div>
               </div>
 
-              {/* Row 2: Amount + info button */}
-              <div className="flex items-center gap-1.5 flex-wrap min-w-0">
-                <span className="font-headline-lg text-xl sm:text-2xl lg:text-3xl font-extrabold text-primary tracking-tight shrink-0">
-                  <RollingNumber
-                    value={activeExpenses}
-                    prefix={getCurrencySymbol(budget?.currency || 'INR')}
-                    locale={getCurrencyLocale(budget?.currency || 'INR')}
-                  />
-                </span>
-                <button 
-                  type="button"
-                  onClick={() => setShowCalcTooltip(!showCalcTooltip)}
-                  className="p-1 text-on-surface-variant/60 hover:text-primary transition-colors cursor-pointer shrink-0"
-                  title="Calculation breakdown"
-                >
-                  <Info className="w-3.5 h-3.5 text-primary" />
-                </button>
-
-                {/* Calculation Breakdown Modal */}
-                <AnimatePresence>
-                  {showCalcTooltip && (
-                    <div 
-                      className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fade-in"
-                      onClick={() => setShowCalcTooltip(false)}
-                    >
-                      <motion.div 
-                        initial={{ opacity: 0, scale: 0.9, y: 10 }}
-                        animate={{ opacity: 1, scale: 1, y: 0 }}
-                        exit={{ opacity: 0, scale: 0.9, y: 10 }}
-                        onClick={(e) => e.stopPropagation()}
-                        className="w-full max-w-sm bg-surface-container-lowest dark:bg-slate-900 border border-outline-variant/40 dark:border-slate-800 rounded-3xl p-5 shadow-2xl space-y-4"
-                      >
-                        <div className="flex items-center justify-between border-b border-outline-variant/20 dark:border-slate-800 pb-3">
-                          <div className="flex items-center gap-2.5">
-                            <div className="p-2.5 bg-primary/10 rounded-2xl">
-                              <Info className="w-5 h-5 text-primary" />
-                            </div>
-                            <div>
-                              <h3 className="font-outfit font-black text-base text-on-surface dark:text-white">
-                                Calculation Breakdown
-                              </h3>
-                              <p className="text-[11px] text-on-surface-variant dark:text-slate-400 font-medium">
-                                {summaryMode === 'monthly' ? 'Total Monthly Spending Formula' : 'Total Weekly Spending Formula'}
-                              </p>
-                            </div>
-                          </div>
-                          <button 
-                            type="button"
-                            onClick={() => setShowCalcTooltip(false)}
-                            className="w-8 h-8 rounded-full bg-surface-container-high dark:bg-slate-800 text-on-surface-variant dark:text-slate-300 hover:text-on-surface flex items-center justify-center font-bold text-xs cursor-pointer transition-colors"
-                          >
-                            ✕
-                          </button>
-                        </div>
-
-                        <div className="space-y-2.5 text-xs">
-                          <div className="flex justify-between items-center p-3 rounded-2xl bg-surface-container-low dark:bg-slate-800/60 border border-outline-variant/20">
-                            <span className="text-on-surface-variant dark:text-slate-300 font-medium">Logged Purchases</span>
-                            <span className="font-mono font-extrabold text-on-surface dark:text-white text-sm">
-                              {formatCurrency(Math.abs(currentMonthTxs.filter(t => t.amount < 0).reduce((sum, t) => sum + t.amount, 0)))}
-                            </span>
-                          </div>
-
-                          <div className="flex justify-between items-center p-3 rounded-2xl bg-surface-container-low dark:bg-slate-800/60 border border-outline-variant/20">
-                            <span className="text-on-surface-variant dark:text-slate-300 font-medium">Active Subscriptions</span>
-                            <span className="font-mono font-extrabold text-on-surface dark:text-white text-sm">
-                              {formatCurrency(activeSubsTotal)}
-                            </span>
-                          </div>
-
-                          <div className="flex justify-between items-center p-3.5 rounded-2xl bg-primary/10 border border-primary/20">
-                            <span className="font-bold text-primary">Total Calculated Outflow</span>
-                            <span className="font-mono font-black text-primary text-base">
-                              {formatCurrency(totalExpenses)}
-                            </span>
-                          </div>
-                        </div>
-
-                        <button
-                          type="button"
-                          onClick={() => setShowCalcTooltip(false)}
-                          className="w-full py-3 bg-primary hover:bg-primary/90 text-on-primary font-bold text-xs rounded-2xl shadow-xs transition-all cursor-pointer"
-                        >
-                          Got It
-                        </button>
-                      </motion.div>
-                    </div>
-                  )}
-                </AnimatePresence>
-              </div>
-
-              {/* Row 3: Pills — MoM + budget health with RizzEat style */}
-              <div className="flex items-center gap-1.5 flex-wrap">
-                {/* MoM Comparison Pill */}
-                {summaryMode === 'monthly' && prevMonthExpenses > 0 && (
-                  <span className={`rizzeat-pill border shrink-0 ${
-                    monthlyDiffPercent <= 0 
-                      ? 'bg-emerald-500/15 text-emerald-500 dark:text-emerald-400 border-emerald-500/30' 
-                      : 'bg-rose-500/15 text-rose-500 dark:text-rose-400 border-rose-500/30'
-                  }`}>
-                    {monthlyDiffPercent <= 0 ? <TrendingDown className="w-3 h-3" /> : <TrendingUp className="w-3 h-3" />}
-                    <span>{monthlyDiffPercent <= 0 ? `${Math.abs(Math.round(monthlyDiffPercent))}% vs last mo` : `+${Math.round(monthlyDiffPercent)}% vs last mo`}</span>
-                  </span>
+              {/* Status footer quote */}
+              <div className="text-[11px] text-on-surface-variant leading-tight p-2 rounded-xl bg-primary/5 border border-primary/10">
+                {(activeExpenses / (activeLimit || 3000)) * 100 > 100 ? (
+                  <span className="text-error font-semibold">Exceeded budget limit. Stabilize discretionary expenses.</span>
+                ) : (activeExpenses / (activeLimit || 3000)) * 100 > 85 ? (
+                  <span>Approaching ceiling: <strong className="text-primary font-bold">{formatCurrency((activeLimit || 3000) - activeExpenses)}</strong> buffer left.</span>
+                ) : (
+                  <span>Budget health excellent: <strong className="text-emerald-600 dark:text-emerald-400 font-bold">{formatCurrency((activeLimit || 3000) - activeExpenses)}</strong> buffer remaining.</span>
                 )}
+              </div>
+            </section>
+          </div>
+        )}
 
-                {/* Comparison info pill */}
-                {(() => {
-                  const comp = getComparisonInfo();
-                  return (
-                    <span className={`rizzeat-pill border shrink-0 ${
-                      comp.label === 'No comparative data'
-                        ? 'bg-surface-container text-on-surface-variant border-outline-variant/30'
-                        : comp.isLess
-                        ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20'
-                        : 'bg-error/10 text-error border-error/20'
-                    }`}>
-                      {comp.showIcon && (comp.isLess ? <TrendingDown className="w-2.5 h-2.5" /> : <TrendingUp className="w-2.5 h-2.5" />)}
-                      <span>{comp.label}</span>
-                    </span>
-                  );
-                })()}
-
-                {/* Budget health pill with pulsing live dot */}
-                {hasBudget && (
-                  <span className={`rizzeat-pill border shrink-0 ${budgetHealth.bgClass} ${budgetHealth.colorClass} ${budgetHealth.borderClass}`}>
+        {/* Bento Cell 3: AI Financial Insights (Span 3 on Desktop) */}
+        {(() => {
+          const nudges = getSpenderNudges();
+          if (nudges.length === 0) return null;
+          return (
+            <div className="lg:col-span-3 flex flex-col">
+              <section className="p-4 sm:p-5 rounded-2xl bg-surface-container-low/90 backdrop-blur-md border border-outline-variant/30 shadow-sm rizzeat-bento-card flex flex-col justify-between h-full space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <Sparkles className="w-4 h-4 text-primary" />
+                    <h3 className="font-outfit text-sm text-on-surface font-black tracking-tight uppercase">
+                      AI Insights
+                    </h3>
+                  </div>
+                  <div className="rizzeat-pill bg-primary/10 text-primary border border-primary/20 select-none">
                     <div className="rizzeat-pulse-dot">
-                      <span className={
-                        budgetHealth.label === 'On Track' 
-                          ? 'bg-emerald-400' 
-                          : budgetHealth.label.includes('Caution') 
-                          ? 'bg-amber-400' 
-                          : 'bg-rose-400'
-                      } />
-                      <span className={
-                        budgetHealth.label === 'On Track' 
-                          ? 'bg-emerald-500' 
-                          : budgetHealth.label.includes('Caution') 
-                          ? 'bg-amber-500' 
-                          : 'bg-rose-500'
-                      } />
+                      <span className="bg-primary/50"></span>
+                      <span className="bg-primary"></span>
                     </div>
-                    <span>{budgetHealth.label}</span>
-                  </span>
-                )}
-              </div>
-            </section>
-          }
-          back={
-            <section className="bg-surface-container-high/90 dark:bg-surface-container/90 backdrop-blur-md p-3.5 sm:p-4 rounded-2xl border border-primary/30 shadow-3d flex flex-col justify-between h-full relative overflow-hidden">
-              <div className="flex items-center justify-between border-b border-outline-variant/20 pb-2">
-                <div className="flex items-center gap-1.5">
-                  <Sparkles className="w-4 h-4 text-primary" />
-                  <span className="text-[11px] font-bold text-on-surface uppercase tracking-wider">
-                    Spending Velocity & Health
-                  </span>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    triggerHaptic('light');
-                    setIsHeroFlipped(false);
-                  }}
-                  className="flex items-center gap-1 px-2 py-0.5 rounded-lg bg-primary text-on-primary text-[9px] font-bold shadow-2xs hover:bg-primary/90 transition-all cursor-pointer"
-                >
-                  <RotateCw className="w-3 h-3" />
-                  <span>Done</span>
-                </button>
-              </div>
-
-              {/* Micro Analytics Metrics */}
-              <div className="grid grid-cols-3 gap-2 py-2">
-                {/* 1. Daily Average */}
-                <div className="p-2 bg-surface-container-low rounded-xl text-center border border-outline-variant/20">
-                  <span className="text-[8px] font-bold text-on-surface-variant uppercase tracking-wider block">Daily Pace</span>
-                  <p className="font-mono text-xs font-black text-primary mt-0.5">
-                    {(() => {
-                      const today = new Date().getDate();
-                      const avg = today > 0 ? Math.round(activeExpenses / today) : activeExpenses;
-                      return formatCurrency(avg);
-                    })()}
-                  </p>
-                  <span className="text-[7px] text-on-surface-variant font-medium block">per day</span>
+                    <span>Autonomous</span>
+                  </div>
                 </div>
 
-                {/* 2. Top Outflow Category */}
-                <div className="p-2 bg-surface-container-low rounded-xl text-center border border-outline-variant/20">
-                  <span className="text-[8px] font-bold text-on-surface-variant uppercase tracking-wider block">Top Category</span>
-                  <p className="font-title-md text-xs font-black text-on-surface truncate mt-0.5">
-                    {chartData.length > 0 ? chartData[0].name : 'None'}
-                  </p>
-                  <span className="text-[7px] text-on-surface-variant font-medium block">
-                    {chartData.length > 0 ? formatCurrency(chartData[0].value) : '₹0'}
-                  </span>
+                <div className="space-y-2 flex-1 overflow-y-auto max-h-56 pr-1">
+                  {nudges.map((nudge, idx) => (
+                    <div 
+                      key={idx}
+                      className={`p-2.5 sm:p-3 rounded-xl border text-xs flex items-start gap-2 shadow-2xs animate-fade-in ${
+                        nudge.type === 'warning' 
+                          ? 'bg-error/5 text-error border-error/15 dark:bg-error/10 dark:text-error-container' 
+                          : nudge.type === 'success'
+                          ? 'bg-emerald-500/5 text-emerald-700 border-emerald-500/15 dark:bg-emerald-500/10 dark:text-emerald-400'
+                          : 'bg-primary/5 text-primary border-primary/15 dark:bg-primary/10 dark:text-primary-container'
+                      }`}
+                    >
+                      <span className="p-1 rounded-lg bg-surface-container-lowest shadow-2xs shrink-0 mt-0.5">
+                        {nudge.type === 'warning' ? (
+                          <ShieldAlert className="w-3 h-3 text-error" />
+                        ) : nudge.type === 'success' ? (
+                          <TrendingDown className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
+                        ) : (
+                          <Sparkles className="w-3 h-3 text-primary" />
+                        )}
+                      </span>
+                      <div className="flex-1 leading-snug font-medium text-[11px]">
+                        {nudge.text}
+                      </div>
+                    </div>
+                  ))}
                 </div>
 
-                {/* 3. Runway Left */}
-                <div className="p-2 bg-surface-container-low rounded-xl text-center border border-outline-variant/20">
-                  <span className="text-[8px] font-bold text-on-surface-variant uppercase tracking-wider block">Remaining</span>
-                  <p className={`font-mono text-xs font-black mt-0.5 ${
-                    activeLimit - activeExpenses < 0 ? 'text-error' : 'text-emerald-600 dark:text-emerald-400'
-                  }`}>
-                    {formatCurrency(activeLimit - activeExpenses)}
-                  </p>
-                  <span className="text-[7px] text-on-surface-variant font-medium block">
-                    {activeLimit - activeExpenses < 0 ? 'over limit' : 'buffer'}
-                  </span>
+                <div className="text-[10px] text-on-surface-variant font-medium border-t border-outline-variant/15 pt-2 flex items-center justify-between">
+                  <span>Smart telemetry</span>
+                  <span className="text-primary font-bold">RizzEat ML</span>
                 </div>
-              </div>
+              </section>
+            </div>
+          );
+        })()}
 
-              <div className="flex items-center justify-between text-[9px] text-on-surface-variant/80 pt-1 border-t border-outline-variant/15">
-                <span>Tap anywhere or Done to return to card view</span>
-                <span className="font-mono font-bold text-primary">SpendTrack 3D</span>
-              </div>
-            </section>
-          }
-        />
-      </TiltCard3D>
-
-
+      </div>
 
       {/* 1-Tap Cockpit Quick Shortcuts */}
       <QuickShortcutsWidget
@@ -1063,290 +1254,116 @@ export default function DashboardTab({
         }}
       />
 
+      {/* ── BENTO ROW 2 (Desktop Dual Columns: Recent Transactions vs Health 360 Radar & Heatmap) ── */}
+      <div className="flex flex-col lg:grid lg:grid-cols-12 gap-4 sm:gap-6 items-start">
+        
+        {/* Left Column: Recent Transactions (Span 7 on Desktop) */}
+        <section className="lg:col-span-7 w-full space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <h3 className="font-outfit text-lg text-on-surface font-black tracking-tight">Recent Transactions</h3>
+              {activeCategoryFilter && (
+                <span className="text-[10px] font-bold bg-primary/10 text-primary border border-primary/20 px-2.5 py-0.5 rounded-full flex items-center gap-1 animate-fade-in">
+                  <span>{activeCategoryFilter}</span>
+                  <button 
+                    onClick={() => setActiveCategoryFilter(null)}
+                    className="hover:text-error transition-colors font-black cursor-pointer text-[12px] pl-0.5"
+                  >
+                    ×
+                  </button>
+                </span>
+              )}
+            </div>
+            <button 
+              onClick={onNavigateToHistory}
+              className="font-label-lg text-xs text-primary hover:underline flex items-center gap-0.5"
+            >
+              View All
+              <ChevronRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
 
-
-      {/* High Priority #1: Recent Transactions (Immediate Daily Log Access) */}
-      <section className="space-y-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <h3 className="font-outfit text-lg text-on-surface font-black tracking-tight">Recent Transactions</h3>
-            {activeCategoryFilter && (
-              <span className="text-[10px] font-bold bg-primary/10 text-primary border border-primary/20 px-2.5 py-0.5 rounded-full flex items-center gap-1 animate-fade-in">
-                <span>{activeCategoryFilter}</span>
-                <button 
-                  onClick={() => setActiveCategoryFilter(null)}
-                  className="hover:text-error transition-colors font-black cursor-pointer text-[12px] pl-0.5"
+          <div className="space-y-2">
+            {recentTransactions.length === 0 ? (
+              <div className="p-6 text-center bg-surface-container-lowest border border-outline-variant/30 rounded-2xl space-y-2">
+                <p className="text-xs text-on-surface-variant font-medium">No recent transactions logged yet.</p>
+                <button
+                  onClick={onAddTransactionClick}
+                  className="px-3.5 py-1.5 bg-primary text-on-primary text-xs font-bold rounded-xl shadow-xs"
                 >
-                  ×
+                  <PressSlideText>+ Log First Expense</PressSlideText>
                 </button>
-              </span>
+              </div>
+            ) : (
+              recentTransactions.map((tx, idx) => {
+                const config = getCategoryConfig(tx.category);
+                const IconComponent = config.icon;
+                const isExpense = tx.amount < 0;
+
+                return (
+                  <RevealOnScroll key={tx.id} stagger={idx}>
+                    <Card3D
+                      depth={4}
+                      scaleOnHover={1.012}
+                      glare={true}
+                      onClick={() => setSelectedTx(tx)}
+                      className="rounded-xl"
+                    >
+                      <div 
+                        id={`transaction-row-${tx.id}`}
+                        className="flex items-center justify-between p-2.5 sm:p-3 bg-surface-container-lowest rounded-xl border border-outline-variant/30 transition-all cursor-pointer group active:bg-surface-container-high/50"
+                      >
+                        <div className="flex items-center gap-2.5">
+                          <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center ${config.bg} shadow-2xs shrink-0`}>
+                            <IconComponent className="w-4 h-4 text-on-surface" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="font-title-md text-xs sm:text-sm text-on-surface font-bold truncate group-hover:text-primary transition-colors">
+                              {tx.title}
+                            </div>
+                            <div className="text-[11px] text-on-surface-variant font-medium truncate">
+                              {tx.category} • {formatDateLabel(tx.date)}, {tx.time}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="text-right ml-2 flex flex-col items-end shrink-0">
+                          <div className={`font-mono text-xs sm:text-sm font-bold ${isExpense ? 'text-on-surface' : 'text-emerald-600 dark:text-emerald-400'}`}>
+                            {isExpense ? '' : '+'}{formatCurrency(Math.abs(tx.amount))}
+                          </div>
+                          <span className="inline-block px-1.5 py-0.5 mt-0.5 text-[9px] font-medium bg-surface-variant text-on-surface-variant rounded-md">
+                            {tx.label}
+                          </span>
+                        </div>
+                      </div>
+                    </Card3D>
+                  </RevealOnScroll>
+                );
+              })
             )}
           </div>
-          <button 
-            onClick={onNavigateToHistory}
-            className="font-label-lg text-xs text-primary hover:underline flex items-center gap-0.5"
-          >
-            View All
-            <ChevronRight className="w-3.5 h-3.5" />
-          </button>
-        </div>
-
-        <div className="space-y-2">
-          {recentTransactions.length === 0 ? (
-            <div className="p-6 text-center bg-surface-container-lowest border border-outline-variant/30 rounded-2xl space-y-2">
-              <p className="text-xs text-on-surface-variant font-medium">No recent transactions logged yet.</p>
-              <button
-                onClick={onAddTransactionClick}
-                className="px-3.5 py-1.5 bg-primary text-on-primary text-xs font-bold rounded-xl shadow-xs"
-              >
-                <PressSlideText>+ Log First Expense</PressSlideText>
-              </button>
-            </div>
-          ) : (
-            recentTransactions.map((tx, idx) => {
-              const config = getCategoryConfig(tx.category);
-              const IconComponent = config.icon;
-              const isExpense = tx.amount < 0;
-
-              return (
-                <RevealOnScroll key={tx.id} stagger={idx}>
-                  <Card3D
-                    depth={4}
-                    scaleOnHover={1.012}
-                    glare={true}
-                    onClick={() => setSelectedTx(tx)}
-                    className="rounded-xl"
-                  >
-                    <div 
-                      id={`transaction-row-${tx.id}`}
-                      className="flex items-center justify-between p-2.5 sm:p-3 bg-surface-container-lowest rounded-xl border border-outline-variant/30 transition-all cursor-pointer group active:bg-surface-container-high/50"
-                    >
-                      <div className="flex items-center gap-2.5">
-                        <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center ${config.bg} shadow-2xs shrink-0`}>
-                          <IconComponent className="w-4 h-4 text-on-surface" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="font-title-md text-xs sm:text-sm text-on-surface font-bold truncate group-hover:text-primary transition-colors">
-                            {tx.title}
-                          </div>
-                          <div className="text-[11px] text-on-surface-variant font-medium truncate">
-                            {tx.category} • {formatDateLabel(tx.date)}, {tx.time}
-                          </div>
-                        </div>
-                      </div>
-                      <div className="text-right ml-2 flex flex-col items-end shrink-0">
-                        <div className={`font-mono text-xs sm:text-sm font-bold ${isExpense ? 'text-on-surface' : 'text-emerald-600 dark:text-emerald-400'}`}>
-                          {isExpense ? '' : '+'}{formatCurrency(Math.abs(tx.amount))}
-                        </div>
-                        <span className="inline-block px-1.5 py-0.5 mt-0.5 text-[9px] font-medium bg-surface-variant text-on-surface-variant rounded-md">
-                          {tx.label}
-                        </span>
-                      </div>
-                    </div>
-                  </Card3D>
-                </RevealOnScroll>
-              );
-            })
-          )}
-        </div>
-      </section>
-
-
-
-      {/* AI Spending Insights (Nudges) - RizzEat SpiceBot inspired */}
-      {(() => {
-        const nudges = getSpenderNudges();
-        if (nudges.length === 0) return null;
-        return (
-          <section className="space-y-2.5">
-            <div className="flex items-center justify-between px-0.5">
-              <div className="flex items-center gap-1.5">
-                <Sparkles className="w-4 h-4 text-primary" />
-                <h3 className="font-outfit text-sm text-on-surface font-black tracking-tight uppercase">
-                  AI Financial Insights
-                </h3>
-              </div>
-              <div className="rizzeat-pill bg-primary/10 text-primary border border-primary/20 select-none">
-                <div className="rizzeat-pulse-dot">
-                  <span className="bg-primary/50"></span>
-                  <span className="bg-primary"></span>
-                </div>
-                <span>Autonomous</span>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 gap-2.5">
-              {nudges.map((nudge, idx) => (
-                <div 
-                  key={idx}
-                  className={`p-3 sm:p-3.5 rounded-2xl border text-xs flex items-start gap-2.5 shadow-2xs animate-fade-in rizzeat-bento-card ${
-                    nudge.type === 'warning' 
-                      ? 'bg-error/5 text-error border-error/15 dark:bg-error/10 dark:text-error-container' 
-                      : nudge.type === 'success'
-                      ? 'bg-emerald-500/5 text-emerald-700 border-emerald-500/15 dark:bg-emerald-500/10 dark:text-emerald-400'
-                      : 'bg-primary/5 text-primary border-primary/15 dark:bg-primary/10 dark:text-primary-container'
-                  }`}
-                >
-                  <span className="p-1.5 rounded-xl bg-surface-container-lowest shadow-2xs shrink-0">
-                    {nudge.type === 'warning' ? (
-                      <ShieldAlert className="w-3.5 h-3.5 text-error" />
-                    ) : nudge.type === 'success' ? (
-                      <TrendingDown className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-                    ) : (
-                      <Sparkles className="w-3.5 h-3.5 text-primary" />
-                    )}
-                  </span>
-                  <div className="flex-1 leading-normal font-medium pt-0.5">
-                    {nudge.text}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </section>
-        );
-      })()}
-
-
-
-      {/* Budget Health Radial Progress Section - RizzEat Bento Aesthetic */}
-      {hasBudget && (
-        <section className="space-y-3">
-          <div className="flex items-center justify-between">
-            <h3 className="font-outfit text-lg text-on-surface font-black tracking-tight">Budget Health</h3>
-            <span className={`rizzeat-pill border ${
-              (activeExpenses / (activeLimit || 3000)) * 100 > 100 
-                ? 'bg-error/10 text-error border-error/20' 
-                : (activeExpenses / (activeLimit || 3000)) * 100 > 85 
-                  ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20' 
-                  : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20'
-            }`}>
-              <div className="rizzeat-pulse-dot">
-                <span className={
-                  (activeExpenses / (activeLimit || 3000)) * 100 > 100
-                    ? 'bg-error'
-                    : (activeExpenses / (activeLimit || 3000)) * 100 > 85
-                    ? 'bg-amber-400'
-                    : 'bg-emerald-400'
-                } />
-                <span className={
-                  (activeExpenses / (activeLimit || 3000)) * 100 > 100
-                    ? 'bg-error'
-                    : (activeExpenses / (activeLimit || 3000)) * 100 > 85
-                    ? 'bg-amber-500'
-                    : 'bg-emerald-500'
-                } />
-              </div>
-              <span>
-                {(activeExpenses / (activeLimit || 3000)) * 100 > 100 
-                  ? 'Over Budget' 
-                  : (activeExpenses / (activeLimit || 3000)) * 100 > 85 
-                    ? 'Approaching Limit' 
-                    : 'Healthy Budget'
-                }
-              </span>
-            </span>
-          </div>
-
-          <div className="p-5 rounded-2xl bg-surface-container-low border border-outline-variant/30 shadow-sm rizzeat-bento-card grid grid-cols-1 md:grid-cols-12 gap-6 items-center">
-            {/* Radial Chart Area */}
-            <div className="md:col-span-5 h-44 relative flex items-center justify-center">
-              <div className="w-40 h-40 relative">
-                <ResponsiveContainer width="100%" height="100%">
-                  <RadialBarChart 
-                    cx="50%" 
-                    cy="50%" 
-                    innerRadius="75%" 
-                    outerRadius="100%" 
-                    barSize={12} 
-                    data={[
-                      {
-                        name: 'Spent',
-                        value: Math.min(100, (activeExpenses / (activeLimit || 3000)) * 100),
-                        fill: (activeExpenses / (activeLimit || 3000)) * 100 > 100 
-                          ? themeError 
-                          : (activeExpenses / (activeLimit || 3000)) * 100 > 85 
-                            ? '#D97706' 
-                            : themeColors.primary
-                      }
-                    ]} 
-                    startAngle={90} 
-                    endAngle={-270}
-                  >
-                    <PolarAngleAxis
-                      type="number"
-                      domain={[0, 100]}
-                      angleAxisId={0}
-                      tick={false}
-                    />
-                    <RadialBar
-                      background={{ fill: 'rgba(0, 0, 0, 0.05)', stroke: 'none', strokeWidth: 0 }}
-                      dataKey="value"
-                      cornerRadius={6}
-                      stroke="none"
-                      strokeWidth={0}
-                      activeShape={false}
-                    />
-                  </RadialBarChart>
-                </ResponsiveContainer>
-                
-                {/* Inner Center Text overlay */}
-                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                  <span className="text-[10px] uppercase font-bold text-on-surface-variant tracking-wider leading-none">
-                    Spent
-                  </span>
-                  <span className={`text-2xl font-black font-mono mt-1 leading-none ${
-                    (activeExpenses / (activeLimit || 3000)) * 100 > 100 ? 'text-error animate-pulse' : 'text-on-surface'
-                  }`}>
-                    {Math.round((activeExpenses / (activeLimit || 3000)) * 100)}%
-                  </span>
-                  <span className="text-[9px] text-on-surface-variant font-medium mt-1 leading-none">
-                    of {formatCurrency(activeLimit || 3000)}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* Budget Statistics Area */}
-            <div className="md:col-span-7 space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="p-3 bg-surface-container-high/60 rounded-xl space-y-1">
-                  <span className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider block">Total Spent</span>
-                  <p className="text-base font-extrabold text-on-surface font-mono">{formatCurrency(activeExpenses)}</p>
-                  <span className="text-[9px] text-on-surface-variant/80 block">
-                    {summaryMode === 'monthly' ? 'Incl. Subscriptions' : 'Incl. Subscriptions (Pro-rated)'}
-                  </span>
-                </div>
-                <div className="p-3 bg-surface-container-high/60 rounded-xl space-y-1">
-                  <span className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider block">
-                    {summaryMode === 'monthly' ? 'Monthly Limit' : 'Weekly Limit'}
-                  </span>
-                  <p className="text-base font-extrabold text-on-surface font-mono">{formatCurrency(activeLimit || 3000)}</p>
-                  <span className="text-[9px] text-on-surface-variant/80 block">
-                    {summaryMode === 'monthly' ? 'Configurable in Settings' : 'Estimated (1/4.33 of monthly)'}
-                  </span>
-                </div>
-              </div>
-
-              {/* Narrative Context */}
-              <div className="p-3 rounded-xl bg-primary/5 border border-primary/10 text-xs text-on-surface-variant leading-relaxed">
-                {(activeExpenses / (activeLimit || 3000)) * 100 > 100 ? (
-                  <p>
-                    ⚠️ You have exceeded your {summaryMode} limit by <strong className="text-error font-bold">{formatCurrency(activeExpenses - (activeLimit || 3000))}</strong>. We strongly recommend visiting the settings tab or pruning non-essential subscription costs to stabilize your financial runway.
-                  </p>
-                ) : (activeExpenses / (activeLimit || 3000)) * 100 > 85 ? (
-                  <p>
-                    ⚠️ You have utilized <strong className="font-bold">{Math.round((activeExpenses / (activeLimit || 3000)) * 100)}%</strong> of your {summaryMode} allocation. There is <strong className="font-bold text-primary">{formatCurrency((activeLimit || 3000) - activeExpenses)}</strong> remaining. Try to avoid high-discretionary purchases until the next billing cycle.
-                  </p>
-                ) : (
-                  <p>
-                    🟢 Your {summaryMode} budget health is currently <strong className="text-primary font-bold">Excellent</strong>! You have only spent <strong className="font-bold">{Math.round((activeExpenses / (activeLimit || 3000)) * 100)}%</strong> of your target cap. You have a comfortable buffer of <strong className="font-bold text-primary">{formatCurrency((activeLimit || 3000) - activeExpenses)}</strong> left.
-                  </p>
-                )}
-              </div>
-            </div>
-          </div>
         </section>
-      )}
+
+        {/* Right Column: Financial Health 360 Radar & No-Spend Heatmap (Span 5 on Desktop) */}
+        <div className="lg:col-span-5 w-full space-y-4 sm:space-y-6">
+          <div ref={healthRadarRef} className="space-y-3">
+            <FinancialHealthRadarCard
+              transactions={transactions}
+              budget={budget}
+              subscriptions={subscriptions}
+              currency={budget?.currency || 'INR'}
+              onNavigateToSettings={onNavigateToSettings}
+            />
+          </div>
+
+          <div ref={noSpendRef} className="space-y-3">
+            <NoSpendHeatmapCard
+              transactions={transactions}
+              budget={budget}
+            />
+          </div>
+        </div>
+
+      </div>
 
       {/* ── Visual Summary ─────────────────────────────────────── */}
       <section className="space-y-3">
@@ -2249,24 +2266,7 @@ export default function DashboardTab({
     )}
   </section>
 
-      {/* Financial Health Radar & Discipline Analysis */}
-      <div ref={healthRadarRef} className="space-y-3">
-        <FinancialHealthRadarCard
-          transactions={transactions}
-          budget={budget}
-          subscriptions={subscriptions}
-          currency={budget?.currency || 'INR'}
-          onNavigateToSettings={onNavigateToSettings}
-        />
-      </div>
 
-      {/* No-Spend Days & Consistency Heatmap */}
-      <div ref={noSpendRef} className="space-y-3">
-        <NoSpendHeatmapCard
-          transactions={transactions}
-          budget={budget}
-        />
-      </div>
 
       {/* Transaction Detail Bottom Sheet Modal */}
       {selectedTx && (
