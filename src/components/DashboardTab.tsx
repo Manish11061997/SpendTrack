@@ -5,7 +5,8 @@ import { Transaction, UserProfile, BudgetConfig, Subscription } from '../types';
 import { formatCurrency as formatCustomCurrency, getCurrencySymbol, getCurrencyLocale, isSubscriptionDoubleCounted, parseRawAmount } from '../utils/currency';
 import { COLOR_PRESETS } from '../theme';
 import { triggerHaptic } from '../utils/haptics';
-import { ThreeDDonutCanvas, ThreeDCardCanvas, TiltCard3D, FlipCard3D } from './animated';
+import { ThreeDDonutCanvas, ThreeDCardCanvas, TiltCard3D, FlipCard3D, Card3D, RollingNumber } from './animated';
+import { BorderBeam } from './ui/BorderBeam';
 import { ThreeDCardModal } from './ThreeDCardModal';
 import { QuickShortcutsWidget } from './QuickShortcutsWidget';
 import { FinancialHealthRadarCard } from './FinancialHealthRadarCard';
@@ -2162,6 +2163,7 @@ export default function DashboardTab({
           <div className="col-span-6 flex flex-col">
             <TiltCard3D maxTilt={6} glareEffect={true} className="h-full">
             <div className="p-6 rounded-3xl bg-gradient-to-br from-slate-900 via-[#0D1424] to-[#080D1A] text-white border border-white/10 shadow-2xl relative overflow-hidden flex flex-col justify-between min-h-[300px] rizzeat-bento-card group">
+              <BorderBeam size={280} duration={12} colorFrom="var(--primary, #10B981)" colorTo="var(--secondary, #06B6D4)" />
               {/* Subtle ambient light gradient inside card */}
               <div className="absolute top-0 right-0 w-80 h-80 bg-primary/10 rounded-full blur-3xl pointer-events-none" />
               <div className="absolute -bottom-20 -left-20 w-60 h-60 bg-secondary/10 rounded-full blur-2xl pointer-events-none" />
@@ -2284,8 +2286,13 @@ export default function DashboardTab({
                           )}
                         </div>
                         <div className="flex items-baseline gap-3">
-                          <h2 className="text-4xl sm:text-5xl font-mono font-black tracking-tight text-white drop-shadow-sm">
-                            {formatCurrency(activeExpenses)}
+                          <h2 className="text-4xl sm:text-5xl font-mono font-black tracking-tight text-white drop-shadow-sm flex items-center">
+                            <RollingNumber
+                              value={activeExpenses}
+                              prefix={getCurrencySymbol(budget?.currency || 'INR')}
+                              locale={getCurrencyLocale(budget?.currency || 'INR')}
+                              duration={700}
+                            />
                           </h2>
                         </div>
                       </div>
@@ -2463,7 +2470,8 @@ export default function DashboardTab({
           {/* Bento Cell 3: Smart Insights Telemetry (Col 3) */}
           <div className="col-span-3 flex flex-col">
             <TiltCard3D maxTilt={5} glareEffect={true} className="h-full">
-            <div className="p-5 rounded-3xl bg-surface-container-low/90 backdrop-blur-md border border-outline-variant/30 shadow-sm flex flex-col justify-between h-full rizzeat-bento-card space-y-3">
+            <div className="p-5 rounded-3xl bg-surface-container-low/90 backdrop-blur-md border border-outline-variant/30 shadow-sm flex flex-col justify-between h-full rizzeat-bento-card space-y-3 relative overflow-hidden">
+              <BorderBeam size={200} duration={14} colorFrom="var(--secondary, #06B6D4)" colorTo="var(--primary, #10B981)" />
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-1.5">
                   <Sparkles className="w-4 h-4 text-primary" />
@@ -2601,40 +2609,41 @@ export default function DashboardTab({
                   const brand = getBrandInfo(tx.title);
 
                   return (
-                    <div 
-                      key={tx.id}
-                      onClick={() => setSelectedTx(tx)}
-                      className="flex items-center justify-between p-3 bg-surface-container-low/60 hover:bg-surface-container-low border border-outline-variant/20 hover:border-outline-variant/40 rounded-2xl transition-all cursor-pointer group"
-                    >
-                      <div className="flex items-center gap-3">
-                        {brand ? (
-                          <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold text-sm border shrink-0 ${brand.color}`}>
-                            {brand.letter}
-                          </div>
-                        ) : (
-                          <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${config.bg} shadow-2xs shrink-0`}>
-                            <IconComponent className="w-4.5 h-4.5 text-on-surface" />
-                          </div>
-                        )}
-                        <div className="min-w-0">
-                          <div className="font-title-md text-sm text-on-surface font-bold truncate group-hover:text-primary transition-colors">
-                            {tx.title}
-                          </div>
-                          <div className="text-[11px] text-on-surface-variant font-medium">
-                            {tx.category} • {formatDateLabel(tx.date)}, {tx.time}
+                    <Card3D key={tx.id} depth={4} scaleOnHover={1.015} glare={true} className="rounded-2xl">
+                      <div 
+                        onClick={() => setSelectedTx(tx)}
+                        className="flex items-center justify-between p-3 bg-surface-container-low/60 hover:bg-surface-container-low border border-outline-variant/20 hover:border-outline-variant/40 rounded-2xl transition-all cursor-pointer group"
+                      >
+                        <div className="flex items-center gap-3">
+                          {brand ? (
+                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold text-sm border shrink-0 ${brand.color}`}>
+                              {brand.letter}
+                            </div>
+                          ) : (
+                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${config.bg} shadow-2xs shrink-0`}>
+                              <IconComponent className="w-4.5 h-4.5 text-on-surface" />
+                            </div>
+                          )}
+                          <div className="min-w-0">
+                            <div className="font-title-md text-sm text-on-surface font-bold truncate group-hover:text-primary transition-colors">
+                              {tx.title}
+                            </div>
+                            <div className="text-[11px] text-on-surface-variant font-medium">
+                              {tx.category} • {formatDateLabel(tx.date)}, {tx.time}
+                            </div>
                           </div>
                         </div>
-                      </div>
 
-                      <div className="text-right flex flex-col items-end shrink-0">
-                        <div className={`font-mono text-sm font-bold ${isExpense ? 'text-on-surface' : 'text-emerald-600 dark:text-emerald-400'}`}>
-                          {isExpense ? '' : '+'}{formatCurrency(Math.abs(tx.amount))}
+                        <div className="text-right flex flex-col items-end shrink-0">
+                          <div className={`font-mono text-sm font-bold ${isExpense ? 'text-on-surface' : 'text-emerald-600 dark:text-emerald-400'}`}>
+                            {isExpense ? '' : '+'}{formatCurrency(Math.abs(tx.amount))}
+                          </div>
+                          <span className="inline-block px-2 py-0.5 mt-0.5 text-[9px] font-semibold bg-surface-container-highest text-on-surface-variant rounded-md">
+                            {tx.label}
+                          </span>
                         </div>
-                        <span className="inline-block px-2 py-0.5 mt-0.5 text-[9px] font-semibold bg-surface-container-highest text-on-surface-variant rounded-md">
-                          {tx.label}
-                        </span>
                       </div>
-                    </div>
+                    </Card3D>
                   );
                 })
               )}
@@ -2643,6 +2652,7 @@ export default function DashboardTab({
 
           {/* Right: Quick Action Hub & Presets (Col 5) */}
           <div className="col-span-5 space-y-4">
+            <TiltCard3D maxTilt={4} glareEffect={true} className="h-full">
             <div className="p-5 rounded-3xl bg-surface-container-low/60 border border-outline-variant/25 space-y-3">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold text-on-surface-variant uppercase tracking-wider flex items-center gap-1.5">
@@ -2693,6 +2703,7 @@ export default function DashboardTab({
                 }}
               />
             </div>
+            </TiltCard3D>
           </div>
 
         </div>
@@ -2721,6 +2732,7 @@ export default function DashboardTab({
               </span>
             </div>
 
+            <TiltCard3D maxTilt={4} glareEffect={true} className="h-full">
             <div className="p-5 rounded-3xl bg-surface-container-low/60 border border-outline-variant/30 shadow-sm rizzeat-bento-card">
               {chartData.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-12 text-center space-y-2">
@@ -2789,7 +2801,12 @@ export default function DashboardTab({
                                   {focusedItem.name}
                                 </span>
                                 <span style={{ fontSize: '14px', fontWeight: 900, fontFamily: 'monospace', color: 'var(--color-on-surface,#1c1b1f)', marginTop: '2px' }}>
-                                  {formatCurrency(focusedItem.value)}
+                                  <RollingNumber
+                                    value={focusedItem.value}
+                                    prefix={getCurrencySymbol(budget?.currency || 'INR')}
+                                    locale={getCurrencyLocale(budget?.currency || 'INR')}
+                                    duration={450}
+                                  />
                                 </span>
                                 <span style={{ fontSize: '10px', fontWeight: 700, color: focusedItem.color, marginTop: '3px', background: `${focusedItem.color}22`, padding: '1px 6px', borderRadius: '99px' }}>
                                   {totalSpendingForMonth > 0 ? ((focusedItem.value / totalSpendingForMonth) * 100).toFixed(1) : 0}%
@@ -2801,7 +2818,12 @@ export default function DashboardTab({
                                   Total
                                 </span>
                                 <span style={{ fontSize: '14px', fontWeight: 900, fontFamily: 'monospace', color: 'var(--color-on-surface,#1c1b1f)', marginTop: '2px' }}>
-                                  {formatCurrency(totalSpendingForMonth)}
+                                  <RollingNumber
+                                    value={totalSpendingForMonth}
+                                    prefix={getCurrencySymbol(budget?.currency || 'INR')}
+                                    locale={getCurrencyLocale(budget?.currency || 'INR')}
+                                    duration={500}
+                                  />
                                 </span>
                                 <span style={{ fontSize: '9px', fontWeight: 500, color: 'var(--color-on-surface-variant,#49454f)', marginTop: '3px' }}>
                                   {chartData.length} categories
@@ -2848,21 +2870,26 @@ export default function DashboardTab({
                 );
               })()}
             </div>
+            </TiltCard3D>
           </div>
 
           {/* Right: Financial Health 360 Radar & Heatmap (Col 6) */}
           <div className="col-span-6 space-y-4">
-            <FinancialHealthRadarCard
-              transactions={transactions}
-              budget={budget}
-              subscriptions={subscriptions}
-              currency={budget?.currency || 'INR'}
-              onNavigateToSettings={onNavigateToSettings}
-            />
-            <NoSpendHeatmapCard
-              transactions={transactions}
-              budget={budget}
-            />
+            <TiltCard3D maxTilt={4} glareEffect={true}>
+              <FinancialHealthRadarCard
+                transactions={transactions}
+                budget={budget}
+                subscriptions={subscriptions}
+                currency={budget?.currency || 'INR'}
+                onNavigateToSettings={onNavigateToSettings}
+              />
+            </TiltCard3D>
+            <TiltCard3D maxTilt={4} glareEffect={true}>
+              <NoSpendHeatmapCard
+                transactions={transactions}
+                budget={budget}
+              />
+            </TiltCard3D>
           </div>
 
         </div>
@@ -2884,6 +2911,7 @@ export default function DashboardTab({
               </button>
             </div>
 
+            <TiltCard3D maxTilt={4} glareEffect={true} className="h-full">
             <div className="p-5 rounded-3xl bg-surface-container-low/60 border border-outline-variant/30 space-y-3 rizzeat-bento-card">
               <div className="flex justify-between items-center pb-2 border-b border-outline-variant/20 text-xs">
                 <span className="text-on-surface-variant font-medium">Monthly Outflow Rate:</span>
@@ -2930,6 +2958,7 @@ export default function DashboardTab({
                 )}
               </div>
             </div>
+            </TiltCard3D>
           </div>
 
           {/* Savings Goals Bento Card (Col 6) */}
@@ -2939,6 +2968,7 @@ export default function DashboardTab({
               <span className="text-xs text-on-surface-variant font-medium">{savingsGoals.length} Active Targets</span>
             </div>
 
+            <TiltCard3D maxTilt={4} glareEffect={true} className="h-full">
             <div className="p-5 rounded-3xl bg-surface-container-low/60 border border-outline-variant/30 space-y-3 rizzeat-bento-card">
               <div className="space-y-3 max-h-72 overflow-y-auto">
                 {savingsGoals.length === 0 ? (
@@ -2970,6 +3000,7 @@ export default function DashboardTab({
                 )}
               </div>
             </div>
+            </TiltCard3D>
           </div>
 
         </div>

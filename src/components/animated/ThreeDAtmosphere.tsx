@@ -244,26 +244,26 @@ export const ThreeDAtmosphere: React.FC<ThreeDAtmosphereProps> = ({ className = 
       const delta = clock.getDelta();
       const elapsedTime = clock.getElapsedTime();
 
-      // Lerp mouse coordinates for subtle, calm luxury camera parallax
-      mouseRef.current.x += (mouseRef.current.targetX - mouseRef.current.x) * 0.025;
-      mouseRef.current.y += (mouseRef.current.targetY - mouseRef.current.y) * 0.025;
+      // Lerp mouse coordinates for dynamic camera parallax
+      mouseRef.current.x += (mouseRef.current.targetX - mouseRef.current.x) * 0.045;
+      mouseRef.current.y += (mouseRef.current.targetY - mouseRef.current.y) * 0.045;
 
-      camera.position.x = mouseRef.current.x * 0.45;
-      camera.position.y = mouseRef.current.y * 0.3;
+      camera.position.x = mouseRef.current.x * 0.85;
+      camera.position.y = mouseRef.current.y * 0.6;
       camera.lookAt(0, 0, 0);
 
-      // Very slow, serene particle drift
-      particles.rotation.y = elapsedTime * 0.008;
-      particles.rotation.x = Math.sin(elapsedTime * 0.005) * 0.03;
+      // Visible luxury stardust particle drift
+      particles.rotation.y = elapsedTime * 0.018;
+      particles.rotation.x = Math.sin(elapsedTime * 0.01) * 0.05;
 
-      // Serene, calm ambient objects in deep space
+      // Floating geometric prisms rotating & bobbing in 3D space
       floatingItems.forEach((item) => {
-        item.mesh.rotation.x += item.rotSpeed.x * 0.4;
-        item.mesh.rotation.y += item.rotSpeed.y * 0.4;
-        item.mesh.rotation.z += item.rotSpeed.z * 0.4;
+        item.mesh.rotation.x += item.rotSpeed.x * 0.9;
+        item.mesh.rotation.y += item.rotSpeed.y * 0.9;
+        item.mesh.rotation.z += item.rotSpeed.z * 0.9;
 
-        item.mesh.position.y = item.basePos.y + Math.sin(elapsedTime * 0.25 + item.phase) * 0.12;
-        item.mesh.position.x = item.basePos.x + Math.cos(elapsedTime * 0.2 + item.phase) * 0.08;
+        item.mesh.position.y = item.basePos.y + Math.sin(elapsedTime * 0.5 + item.phase) * 0.24;
+        item.mesh.position.x = item.basePos.x + Math.cos(elapsedTime * 0.4 + item.phase) * 0.16;
       });
 
       // Subtle light oscillation

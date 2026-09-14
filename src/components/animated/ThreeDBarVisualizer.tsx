@@ -33,7 +33,7 @@ export const ThreeDBarVisualizer: React.FC<ThreeDBarVisualizerProps> = ({
   const previousPointerRef = useRef({ x: 0, y: 0 });
   const velocityRef = useRef({ x: 0, y: 0 });
   const [hoveredBar, setHoveredBar] = useState<CategoryBarData | null>(null);
-  const [autoRotate, setAutoRotate] = useState(false);
+  const [autoRotate, setAutoRotate] = useState(true);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -264,7 +264,7 @@ export const ThreeDBarVisualizer: React.FC<ThreeDBarVisualizerProps> = ({
         worldGroup.rotation.x = Math.max(-0.2, Math.min(0.6, worldGroup.rotation.x));
 
         if (autoRotate && Math.abs(velocityRef.current.x) < 0.001) {
-          worldGroup.rotation.y += 0.003;
+          worldGroup.rotation.y += 0.006;
         }
       }
 

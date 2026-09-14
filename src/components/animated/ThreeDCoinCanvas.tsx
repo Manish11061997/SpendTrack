@@ -238,10 +238,10 @@ export const ThreeDCoinCanvas: React.FC<ThreeDCoinCanvasProps> = ({
         coinGroup.rotation.y += velocityRef.current.x;
         coinGroup.rotation.x += velocityRef.current.y;
 
-        // When nearly at rest, smoothly settle into light-catching hero angle
+        // Continuous graceful spin & floating bob catching light
         if (Math.abs(velocityRef.current.x) < 0.001 && Math.abs(velocityRef.current.y) < 0.001) {
-          coinGroup.rotation.y = THREE.MathUtils.lerp(coinGroup.rotation.y, 0.28, 0.04);
-          coinGroup.rotation.x = THREE.MathUtils.lerp(coinGroup.rotation.x, 0.14, 0.04);
+          coinGroup.rotation.y += 0.012;
+          coinMesh.position.y = Math.sin(clock.getElapsedTime() * 1.8) * 0.12;
         }
       }
 

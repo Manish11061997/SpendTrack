@@ -37,7 +37,7 @@ export const ThreeDDonutCanvas: React.FC<ThreeDDonutCanvasProps> = ({
   const previousPointerRef = useRef({ x: 0, y: 0 });
   const velocityRef = useRef({ x: 0, y: 0 });
   const [hoveredSlice, setHoveredSlice] = useState<CategoryRingData | null>(null);
-  const [autoRotate, setAutoRotate] = useState(false);
+  const [autoRotate, setAutoRotate] = useState(true);
 
   const overallPct = totalBudget > 0 ? Math.min(100, Math.round((totalSpent / totalBudget) * 100)) : 68;
 
@@ -287,9 +287,10 @@ export const ThreeDDonutCanvas: React.FC<ThreeDDonutCanvasProps> = ({
         donutGroup.rotation.x += velocityRef.current.y;
         donutGroup.rotation.x = Math.max(-0.8, Math.min(1.2, donutGroup.rotation.x));
 
-        // Only rotate when user explicitly enables Orbit
+        // Continuous 3D orbit and floating bob
         if (autoRotate && Math.abs(velocityRef.current.x) < 0.001) {
-          donutGroup.rotation.y += 0.004;
+          donutGroup.rotation.y += 0.006;
+          donutGroup.position.y = Math.sin(clock.getElapsedTime() * 1.2) * 0.06;
         }
       }
 

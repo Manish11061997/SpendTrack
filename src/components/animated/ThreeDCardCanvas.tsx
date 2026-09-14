@@ -351,8 +351,10 @@ export const ThreeDCardCanvas: React.FC<ThreeDCardCanvasProps> = ({
         cardMesh.rotation.y += velocityRef.current.x;
         cardMesh.rotation.x += velocityRef.current.y;
 
-        // Extremely calm, resting breathing oscillation
-        cardMesh.position.y = Math.sin(elapsedTime * 0.75) * 0.022;
+        // Active floating & gentle 3D sway
+        cardMesh.rotation.y = Math.sin(elapsedTime * 0.8) * 0.14;
+        cardMesh.rotation.x = Math.cos(elapsedTime * 0.6) * 0.08;
+        cardMesh.position.y = Math.sin(elapsedTime * 1.2) * 0.08;
       }
 
       renderer.render(scene, camera);
