@@ -35,7 +35,8 @@ import {
 } from 'lucide-react';
 import { Transaction, BudgetConfig, Subscription, SavingsGoal } from '../types';
 import { COLOR_PRESETS } from '../theme';
-import { formatCurrency as formatCustomCurrency, isSubscriptionDoubleCounted, parseRawAmount, formatInputAmount } from '../utils/currency';
+import { formatCurrency as formatCustomCurrency, isSubscriptionDoubleCounted, parseRawAmount, formatInputAmount, getCurrencySymbol } from '../utils/currency';
+import { ThreeDBarVisualizer, CategoryBarData } from './animated/ThreeDBarVisualizer';
 import { FinancialHealthRadarCard } from './FinancialHealthRadarCard';
 import { NoSpendHeatmapCard } from './NoSpendHeatmapCard';
 import { generateMonthlyPdfReport } from '../utils/pdfReportGenerator';
@@ -201,6 +202,13 @@ export default function InsightsTab({
     }
   ];
 
+  const threeDCategories: CategoryBarData[] = categoriesAnalysis.map(cat => ({
+    name: cat.name,
+    spent: cat.spent,
+    limit: cat.avg,
+    color: cat.name === 'Food' ? '#10B981' : cat.name === 'Transport' ? '#06B6D4' : cat.name === 'Rent' ? '#8B5CF6' : cat.name === 'Shopping' ? '#F59E0B' : '#EC4899'
+  }));
+
   // Dynamic values for spending velocity and buffer
   const budgetLimit = budget.monthlyLimit;
   const remainingBudget = budgetLimit - totalSpent;
@@ -316,6 +324,31 @@ export default function InsightsTab({
         subscriptions={subscriptions}
         currency={budget?.currency || 'INR'}
       />
+
+      {/* 3D Spending Monoliths Visualizer (Desktop Only) */}
+      <div className="hidden lg:block p-6 rounded-3xl bg-surface-container-low/95 dark:bg-surface-container-lowest/90 backdrop-blur-md border border-outline-variant/30 shadow-xl rizzeat-bento-card relative overflow-hidden space-y-4">
+        <div className="flex items-center justify-between border-b border-outline-variant/20 dark:border-white/5 pb-3">
+          <div>
+            <div className="flex items-center gap-2">
+              <LineChart className="w-4 h-4 text-primary" />
+              <h3 className="font-outfit text-sm font-bold text-on-surface">3D Spending Monoliths Visualizer</h3>
+              <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded-md bg-primary/10 text-primary border border-primary/20">
+                3D WebGL
+              </span>
+            </div>
+            <p className="text-[11px] text-on-surface-variant mt-0.5">
+              Interactive 3D financial landscape on obsidian mirror base • Category outflow vs. limits
+            </p>
+          </div>
+        </div>
+
+        <div className="h-72 w-full rounded-2xl overflow-hidden bg-black/20 border border-outline-variant/20">
+          <ThreeDBarVisualizer
+            categories={threeDCategories}
+            currencySymbol={getCurrencySymbol(budget?.currency || 'INR')}
+          />
+        </div>
+      </div>
 
       {/* Monthly Budget & Net Cashflow Intelligence Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

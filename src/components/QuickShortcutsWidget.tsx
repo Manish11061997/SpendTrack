@@ -1,7 +1,5 @@
 import React from 'react';
-import { motion } from 'framer-motion';
 import { FileText, Mic, Calendar, Sparkles, Plus, Activity, Settings } from 'lucide-react';
-import { triggerHaptic } from '../utils/haptics';
 
 interface QuickShortcutsWidgetProps {
   onOpenExportAudit: () => void;
@@ -40,36 +38,26 @@ export const QuickShortcutsWidget: React.FC<QuickShortcutsWidgetProps> = ({
           <Sparkles className="w-3.5 h-3.5 text-primary" />
           Shortcuts
         </span>
-        <div className="rizzeat-pill bg-primary/10 text-primary border border-primary/20">
-          <div className="rizzeat-pulse-dot">
-            <span className="bg-primary/50"></span>
-            <span className="bg-primary"></span>
-          </div>
-          <span>Cockpit</span>
-        </div>
+        <span className="text-[9px] font-mono text-on-surface-variant font-semibold px-2 py-0.5 bg-surface-container-high rounded-full border border-outline-variant/20">
+          Cockpit
+        </span>
       </div>
 
       <div className="grid grid-cols-6 gap-1 sm:gap-2">
-        {shortcuts.map((sc, idx) => {
+        {shortcuts.map((sc) => {
           const IconComp = sc.icon;
           return (
-            <motion.button
+            <button
               key={sc.label}
               type="button"
-              onClick={() => {
-                triggerHaptic('light');
-                sc.action();
-              }}
-              whileHover={{ scale: 1.08, y: -2 }}
-              whileTap={{ scale: 0.9, y: 1 }}
-              transition={{ type: 'spring', stiffness: 450, damping: 20 }}
-              className={`p-1.5 sm:p-2 rounded-xl border flex flex-col items-center justify-center gap-1 cursor-pointer text-center group ${sc.color} shadow-2xs hover:shadow-md transition-shadow`}
+              onClick={sc.action}
+              className={`p-1.5 sm:p-2 rounded-xl border flex flex-col items-center justify-center gap-1 transition-all active:scale-95 cursor-pointer text-center group ${sc.color}`}
             >
-              <span className="p-1 rounded-md bg-surface-container-lowest/90 transition-transform group-hover:rotate-6">
+              <span className="p-1 rounded-md bg-surface-container-lowest/90 transition-transform group-active:scale-90">
                 <IconComp className="w-3.5 h-3.5" />
               </span>
               <span className="text-[9px] sm:text-[10px] font-bold tracking-tight leading-none text-on-surface truncate w-full">{sc.label}</span>
-            </motion.button>
+            </button>
           );
         })}
       </div>

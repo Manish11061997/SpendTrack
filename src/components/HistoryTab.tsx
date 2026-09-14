@@ -1,7 +1,8 @@
 import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Transaction, BudgetConfig, UserProfile, Subscription } from '../types';
-import { formatCurrency as formatCustomCurrency, parseRawAmount } from '../utils/currency';
+import { formatCurrency as formatCustomCurrency, parseRawAmount, getCurrencySymbol } from '../utils/currency';
+import { ThreeDCoinCanvas } from './animated/ThreeDCoinCanvas';
 import { 
   ArrowLeft,
   Calendar, 
@@ -197,20 +198,28 @@ export default function HistoryTab({
             <div className="absolute -right-10 -top-10 w-40 h-40 bg-white/10 rounded-full blur-2xl"></div>
             <div className="absolute -left-10 -bottom-10 w-32 h-32 bg-primary-container/20 rounded-full blur-xl"></div>
             
-            <div className="relative z-10 space-y-4">
-              <div>
-                <p className="text-xs font-semibold opacity-80 uppercase tracking-wider">Total Year Outflow</p>
-                <div className="flex items-baseline gap-2 mt-1 flex-wrap">
-                  <span className="text-3xl font-extrabold">{formatCurrency(totalYearOutflow)}</span>
-                  <span className="text-[10px] font-bold bg-white/25 px-2 py-0.5 rounded-full uppercase tracking-wider">
-                    Dynamic YTD
-                  </span>
+            <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div className="space-y-4">
+                <div>
+                  <p className="text-xs font-semibold opacity-80 uppercase tracking-wider">Total Year Outflow</p>
+                  <div className="flex items-baseline gap-2 mt-1 flex-wrap">
+                    <span className="text-3xl font-extrabold">{formatCurrency(totalYearOutflow)}</span>
+                    <span className="text-[10px] font-bold bg-white/25 px-2 py-0.5 rounded-full uppercase tracking-wider">
+                      Dynamic YTD
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 text-xs opacity-90 border-t border-white/15 pt-3">
+                  <Calendar className="w-3.5 h-3.5" />
+                  <span>{getTransactionDateRangeLabel()}</span>
                 </div>
               </div>
 
-              <div className="flex items-center gap-2 text-xs opacity-90 border-t border-white/15 pt-3">
-                <Calendar className="w-3.5 h-3.5" />
-                <span>{getTransactionDateRangeLabel()}</span>
+              {/* 3D Wealth Physical Coin (Desktop Only) */}
+              <div className="hidden lg:flex shrink-0 flex-col items-center justify-center p-2 rounded-2xl bg-black/20 border border-white/10 [transform-style:preserve-3d]">
+                <ThreeDCoinCanvas currencySymbol={getCurrencySymbol(budget?.currency || 'INR')} />
+                <span className="text-[9px] font-mono text-white/80 mt-1">360° Tactile Coin</span>
               </div>
             </div>
           </div>

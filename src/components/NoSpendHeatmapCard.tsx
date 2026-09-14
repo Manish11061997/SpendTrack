@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Transaction, BudgetConfig } from '../types';
 import { formatCurrency } from '../utils/currency';
-import { Card3D } from './animated';
 import { Flame, Award, Calendar as CalendarIcon, CheckCircle2, Zap, Sparkles, ChevronRight } from 'lucide-react';
 
 interface NoSpendHeatmapCardProps {
@@ -79,8 +78,7 @@ export const NoSpendHeatmapCard: React.FC<NoSpendHeatmapCardProps> = ({
   ];
 
   return (
-    <Card3D depth={6} scaleOnHover={1.015} glare={true} className="rounded-3xl">
-      <div className="p-5 bg-surface-container-lowest border border-outline-variant/30 rounded-3xl space-y-4 shadow-sm backdrop-blur-xs">
+    <div className="p-5 bg-surface-container-lowest border border-outline-variant/30 rounded-3xl space-y-4 shadow-sm backdrop-blur-xs">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <span className="p-1.5 rounded-xl bg-emerald-500/10 text-emerald-500">
@@ -94,11 +92,8 @@ export const NoSpendHeatmapCard: React.FC<NoSpendHeatmapCardProps> = ({
           </div>
         </div>
 
-        <div className="rizzeat-pill bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 font-mono">
-          <div className="rizzeat-pulse-dot">
-            <span className="bg-emerald-400"></span>
-            <span className="bg-emerald-500"></span>
-          </div>
+        <div className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 text-[10px] font-black font-mono">
+          <Flame className="w-3.5 h-3.5 text-emerald-500 animate-pulse" />
           <span>{currentStreak} Day Streak</span>
         </div>
       </div>
@@ -224,6 +219,5 @@ export const NoSpendHeatmapCard: React.FC<NoSpendHeatmapCardProps> = ({
         </div>
       </div>
     </div>
-    </Card3D>
   );
 };

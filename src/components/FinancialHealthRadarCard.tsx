@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Transaction, BudgetConfig, Subscription } from '../types';
 import { formatCurrency, getCurrencySymbol, isSubscriptionDoubleCounted } from '../utils/currency';
-import { Card3D } from './animated';
 import { ShieldCheck, TrendingUp, Sparkles, ChevronDown, ChevronUp, AlertCircle, Award, Target, Activity } from 'lucide-react';
 
 interface FinancialHealthRadarCardProps {
@@ -146,8 +145,7 @@ export const FinancialHealthRadarCard: React.FC<FinancialHealthRadarCardProps> =
   const status = getScoreStatus(totalScore);
 
   return (
-    <Card3D depth={6} scaleOnHover={1.015} glare={true} className="rounded-3xl">
-      <div className="p-5 bg-surface-container-lowest border border-outline-variant/30 rounded-3xl space-y-4 shadow-sm backdrop-blur-xs">
+    <div className="p-5 bg-surface-container-lowest border border-outline-variant/30 rounded-3xl space-y-4 shadow-sm backdrop-blur-xs">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <span className="p-1.5 rounded-xl bg-primary/10 text-primary">
@@ -161,12 +159,8 @@ export const FinancialHealthRadarCard: React.FC<FinancialHealthRadarCardProps> =
           </div>
         </div>
 
-        <span className={`rizzeat-pill border ${status.colorClass}`}>
-          <div className="rizzeat-pulse-dot">
-            <span className={status.strokeColor === '#10B981' ? 'bg-emerald-400' : status.strokeColor === '#6366F1' ? 'bg-indigo-400' : status.strokeColor === '#F59E0B' ? 'bg-amber-400' : 'bg-rose-400'} />
-            <span className={status.strokeColor === '#10B981' ? 'bg-emerald-500' : status.strokeColor === '#6366F1' ? 'bg-indigo-500' : status.strokeColor === '#F59E0B' ? 'bg-amber-500' : 'bg-rose-500'} />
-          </div>
-          <span>{status.label}</span>
+        <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold border ${status.colorClass}`}>
+          {status.label}
         </span>
       </div>
 
@@ -256,7 +250,6 @@ export const FinancialHealthRadarCard: React.FC<FinancialHealthRadarCardProps> =
           </motion.div>
         )}
       </AnimatePresence>
-      </div>
-    </Card3D>
+    </div>
   );
 };

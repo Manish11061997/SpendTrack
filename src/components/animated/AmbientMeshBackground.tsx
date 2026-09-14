@@ -1,5 +1,5 @@
 import React from 'react';
-import { motion, useReducedMotion } from 'framer-motion';
+import { motion, useReducedMotion } from 'motion/react';
 
 export const AmbientMeshBackground: React.FC = () => {
   const shouldReduceMotion = useReducedMotion();
@@ -7,61 +7,70 @@ export const AmbientMeshBackground: React.FC = () => {
   if (shouldReduceMotion) return null;
 
   return (
-    <div className="fixed inset-0 pointer-events-none overflow-hidden z-0 opacity-40 dark:opacity-30">
-      {/* Orb 1: Primary Cyan/Blue floating gradient orb */}
-      <motion.div
-        className="absolute -top-[15%] -left-[10%] w-[55vw] h-[55vw] max-w-[500px] max-h-[500px] rounded-full blur-3xl"
-        style={{
-          background: 'radial-gradient(circle, rgba(37, 99, 235, 0.45) 0%, rgba(37, 99, 235, 0) 70%)',
-          willChange: 'transform',
-        }}
-        animate={{
-          x: [0, 40, -30, 0],
-          y: [0, 50, 20, 0],
-          scale: [1, 1.15, 0.9, 1],
-        }}
-        transition={{
-          duration: 18,
-          repeat: Infinity,
-          ease: 'easeInOut',
-        }}
-      />
+    <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
+      {/* Theme-Reactive Ambient Glow Orbs */}
+      <div className="absolute inset-0 opacity-45 dark:opacity-35 transition-opacity duration-700">
+        {/* Orb 1: Primary Brand Ambient Glow */}
+        <motion.div
+          className="absolute -top-[18%] -left-[12%] w-[65vw] h-[65vw] max-w-[650px] max-h-[650px] rounded-full blur-[100px]"
+          style={{
+            background: 'radial-gradient(circle, color-mix(in srgb, var(--primary, #10B981) 40%, transparent) 0%, transparent 70%)',
+            willChange: 'transform',
+          }}
+          animate={{
+            scale: [1, 1.04, 1],
+            opacity: [0.85, 1, 0.85],
+          }}
+          transition={{
+            duration: 12,
+            repeat: Infinity,
+            ease: 'easeInOut',
+          }}
+        />
 
-      {/* Orb 2: Violet/Purple accent floating orb */}
-      <motion.div
-        className="absolute top-[35%] -right-[15%] w-[60vw] h-[60vw] max-w-[550px] max-h-[550px] rounded-full blur-3xl"
-        style={{
-          background: 'radial-gradient(circle, rgba(124, 58, 237, 0.35) 0%, rgba(124, 58, 237, 0) 70%)',
-          willChange: 'transform',
-        }}
-        animate={{
-          x: [0, -50, 20, 0],
-          y: [0, -40, 40, 0],
-          scale: [1, 0.92, 1.12, 1],
-        }}
-        transition={{
-          duration: 22,
-          repeat: Infinity,
-          ease: 'easeInOut',
-        }}
-      />
+        {/* Orb 2: Tertiary / Accent Atmospheric Orb */}
+        <motion.div
+          className="absolute top-[30%] -right-[18%] w-[60vw] h-[60vw] max-w-[600px] max-h-[600px] rounded-full blur-[110px]"
+          style={{
+            background: 'radial-gradient(circle, color-mix(in srgb, var(--tertiary, #8B5CF6) 32%, transparent) 0%, transparent 70%)',
+            willChange: 'transform',
+          }}
+          animate={{
+            scale: [1, 1.05, 1],
+            opacity: [0.8, 0.95, 0.8],
+          }}
+          transition={{
+            duration: 14,
+            repeat: Infinity,
+            ease: 'easeInOut',
+          }}
+        />
 
-      {/* Orb 3: Emerald financial-green floating subtle orb */}
-      <motion.div
-        className="absolute -bottom-[10%] left-[20%] w-[50vw] h-[50vw] max-w-[450px] max-h-[450px] rounded-full blur-3xl"
+        {/* Orb 3: Secondary / Counter-Glow Orb */}
+        <motion.div
+          className="absolute -bottom-[15%] left-[25%] w-[55vw] h-[55vw] max-w-[550px] max-h-[550px] rounded-full blur-[95px]"
+          style={{
+            background: 'radial-gradient(circle, color-mix(in srgb, var(--secondary, #06B6D4) 28%, transparent) 0%, transparent 70%)',
+            willChange: 'transform',
+          }}
+          animate={{
+            scale: [1, 1.04, 1],
+            opacity: [0.85, 1, 0.85],
+          }}
+          transition={{
+            duration: 16,
+            repeat: Infinity,
+            ease: 'easeInOut',
+          }}
+        />
+      </div>
+
+      {/* Subtle Cinematic Micro-Grain Texture overlay (eliminates banding & gives tactile finish) */}
+      <div 
+        className="absolute inset-0 opacity-[0.035] dark:opacity-[0.045] mix-blend-overlay pointer-events-none"
         style={{
-          background: 'radial-gradient(circle, rgba(16, 185, 129, 0.3) 0%, rgba(16, 185, 129, 0) 70%)',
-          willChange: 'transform',
-        }}
-        animate={{
-          x: [0, 35, -25, 0],
-          y: [0, -30, 25, 0],
-          scale: [1, 1.1, 0.95, 1],
-        }}
-        transition={{
-          duration: 20,
-          repeat: Infinity,
-          ease: 'easeInOut',
+          backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E")`,
+          backgroundRepeat: 'repeat',
         }}
       />
     </div>

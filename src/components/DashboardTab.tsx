@@ -1,12 +1,12 @@
 import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Sector, RadialBarChart, RadialBar, PolarAngleAxis } from 'recharts';
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Sector, RadialBarChart, RadialBar, PolarAngleAxis, AreaChart, Area } from 'recharts';
 import { Transaction, UserProfile, BudgetConfig, Subscription } from '../types';
 import { formatCurrency as formatCustomCurrency, getCurrencySymbol, getCurrencyLocale, isSubscriptionDoubleCounted, parseRawAmount } from '../utils/currency';
 import { COLOR_PRESETS } from '../theme';
 import { triggerHaptic } from '../utils/haptics';
-import { triggerSuccessBurst } from '../utils/celebration';
-import { RollingNumber, PressSlideText, RevealOnScroll, AnimatedProgressBar, TiltCard3D, FlipCard3D, Card3D } from './animated';
+import { ThreeDDonutCanvas, ThreeDCardCanvas } from './animated';
+import { ThreeDCardModal } from './ThreeDCardModal';
 import { QuickShortcutsWidget } from './QuickShortcutsWidget';
 import { FinancialHealthRadarCard } from './FinancialHealthRadarCard';
 import { NoSpendHeatmapCard } from './NoSpendHeatmapCard';
@@ -16,11 +16,13 @@ import {
   TrendingDown, 
   TrendingUp, 
   ArrowDown, 
-  ArrowUp,
+  ArrowUp, 
   ArrowRight,
+  ArrowUpRight,
   Coins, 
   ShoppingCart, 
   ChevronRight,
+  ChevronLeft,
   Utensils,
   Car,
   Home as HomeIcon,
@@ -38,10 +40,34 @@ import {
   Target,
   Info,
   ShieldAlert,
+  ShieldCheck,
   Sparkles,
   Award,
-  RotateCw
+  RotateCw,
+  Zap,
+  PieChart as LucidePieChart,
+  Activity,
+  Wallet
 } from 'lucide-react';
+
+// Recognizable brand logos and styling for punchy transactions
+const getBrandInfo = (title: string) => {
+  const t = (title || '').toLowerCase();
+  if (t.includes('swiggy')) return { name: 'Swiggy', color: 'bg-orange-500/15 text-orange-500 border-orange-500/30', letter: 'S' };
+  if (t.includes('zomato')) return { name: 'Zomato', color: 'bg-red-500/15 text-red-500 border-red-500/30', letter: 'Z' };
+  if (t.includes('amazon')) return { name: 'Amazon', color: 'bg-amber-500/15 text-amber-500 border-amber-500/30', letter: 'A' };
+  if (t.includes('uber')) return { name: 'Uber', color: 'bg-zinc-800 text-white border-zinc-700', letter: 'U' };
+  if (t.includes('ola')) return { name: 'Ola', color: 'bg-lime-500/15 text-lime-500 border-lime-500/30', letter: 'O' };
+  if (t.includes('netflix')) return { name: 'Netflix', color: 'bg-red-600/15 text-red-500 border-red-600/30', letter: 'N' };
+  if (t.includes('spotify')) return { name: 'Spotify', color: 'bg-emerald-500/15 text-emerald-500 border-emerald-500/30', letter: 'S' };
+  if (t.includes('starbucks') || t.includes('coffee') || t.includes('chai') || t.includes('tea')) return { name: 'Coffee', color: 'bg-amber-700/15 text-amber-600 border-amber-700/30', letter: '☕' };
+  if (t.includes('blinkit') || t.includes('zepto') || t.includes('instamart') || t.includes('grocery')) return { name: 'Grocery', color: 'bg-yellow-500/15 text-yellow-500 border-yellow-500/30', letter: '🛒' };
+  if (t.includes('flipkart')) return { name: 'Flipkart', color: 'bg-blue-500/15 text-blue-500 border-blue-500/30', letter: 'F' };
+  if (t.includes('apple')) return { name: 'Apple', color: 'bg-slate-700/15 text-slate-300 border-slate-700/30', letter: '' };
+  if (t.includes('salary') || t.includes('payroll')) return { name: 'Salary', color: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40', letter: '💰' };
+  return null;
+};
+
 
 interface DashboardTabProps {
   transactions: Transaction[];
@@ -127,6 +153,10 @@ export default function DashboardTab({
   const [isSubsExpanded, setIsSubsExpanded] = useState<boolean>(false);
   const [isGoalsExpanded, setIsGoalsExpanded] = useState<boolean>(false);
   const [isHeroFlipped, setIsHeroFlipped] = useState<boolean>(false);
+  const [smartInsightSlide, setSmartInsightSlide] = useState<number>(0);
+  const [is3DModalOpen, setIs3DModalOpen] = useState<boolean>(false);
+  const [heroMode, setHeroMode] = useState<'stats' | '3d'>('stats');
+  const [donutMode, setDonutMode] = useState<'3d' | 'rings'>('3d');
 
   // Subscription inline form states
   const [isAddSubOpen, setIsAddSubOpen] = useState(false);
@@ -703,518 +733,254 @@ export default function DashboardTab({
     return date.toLocaleString('en-IN', { month: 'long', year: 'numeric' });
   };
 
+  // Daily spending trajectory spline for the Desktop Virtual Metallic Card
+  const spendingTrendData = useMemo(() => {
+    const today = new Date();
+    const daysInMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
+    const currentDay = today.getDate();
+    const currentMonthKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
+    
+    const dailyTotals: Record<number, number> = {};
+    for (let d = 1; d <= daysInMonth; d++) {
+      dailyTotals[d] = 0;
+    }
+    
+    currentMonthTxs.forEach(t => {
+      if (t.amount < 0 && t.date && typeof t.date === 'string' && t.date.startsWith(currentMonthKey)) {
+        const day = parseInt(t.date.slice(8, 10), 10);
+        if (day >= 1 && day <= daysInMonth) {
+          dailyTotals[day] = (dailyTotals[day] || 0) + Math.abs(t.amount);
+        }
+      }
+    });
+
+    const data = [];
+    const maxDay = Math.max(currentDay, 7);
+    for (let d = 1; d <= maxDay; d++) {
+      data.push({ day: d, amount: dailyTotals[d] || 0 });
+    }
+    return data;
+  }, [currentMonthTxs]);
+
+  const rings3dData = useMemo(() => {
+    const total = chartData.reduce((sum, c) => sum + c.value, 0);
+    if (chartData.length === 0) {
+      return [
+        { name: 'Housing', value: 25000, color: '#8B5CF6', percent: 30 },
+        { name: 'Food', value: 21000, color: '#10B981', percent: 25 },
+        { name: 'Travel', value: 15000, color: '#06B6D4', percent: 18 },
+        { name: 'Shopping', value: 12000, color: '#F59E0B', percent: 14 },
+        { name: 'Utilities', value: 8000, color: '#EC4899', percent: 10 },
+      ];
+    }
+    return chartData.slice(0, 5).map(c => ({
+      name: c.name,
+      value: c.value,
+      color: c.color,
+      percent: total > 0 ? Math.round((c.value / total) * 100) : 0
+    }));
+  }, [chartData]);
+
   return (
-    <div className="w-full max-w-5xl mx-auto space-y-4 sm:space-y-6 pb-20 animate-fade-in">
+    <div className="w-full max-w-[1440px] mx-auto space-y-4 sm:space-y-6 pb-12 animate-fade-in">
       
-      {/* ── BENTO ROW 1 (Desktop Bento Grid / Mobile Vertical Stack) ── */}
-      <div className="flex flex-col lg:grid lg:grid-cols-12 gap-4 sm:gap-6 items-stretch">
-        
-        {/* Bento Cell 1: Hero Spending Card (Span 5 on Desktop) */}
-        <div className="lg:col-span-5 flex flex-col">
-          <TiltCard3D maxTilt={6} className="z-20 h-full flex flex-col">
-            <FlipCard3D
-              isFlipped={isHeroFlipped}
-              onFlipChange={setIsHeroFlipped}
-              front={
-                <section className="bg-surface-container-low/80 dark:bg-surface-container-low/60 backdrop-blur-md p-3.5 sm:p-4 rounded-2xl border border-outline-variant/30 shadow-3d space-y-2.5 relative overflow-hidden h-full flex flex-col justify-between">
-                  {/* Row 1: Label + Controls */}
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-1.5 flex-wrap min-w-0">
-                      <span className="text-[11px] font-bold text-on-surface-variant uppercase tracking-wider">
-                        {summaryMode === 'monthly' ? 'Monthly Spend' : 'Weekly Spend'}
-                      </span>
-                      {summaryMode === 'weekly' && getWeeklyPeriodRange() && (
-                        <span className="text-[9px] font-bold text-primary bg-primary-container/40 px-1.5 py-0.5 rounded-full border border-primary/10 shrink-0">
-                          {getWeeklyPeriodRange()}
-                        </span>
-                      )}
-                    </div>
+      {/* ── MOBILE NATIVE LAYOUT (Visible on Mobile, Hidden on lg+) — Exact 100% 2 Days Back (Commit 63b751d) ── */}
+      <div className="lg:hidden space-y-3.5 sm:space-y-5 pb-20">
+      
+      {/* Hero Section: Total Spending */}
+      <section className="bg-surface-container-low/40 p-3 sm:p-4 rounded-2xl border border-outline-variant/25 space-y-2 relative z-20 overflow-hidden">
+        {/* Row 1: Label + Toggle */}
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-1.5 flex-wrap min-w-0">
+            <span className="text-[11px] font-bold text-on-surface-variant uppercase tracking-wider">
+              {summaryMode === 'monthly' ? 'Monthly Spend' : 'Weekly Spend'}
+            </span>
+            {summaryMode === 'weekly' && getWeeklyPeriodRange() && (
+              <span className="text-[9px] font-bold text-primary bg-primary-container/40 px-1.5 py-0.5 rounded-full border border-primary/10 shrink-0">
+                {getWeeklyPeriodRange()}
+              </span>
+            )}
+          </div>
 
-                    {/* Controls: Flip Card Button + Badges Icon + Segmented Toggle */}
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          triggerHaptic('light');
-                          setIsHeroFlipped(true);
-                        }}
-                        title="Flip for Spending Analytics"
-                        aria-label="Flip card for statistics"
-                        className="flex items-center gap-1 px-1.5 py-1 rounded-lg bg-surface-container-high/60 hover:bg-surface-container-highest text-on-surface-variant hover:text-primary transition-all text-[9px] font-bold border border-outline-variant/30 cursor-pointer active:scale-95"
-                      >
-                        <RotateCw className="w-3 h-3 text-primary animate-spin-slow" />
-                        <span className="hidden xs:inline">Stats</span>
-                      </button>
+          {/* Controls: Badges Icon + Segmented Toggle */}
+          <div className="flex items-center gap-1.5 shrink-0">
+            {onOpenBadges && (
+              <button
+                type="button"
+                onClick={onOpenBadges}
+                aria-label="Financial Discipline Badges"
+                title={`Financial Discipline Badges (${unlockedBadgesCount}/6 Mastered)`}
+                className="w-6 h-6 rounded-md bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/25 text-amber-600 dark:text-amber-400 flex items-center justify-center transition-all active:scale-90 cursor-pointer shrink-0"
+              >
+                <Award className="w-3.5 h-3.5" />
+              </button>
+            )}
 
-                      {onOpenBadges && (
-                        <button
-                          type="button"
-                          onClick={onOpenBadges}
-                          aria-label="Financial Discipline Badges"
-                          title={`Financial Discipline Badges (${unlockedBadgesCount}/6 Mastered)`}
-                          className="w-6 h-6 rounded-md bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/25 text-amber-600 dark:text-amber-400 flex items-center justify-center transition-all active:scale-90 cursor-pointer shrink-0"
-                        >
-                          <Award className="w-3.5 h-3.5" />
-                        </button>
-                      )}
-
-                      {/* Segmented Toggle Control with spring pill */}
-                      <div className="relative flex bg-surface-container rounded-lg p-0.5 border border-outline-variant/35 shrink-0">
-                        <button
-                          id="summary-mode-monthly-btn"
-                          type="button"
-                          onClick={() => {
-                            triggerHaptic('light');
-                            setSummaryMode('monthly');
-                          }}
-                          className={`relative z-10 px-2 py-0.5 rounded-md font-bold text-[9px] sm:text-[10px] uppercase tracking-wider transition-colors cursor-pointer ${
-                            summaryMode === 'monthly'
-                              ? 'text-on-primary'
-                              : 'text-on-surface-variant hover:text-on-surface'
-                          }`}
-                        >
-                          {summaryMode === 'monthly' && (
-                            <motion.div
-                              layoutId="segmented-summary-pill"
-                              className="absolute inset-0 bg-primary rounded-md shadow-xs -z-10"
-                              transition={{ type: 'spring', stiffness: 500, damping: 35 }}
-                            />
-                          )}
-                          Monthly
-                        </button>
-                        <button
-                          id="summary-mode-weekly-btn"
-                          type="button"
-                          onClick={() => {
-                            triggerHaptic('light');
-                            setSummaryMode('weekly');
-                          }}
-                          className={`relative z-10 px-2 py-0.5 rounded-md font-bold text-[9px] sm:text-[10px] uppercase tracking-wider transition-colors cursor-pointer ${
-                            summaryMode === 'weekly'
-                              ? 'text-on-primary'
-                              : 'text-on-surface-variant hover:text-on-surface'
-                          }`}
-                        >
-                          {summaryMode === 'weekly' && (
-                            <motion.div
-                              layoutId="segmented-summary-pill"
-                              className="absolute inset-0 bg-primary rounded-md shadow-xs -z-10"
-                              transition={{ type: 'spring', stiffness: 500, damping: 35 }}
-                            />
-                          )}
-                          Weekly
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Row 2: Amount + info button */}
-                  <div className="flex items-center gap-1.5 flex-wrap min-w-0 my-auto">
-                    <span className="font-headline-lg text-2xl sm:text-3xl lg:text-4xl font-extrabold text-primary tracking-tight shrink-0">
-                      <RollingNumber
-                        value={activeExpenses}
-                        prefix={getCurrencySymbol(budget?.currency || 'INR')}
-                        locale={getCurrencyLocale(budget?.currency || 'INR')}
-                      />
-                    </span>
-                    <button 
-                      type="button"
-                      onClick={() => setShowCalcTooltip(!showCalcTooltip)}
-                      className="p-1 text-on-surface-variant/60 hover:text-primary transition-colors cursor-pointer shrink-0"
-                      title="Calculation breakdown"
-                    >
-                      <Info className="w-3.5 h-3.5 text-primary" />
-                    </button>
-
-                    {/* Calculation Breakdown Modal */}
-                    <AnimatePresence>
-                      {showCalcTooltip && (
-                        <div 
-                          className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fade-in"
-                          onClick={() => setShowCalcTooltip(false)}
-                        >
-                          <motion.div 
-                            initial={{ opacity: 0, scale: 0.9, y: 10 }}
-                            animate={{ opacity: 1, scale: 1, y: 0 }}
-                            exit={{ opacity: 0, scale: 0.9, y: 10 }}
-                            onClick={(e) => e.stopPropagation()}
-                            className="w-full max-w-sm bg-surface-container-lowest dark:bg-slate-900 border border-outline-variant/40 dark:border-slate-800 rounded-3xl p-5 shadow-2xl space-y-4"
-                          >
-                            <div className="flex items-center justify-between border-b border-outline-variant/20 dark:border-slate-800 pb-3">
-                              <div className="flex items-center gap-2.5">
-                                <div className="p-2.5 bg-primary/10 rounded-2xl">
-                                  <Info className="w-5 h-5 text-primary" />
-                                </div>
-                                <div>
-                                  <h3 className="font-outfit font-black text-base text-on-surface dark:text-white">
-                                    Calculation Breakdown
-                                  </h3>
-                                  <p className="text-[11px] text-on-surface-variant dark:text-slate-400 font-medium">
-                                    {summaryMode === 'monthly' ? 'Total Monthly Spending Formula' : 'Total Weekly Spending Formula'}
-                                  </p>
-                                </div>
-                              </div>
-                              <button 
-                                type="button"
-                                onClick={() => setShowCalcTooltip(false)}
-                                className="w-8 h-8 rounded-full bg-surface-container-high dark:bg-slate-800 text-on-surface-variant dark:text-slate-300 hover:text-on-surface flex items-center justify-center font-bold text-xs cursor-pointer transition-colors"
-                              >
-                                ✕
-                              </button>
-                            </div>
-
-                            <div className="space-y-2.5 text-xs">
-                              <div className="flex justify-between items-center p-3 rounded-2xl bg-surface-container-low dark:bg-slate-800/60 border border-outline-variant/20">
-                                <span className="text-on-surface-variant dark:text-slate-300 font-medium">Logged Purchases</span>
-                                <span className="font-mono font-extrabold text-on-surface dark:text-white text-sm">
-                                  {formatCurrency(Math.abs(currentMonthTxs.filter(t => t.amount < 0).reduce((sum, t) => sum + t.amount, 0)))}
-                                </span>
-                              </div>
-
-                              <div className="flex justify-between items-center p-3 rounded-2xl bg-surface-container-low dark:bg-slate-800/60 border border-outline-variant/20">
-                                <span className="text-on-surface-variant dark:text-slate-300 font-medium">Active Subscriptions</span>
-                                <span className="font-mono font-extrabold text-on-surface dark:text-white text-sm">
-                                  {formatCurrency(activeSubsTotal)}
-                                </span>
-                              </div>
-
-                              <div className="flex justify-between items-center p-3.5 rounded-2xl bg-primary/10 border border-primary/20">
-                                <span className="font-bold text-primary">Total Calculated Outflow</span>
-                                <span className="font-mono font-black text-primary text-base">
-                                  {formatCurrency(totalExpenses)}
-                                </span>
-                              </div>
-                            </div>
-
-                            <button
-                              type="button"
-                              onClick={() => setShowCalcTooltip(false)}
-                              className="w-full py-3 bg-primary hover:bg-primary/90 text-on-primary font-bold text-xs rounded-2xl shadow-xs transition-all cursor-pointer"
-                            >
-                              Got It
-                            </button>
-                          </motion.div>
-                        </div>
-                      )}
-                    </AnimatePresence>
-                  </div>
-
-                  {/* Row 3: Pills — MoM + budget health with RizzEat style */}
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    {/* MoM Comparison Pill */}
-                    {summaryMode === 'monthly' && prevMonthExpenses > 0 && (
-                      <span className={`rizzeat-pill border shrink-0 ${
-                        monthlyDiffPercent <= 0 
-                          ? 'bg-emerald-500/15 text-emerald-500 dark:text-emerald-400 border-emerald-500/30' 
-                          : 'bg-rose-500/15 text-rose-500 dark:text-rose-400 border-rose-500/30'
-                      }`}>
-                        {monthlyDiffPercent <= 0 ? <TrendingDown className="w-3 h-3" /> : <TrendingUp className="w-3 h-3" />}
-                        <span>{monthlyDiffPercent <= 0 ? `${Math.abs(Math.round(monthlyDiffPercent))}% vs last mo` : `+${Math.round(monthlyDiffPercent)}% vs last mo`}</span>
-                      </span>
-                    )}
-
-                    {/* Comparison info pill */}
-                    {(() => {
-                      const comp = getComparisonInfo();
-                      return (
-                        <span className={`rizzeat-pill border shrink-0 ${
-                          comp.label === 'No comparative data'
-                            ? 'bg-surface-container text-on-surface-variant border-outline-variant/30'
-                            : comp.isLess
-                            ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20'
-                            : 'bg-error/10 text-error border-error/20'
-                        }`}>
-                          {comp.showIcon && (comp.isLess ? <TrendingDown className="w-2.5 h-2.5" /> : <TrendingUp className="w-2.5 h-2.5" />)}
-                          <span>{comp.label}</span>
-                        </span>
-                      );
-                    })()}
-
-                    {/* Budget health pill with pulsing live dot */}
-                    {hasBudget && (
-                      <span className={`rizzeat-pill border shrink-0 ${budgetHealth.bgClass} ${budgetHealth.colorClass} ${budgetHealth.borderClass}`}>
-                        <div className="rizzeat-pulse-dot">
-                          <span className={
-                            budgetHealth.label === 'On Track' 
-                              ? 'bg-emerald-400' 
-                              : budgetHealth.label.includes('Caution') 
-                              ? 'bg-amber-400' 
-                              : 'bg-rose-400'
-                          } />
-                          <span className={
-                            budgetHealth.label === 'On Track' 
-                              ? 'bg-emerald-500' 
-                              : budgetHealth.label.includes('Caution') 
-                              ? 'bg-amber-500' 
-                              : 'bg-rose-500'
-                          } />
-                        </div>
-                        <span>{budgetHealth.label}</span>
-                      </span>
-                    )}
-                  </div>
-                </section>
-              }
-              back={
-                <section className="bg-surface-container-high/90 dark:bg-surface-container/90 backdrop-blur-md p-3.5 sm:p-4 rounded-2xl border border-primary/30 shadow-3d flex flex-col justify-between h-full relative overflow-hidden">
-                  <div className="flex items-center justify-between border-b border-outline-variant/20 pb-2">
-                    <div className="flex items-center gap-1.5">
-                      <Sparkles className="w-4 h-4 text-primary" />
-                      <span className="text-[11px] font-bold text-on-surface uppercase tracking-wider">
-                        Spending Velocity & Health
-                      </span>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        triggerHaptic('light');
-                        setIsHeroFlipped(false);
-                      }}
-                      className="flex items-center gap-1 px-2 py-0.5 rounded-lg bg-primary text-on-primary text-[9px] font-bold shadow-2xs hover:bg-primary/90 transition-all cursor-pointer"
-                    >
-                      <RotateCw className="w-3 h-3" />
-                      <span>Done</span>
-                    </button>
-                  </div>
-
-                  {/* Micro Analytics Metrics */}
-                  <div className="grid grid-cols-3 gap-2 py-2">
-                    <div className="p-2 bg-surface-container-low rounded-xl text-center border border-outline-variant/20">
-                      <span className="text-[8px] font-bold text-on-surface-variant uppercase tracking-wider block">Daily Pace</span>
-                      <p className="font-mono text-xs font-black text-primary mt-0.5">
-                        {(() => {
-                          const today = new Date().getDate();
-                          const avg = today > 0 ? Math.round(activeExpenses / today) : activeExpenses;
-                          return formatCurrency(avg);
-                        })()}
-                      </p>
-                      <span className="text-[7px] text-on-surface-variant font-medium block">per day</span>
-                    </div>
-
-                    <div className="p-2 bg-surface-container-low rounded-xl text-center border border-outline-variant/20">
-                      <span className="text-[8px] font-bold text-on-surface-variant uppercase tracking-wider block">Top Category</span>
-                      <p className="font-title-md text-xs font-black text-on-surface truncate mt-0.5">
-                        {chartData.length > 0 ? chartData[0].name : 'None'}
-                      </p>
-                      <span className="text-[7px] text-on-surface-variant font-medium block">
-                        {chartData.length > 0 ? formatCurrency(chartData[0].value) : '₹0'}
-                      </span>
-                    </div>
-
-                    <div className="p-2 bg-surface-container-low rounded-xl text-center border border-outline-variant/20">
-                      <span className="text-[8px] font-bold text-on-surface-variant uppercase tracking-wider block">Remaining</span>
-                      <p className={`font-mono text-xs font-black mt-0.5 ${
-                        activeLimit - activeExpenses < 0 ? 'text-error' : 'text-emerald-600 dark:text-emerald-400'
-                      }`}>
-                        {formatCurrency(activeLimit - activeExpenses)}
-                      </p>
-                      <span className="text-[7px] text-on-surface-variant font-medium block">
-                        {activeLimit - activeExpenses < 0 ? 'over limit' : 'buffer'}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center justify-between text-[9px] text-on-surface-variant/80 pt-1 border-t border-outline-variant/15">
-                    <span>Tap anywhere or Done to return to card view</span>
-                    <span className="font-mono font-bold text-primary">SpendTrack 3D</span>
-                  </div>
-                </section>
-              }
-            />
-          </TiltCard3D>
+            {/* Segmented Toggle Control */}
+            <div className="flex bg-surface-container rounded-lg p-0.5 border border-outline-variant/35 shrink-0">
+              <button
+                id="summary-mode-monthly-btn"
+                type="button"
+                onClick={() => setSummaryMode('monthly')}
+                className={`px-2 py-0.5 rounded-md font-bold text-[9px] sm:text-[10px] uppercase tracking-wider transition-all cursor-pointer ${
+                  summaryMode === 'monthly'
+                    ? 'bg-primary text-on-primary shadow-2xs'
+                    : 'text-on-surface-variant hover:text-on-surface'
+                }`}
+              >
+                Monthly
+              </button>
+              <button
+                id="summary-mode-weekly-btn"
+                type="button"
+                onClick={() => setSummaryMode('weekly')}
+                className={`px-2 py-0.5 rounded-md font-bold text-[9px] sm:text-[10px] uppercase tracking-wider transition-all cursor-pointer ${
+                  summaryMode === 'weekly'
+                    ? 'bg-primary text-on-primary shadow-2xs'
+                    : 'text-on-surface-variant hover:text-on-surface'
+                }`}
+              >
+                Weekly
+              </button>
+            </div>
+          </div>
         </div>
 
-        {/* Bento Cell 2: Budget Health Radial Progress Section (Span 4 on Desktop) */}
-        {hasBudget && (
-          <div className="lg:col-span-4 flex flex-col">
-            <section className="p-4 sm:p-5 rounded-2xl bg-surface-container-low/90 backdrop-blur-md border border-outline-variant/30 shadow-sm rizzeat-bento-card flex flex-col justify-between h-full space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-1.5">
-                  <PieChartIcon className="w-4 h-4 text-primary" />
-                  <h3 className="font-outfit text-sm text-on-surface font-black tracking-tight uppercase">Budget Health</h3>
-                </div>
-                <span className={`rizzeat-pill border ${
-                  (activeExpenses / (activeLimit || 3000)) * 100 > 100 
-                    ? 'bg-error/10 text-error border-error/20' 
-                    : (activeExpenses / (activeLimit || 3000)) * 100 > 85 
-                      ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20' 
-                      : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20'
-                }`}>
-                  <div className="rizzeat-pulse-dot">
-                    <span className={
-                      (activeExpenses / (activeLimit || 3000)) * 100 > 100
-                        ? 'bg-error'
-                        : (activeExpenses / (activeLimit || 3000)) * 100 > 85
-                        ? 'bg-amber-400'
-                        : 'bg-emerald-400'
-                    } />
-                    <span className={
-                      (activeExpenses / (activeLimit || 3000)) * 100 > 100
-                        ? 'bg-error'
-                        : (activeExpenses / (activeLimit || 3000)) * 100 > 85
-                        ? 'bg-amber-500'
-                        : 'bg-emerald-500'
-                    } />
-                  </div>
-                  <span>
-                    {(activeExpenses / (activeLimit || 3000)) * 100 > 100 
-                      ? 'Over Budget' 
-                      : (activeExpenses / (activeLimit || 3000)) * 100 > 85 
-                        ? 'Approaching' 
-                        : 'Healthy'
-                    }
-                  </span>
-                </span>
-              </div>
+        {/* Row 2: Amount + info button */}
+        <div className="flex items-center gap-1.5 flex-wrap min-w-0">
+          <span className="font-headline-lg text-xl sm:text-2xl lg:text-3xl font-extrabold text-primary tracking-tight shrink-0">
+            {formatCurrency(activeExpenses)}
+          </span>
+          <button 
+            type="button"
+            onClick={() => setShowCalcTooltip(!showCalcTooltip)}
+            className="p-1 text-on-surface-variant/60 hover:text-primary transition-colors cursor-pointer shrink-0"
+            title="Calculation breakdown"
+          >
+            <Info className="w-3.5 h-3.5 text-primary" />
+          </button>
 
-              {/* Radial Chart & Stats side-by-side or stacked cleanly */}
-              <div className="flex items-center justify-around gap-2 py-1">
-                <div className="w-32 h-32 relative shrink-0">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <RadialBarChart 
-                      cx="50%" 
-                      cy="50%" 
-                      innerRadius="75%" 
-                      outerRadius="100%" 
-                      barSize={10} 
-                      data={[
-                        {
-                          name: 'Spent',
-                          value: Math.min(100, (activeExpenses / (activeLimit || 3000)) * 100),
-                          fill: (activeExpenses / (activeLimit || 3000)) * 100 > 100 
-                            ? themeError 
-                            : (activeExpenses / (activeLimit || 3000)) * 100 > 85 
-                              ? '#D97706' 
-                              : themeColors.primary
-                        }
-                      ]} 
-                      startAngle={90} 
-                      endAngle={-270}
-                    >
-                      <PolarAngleAxis
-                        type="number"
-                        domain={[0, 100]}
-                        angleAxisId={0}
-                        tick={false}
-                      />
-                      <RadialBar
-                        background={{ fill: 'rgba(0, 0, 0, 0.05)', stroke: 'none', strokeWidth: 0 }}
-                        dataKey="value"
-                        cornerRadius={6}
-                        stroke="none"
-                        strokeWidth={0}
-                        activeShape={false}
-                      />
-                    </RadialBarChart>
-                  </ResponsiveContainer>
-                  
-                  {/* Inner Center Text overlay */}
-                  <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                    <span className="text-[9px] uppercase font-bold text-on-surface-variant tracking-wider leading-none">
-                      Spent
-                    </span>
-                    <span className={`text-xl font-black font-mono mt-0.5 leading-none ${
-                      (activeExpenses / (activeLimit || 3000)) * 100 > 100 ? 'text-error animate-pulse' : 'text-on-surface'
-                    }`}>
-                      {Math.round((activeExpenses / (activeLimit || 3000)) * 100)}%
-                    </span>
-                    <span className="text-[8px] text-on-surface-variant font-medium mt-0.5 leading-none">
-                      of {formatCurrency(activeLimit || 3000)}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="space-y-2 flex-1 min-w-0">
-                  <div className="p-2 bg-surface-container-high/60 rounded-xl">
-                    <span className="text-[9px] font-bold text-on-surface-variant uppercase tracking-wider block">Limit</span>
-                    <p className="text-xs font-black text-on-surface font-mono">{formatCurrency(activeLimit || 3000)}</p>
-                  </div>
-                  <div className="p-2 bg-surface-container-high/60 rounded-xl">
-                    <span className="text-[9px] font-bold text-on-surface-variant uppercase tracking-wider block">Runway</span>
-                    <p className={`text-xs font-black font-mono ${
-                      activeLimit - activeExpenses < 0 ? 'text-error' : 'text-emerald-600 dark:text-emerald-400'
-                    }`}>
-                      {formatCurrency(activeLimit - activeExpenses)}
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Status footer quote */}
-              <div className="text-[11px] text-on-surface-variant leading-tight p-2 rounded-xl bg-primary/5 border border-primary/10">
-                {(activeExpenses / (activeLimit || 3000)) * 100 > 100 ? (
-                  <span className="text-error font-semibold">Exceeded budget limit. Stabilize discretionary expenses.</span>
-                ) : (activeExpenses / (activeLimit || 3000)) * 100 > 85 ? (
-                  <span>Approaching ceiling: <strong className="text-primary font-bold">{formatCurrency((activeLimit || 3000) - activeExpenses)}</strong> buffer left.</span>
-                ) : (
-                  <span>Budget health excellent: <strong className="text-emerald-600 dark:text-emerald-400 font-bold">{formatCurrency((activeLimit || 3000) - activeExpenses)}</strong> buffer remaining.</span>
-                )}
-              </div>
-            </section>
-          </div>
-        )}
-
-        {/* Bento Cell 3: AI Financial Insights (Span 3 on Desktop) */}
-        {(() => {
-          const nudges = getSpenderNudges();
-          if (nudges.length === 0) return null;
-          return (
-            <div className="lg:col-span-3 flex flex-col">
-              <section className="p-4 sm:p-5 rounded-2xl bg-surface-container-low/90 backdrop-blur-md border border-outline-variant/30 shadow-sm rizzeat-bento-card flex flex-col justify-between h-full space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-1.5">
-                    <Sparkles className="w-4 h-4 text-primary" />
-                    <h3 className="font-outfit text-sm text-on-surface font-black tracking-tight uppercase">
-                      AI Insights
-                    </h3>
-                  </div>
-                  <div className="rizzeat-pill bg-primary/10 text-primary border border-primary/20 select-none">
-                    <div className="rizzeat-pulse-dot">
-                      <span className="bg-primary/50"></span>
-                      <span className="bg-primary"></span>
-                    </div>
-                    <span>Autonomous</span>
-                  </div>
-                </div>
-
-                <div className="space-y-2 flex-1 overflow-y-auto max-h-56 pr-1">
-                  {nudges.map((nudge, idx) => (
-                    <div 
-                      key={idx}
-                      className={`p-2.5 sm:p-3 rounded-xl border text-xs flex items-start gap-2 shadow-2xs animate-fade-in ${
-                        nudge.type === 'warning' 
-                          ? 'bg-error/5 text-error border-error/15 dark:bg-error/10 dark:text-error-container' 
-                          : nudge.type === 'success'
-                          ? 'bg-emerald-500/5 text-emerald-700 border-emerald-500/15 dark:bg-emerald-500/10 dark:text-emerald-400'
-                          : 'bg-primary/5 text-primary border-primary/15 dark:bg-primary/10 dark:text-primary-container'
-                      }`}
-                    >
-                      <span className="p-1 rounded-lg bg-surface-container-lowest shadow-2xs shrink-0 mt-0.5">
-                        {nudge.type === 'warning' ? (
-                          <ShieldAlert className="w-3 h-3 text-error" />
-                        ) : nudge.type === 'success' ? (
-                          <TrendingDown className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
-                        ) : (
-                          <Sparkles className="w-3 h-3 text-primary" />
-                        )}
-                      </span>
-                      <div className="flex-1 leading-snug font-medium text-[11px]">
-                        {nudge.text}
+          {/* Calculation Breakdown Modal */}
+          <AnimatePresence>
+            {showCalcTooltip && (
+              <div 
+                className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fade-in"
+                onClick={() => setShowCalcTooltip(false)}
+              >
+                <motion.div 
+                  initial={{ opacity: 0, scale: 0.9, y: 10 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.9, y: 10 }}
+                  onClick={(e) => e.stopPropagation()}
+                  className="w-full max-w-sm bg-surface-container-lowest dark:bg-slate-900 border border-outline-variant/40 dark:border-slate-800 rounded-3xl p-5 shadow-2xl space-y-4"
+                >
+                  <div className="flex items-center justify-between border-b border-outline-variant/20 dark:border-slate-800 pb-3">
+                    <div className="flex items-center gap-2.5">
+                      <div className="p-2.5 bg-primary/10 rounded-2xl">
+                        <Info className="w-5 h-5 text-primary" />
+                      </div>
+                      <div>
+                        <h3 className="font-outfit font-black text-base text-on-surface dark:text-white">
+                          Calculation Breakdown
+                        </h3>
+                        <p className="text-[11px] text-on-surface-variant dark:text-slate-400 font-medium">
+                          {summaryMode === 'monthly' ? 'Total Monthly Spending Formula' : 'Total Weekly Spending Formula'}
+                        </p>
                       </div>
                     </div>
-                  ))}
-                </div>
+                    <button 
+                      type="button"
+                      onClick={() => setShowCalcTooltip(false)}
+                      className="w-8 h-8 rounded-full bg-surface-container-high dark:bg-slate-800 text-on-surface-variant dark:text-slate-300 hover:text-on-surface flex items-center justify-center font-bold text-xs cursor-pointer transition-colors"
+                    >
+                      ✕
+                    </button>
+                  </div>
 
-                <div className="text-[10px] text-on-surface-variant font-medium border-t border-outline-variant/15 pt-2 flex items-center justify-between">
-                  <span>Smart telemetry</span>
-                  <span className="text-primary font-bold">RizzEat ML</span>
-                </div>
-              </section>
-            </div>
-          );
-        })()}
+                  <div className="space-y-2.5 text-xs">
+                    <div className="flex justify-between items-center p-3 rounded-2xl bg-surface-container-low dark:bg-slate-800/60 border border-outline-variant/20">
+                      <span className="text-on-surface-variant dark:text-slate-300 font-medium">Logged Purchases</span>
+                      <span className="font-mono font-extrabold text-on-surface dark:text-white text-sm">
+                        {formatCurrency(Math.abs(currentMonthTxs.filter(t => t.amount < 0).reduce((sum, t) => sum + t.amount, 0)))}
+                      </span>
+                    </div>
 
-      </div>
+                    <div className="flex justify-between items-center p-3 rounded-2xl bg-surface-container-low dark:bg-slate-800/60 border border-outline-variant/20">
+                      <span className="text-on-surface-variant dark:text-slate-300 font-medium">Active Subscriptions</span>
+                      <span className="font-mono font-extrabold text-on-surface dark:text-white text-sm">
+                        {formatCurrency(activeSubsTotal)}
+                      </span>
+                    </div>
+
+                    <div className="flex justify-between items-center p-3.5 rounded-2xl bg-primary/10 border border-primary/20">
+                      <span className="font-bold text-primary">Total Calculated Outflow</span>
+                      <span className="font-mono font-black text-primary text-base">
+                        {formatCurrency(totalExpenses)}
+                      </span>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setShowCalcTooltip(false)}
+                    className="w-full py-3 bg-primary hover:bg-primary/90 text-on-primary font-bold text-xs rounded-2xl shadow-xs transition-all cursor-pointer"
+                  >
+                    Got It
+                  </button>
+                </motion.div>
+              </div>
+            )}
+          </AnimatePresence>
+        </div>
+
+        {/* Row 3: Pills — MoM + budget health */}
+        <div className="flex items-center gap-1.5 flex-wrap">
+          {/* MoM Comparison Pill */}
+          {summaryMode === 'monthly' && prevMonthExpenses > 0 && (
+            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-extrabold border shrink-0 ${
+              monthlyDiffPercent <= 0 
+                ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30' 
+                : 'bg-rose-500/15 text-rose-400 border-rose-500/30'
+            }`}>
+              {monthlyDiffPercent <= 0 ? <TrendingDown className="w-3 h-3" /> : <TrendingUp className="w-3 h-3" />}
+              <span>{monthlyDiffPercent <= 0 ? `${Math.abs(Math.round(monthlyDiffPercent))}% vs last mo` : `+${Math.round(monthlyDiffPercent)}% vs last mo`}</span>
+            </span>
+          )}
+
+          {/* Comparison info pill */}
+          {(() => {
+            const comp = getComparisonInfo();
+            return (
+              <span className={`font-label-md text-[9px] sm:text-[10px] flex items-center gap-0.5 px-2 py-0.5 rounded-full border shrink-0 ${
+                comp.label === 'No comparative data'
+                  ? 'bg-surface-container text-on-surface-variant border-outline-variant/30'
+                  : comp.isLess
+                  ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20'
+                  : 'bg-error/10 text-error border-error/20'
+              }`}>
+                {comp.showIcon && (comp.isLess ? <TrendingDown className="w-2.5 h-2.5" /> : <TrendingUp className="w-2.5 h-2.5" />)}
+                <span>{comp.label}</span>
+              </span>
+            );
+          })()}
+
+          {/* Budget health pill */}
+          {hasBudget && (
+            <span className={`font-label-md text-[9px] sm:text-[10px] flex items-center gap-1 px-2 py-0.5 rounded-full border shrink-0 ${budgetHealth.bgClass} ${budgetHealth.colorClass} ${budgetHealth.borderClass}`}>
+              <span className={`w-1.5 h-1.5 rounded-full ${
+                budgetHealth.label === 'On Track' 
+                  ? 'bg-emerald-500' 
+                  : budgetHealth.label.includes('Caution') 
+                  ? 'bg-amber-500 animate-pulse' 
+                  : 'bg-error animate-pulse'
+              }`} />
+              <span>{budgetHealth.label}</span>
+            </span>
+          )}
+        </div>
+      </section>
+
+
 
       {/* 1-Tap Cockpit Quick Shortcuts */}
       <QuickShortcutsWidget
@@ -1233,8 +999,6 @@ export default function DashboardTab({
         templates={budget?.quickTemplates}
         currency={budget?.currency || 'INR'}
         onLogTemplate={(tpl) => {
-          triggerHaptic('medium');
-          triggerSuccessBurst();
           const now = new Date();
           const yyyy = now.getFullYear();
           const mm = String(now.getMonth() + 1).padStart(2, '0');
@@ -1254,116 +1018,246 @@ export default function DashboardTab({
         }}
       />
 
-      {/* ── BENTO ROW 2 (Desktop Dual Columns: Recent Transactions vs Health 360 Radar & Heatmap) ── */}
-      <div className="flex flex-col lg:grid lg:grid-cols-12 gap-4 sm:gap-6 items-start">
-        
-        {/* Left Column: Recent Transactions (Span 7 on Desktop) */}
-        <section className="lg:col-span-7 w-full space-y-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <h3 className="font-outfit text-lg text-on-surface font-black tracking-tight">Recent Transactions</h3>
-              {activeCategoryFilter && (
-                <span className="text-[10px] font-bold bg-primary/10 text-primary border border-primary/20 px-2.5 py-0.5 rounded-full flex items-center gap-1 animate-fade-in">
-                  <span>{activeCategoryFilter}</span>
-                  <button 
-                    onClick={() => setActiveCategoryFilter(null)}
-                    className="hover:text-error transition-colors font-black cursor-pointer text-[12px] pl-0.5"
-                  >
-                    ×
-                  </button>
-                </span>
-              )}
-            </div>
-            <button 
-              onClick={onNavigateToHistory}
-              className="font-label-lg text-xs text-primary hover:underline flex items-center gap-0.5"
-            >
-              View All
-              <ChevronRight className="w-3.5 h-3.5" />
-            </button>
-          </div>
 
-          <div className="space-y-2">
-            {recentTransactions.length === 0 ? (
-              <div className="p-6 text-center bg-surface-container-lowest border border-outline-variant/30 rounded-2xl space-y-2">
-                <p className="text-xs text-on-surface-variant font-medium">No recent transactions logged yet.</p>
-                <button
-                  onClick={onAddTransactionClick}
-                  className="px-3.5 py-1.5 bg-primary text-on-primary text-xs font-bold rounded-xl shadow-xs"
+
+      {/* High Priority #1: Recent Transactions (Immediate Daily Log Access) */}
+      <section className="space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <h3 className="font-outfit text-lg text-on-surface font-black tracking-tight">Recent Transactions</h3>
+            {activeCategoryFilter && (
+              <span className="text-[10px] font-bold bg-primary/10 text-primary border border-primary/20 px-2.5 py-0.5 rounded-full flex items-center gap-1 animate-fade-in">
+                <span>{activeCategoryFilter}</span>
+                <button 
+                  onClick={() => setActiveCategoryFilter(null)}
+                  className="hover:text-error transition-colors font-black cursor-pointer text-[12px] pl-0.5"
                 >
-                  <PressSlideText>+ Log First Expense</PressSlideText>
+                  ×
                 </button>
-              </div>
-            ) : (
-              recentTransactions.map((tx, idx) => {
-                const config = getCategoryConfig(tx.category);
-                const IconComponent = config.icon;
-                const isExpense = tx.amount < 0;
-
-                return (
-                  <RevealOnScroll key={tx.id} stagger={idx}>
-                    <Card3D
-                      depth={4}
-                      scaleOnHover={1.012}
-                      glare={true}
-                      onClick={() => setSelectedTx(tx)}
-                      className="rounded-xl"
-                    >
-                      <div 
-                        id={`transaction-row-${tx.id}`}
-                        className="flex items-center justify-between p-2.5 sm:p-3 bg-surface-container-lowest rounded-xl border border-outline-variant/30 transition-all cursor-pointer group active:bg-surface-container-high/50"
-                      >
-                        <div className="flex items-center gap-2.5">
-                          <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center ${config.bg} shadow-2xs shrink-0`}>
-                            <IconComponent className="w-4 h-4 text-on-surface" />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="font-title-md text-xs sm:text-sm text-on-surface font-bold truncate group-hover:text-primary transition-colors">
-                              {tx.title}
-                            </div>
-                            <div className="text-[11px] text-on-surface-variant font-medium truncate">
-                              {tx.category} • {formatDateLabel(tx.date)}, {tx.time}
-                            </div>
-                          </div>
-                        </div>
-                        <div className="text-right ml-2 flex flex-col items-end shrink-0">
-                          <div className={`font-mono text-xs sm:text-sm font-bold ${isExpense ? 'text-on-surface' : 'text-emerald-600 dark:text-emerald-400'}`}>
-                            {isExpense ? '' : '+'}{formatCurrency(Math.abs(tx.amount))}
-                          </div>
-                          <span className="inline-block px-1.5 py-0.5 mt-0.5 text-[9px] font-medium bg-surface-variant text-on-surface-variant rounded-md">
-                            {tx.label}
-                          </span>
-                        </div>
-                      </div>
-                    </Card3D>
-                  </RevealOnScroll>
-                );
-              })
+              </span>
             )}
           </div>
-        </section>
-
-        {/* Right Column: Financial Health 360 Radar & No-Spend Heatmap (Span 5 on Desktop) */}
-        <div className="lg:col-span-5 w-full space-y-4 sm:space-y-6">
-          <div ref={healthRadarRef} className="space-y-3">
-            <FinancialHealthRadarCard
-              transactions={transactions}
-              budget={budget}
-              subscriptions={subscriptions}
-              currency={budget?.currency || 'INR'}
-              onNavigateToSettings={onNavigateToSettings}
-            />
-          </div>
-
-          <div ref={noSpendRef} className="space-y-3">
-            <NoSpendHeatmapCard
-              transactions={transactions}
-              budget={budget}
-            />
-          </div>
+          <button 
+            onClick={onNavigateToHistory}
+            className="font-label-lg text-xs text-primary hover:underline flex items-center gap-0.5"
+          >
+            View All
+            <ChevronRight className="w-3.5 h-3.5" />
+          </button>
         </div>
 
-      </div>
+        <div className="space-y-2">
+          {recentTransactions.length === 0 ? (
+            <div className="p-6 text-center bg-surface-container-lowest border border-outline-variant/30 rounded-2xl space-y-2">
+              <p className="text-xs text-on-surface-variant font-medium">No recent transactions logged yet.</p>
+              <button
+                onClick={onAddTransactionClick}
+                className="px-3.5 py-1.5 bg-primary text-on-primary text-xs font-bold rounded-xl shadow-xs"
+              >
+                + Log First Expense
+              </button>
+            </div>
+          ) : (
+            recentTransactions.map((tx) => {
+              const config = getCategoryConfig(tx.category);
+              const IconComponent = config.icon;
+              const isExpense = tx.amount < 0;
+
+              return (
+                <div 
+                  id={`transaction-row-${tx.id}`}
+                  key={tx.id}
+                  onClick={() => setSelectedTx(tx)}
+                  className="flex items-center justify-between p-2.5 sm:p-3 bg-surface-container-lowest rounded-xl border border-outline-variant/30 transition-all cursor-pointer group active:scale-[0.98] active:bg-surface-container-high/50"
+                >
+                  <div className="flex items-center gap-2.5">
+                    <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center ${config.bg} shadow-2xs shrink-0`}>
+                      <IconComponent className="w-4 h-4 text-on-surface" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="font-title-md text-xs sm:text-sm text-on-surface font-bold truncate group-hover:text-primary transition-colors">
+                        {tx.title}
+                      </div>
+                      <div className="text-[11px] text-on-surface-variant font-medium truncate">
+                        {tx.category} • {formatDateLabel(tx.date)}, {tx.time}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="text-right ml-2 flex flex-col items-end shrink-0">
+                    <div className={`font-mono text-xs sm:text-sm font-bold ${isExpense ? 'text-on-surface' : 'text-emerald-600 dark:text-emerald-400'}`}>
+                      {isExpense ? '' : '+'}{formatCurrency(Math.abs(tx.amount))}
+                    </div>
+                    <span className="inline-block px-1.5 py-0.5 mt-0.5 text-[9px] font-medium bg-surface-variant text-on-surface-variant rounded-md">
+                      {tx.label}
+                    </span>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+      </section>
+
+
+
+      {/* AI Spending Insights (Nudges) */}
+      {(() => {
+        const nudges = getSpenderNudges();
+        if (nudges.length === 0) return null;
+        return (
+          <div className="grid grid-cols-1 gap-2.5">
+            {nudges.map((nudge, idx) => (
+              <div 
+                key={idx}
+                className={`p-3.5 rounded-2xl border text-xs flex items-start gap-2.5 shadow-2xs animate-fade-in ${
+                  nudge.type === 'warning' 
+                    ? 'bg-error/5 text-error border-error/15 dark:bg-error/10 dark:text-error-container' 
+                    : nudge.type === 'success'
+                    ? 'bg-emerald-500/5 text-emerald-700 border-emerald-500/15 dark:bg-emerald-500/10 dark:text-emerald-400'
+                    : 'bg-primary/5 text-primary border-primary/15 dark:bg-primary/10 dark:text-primary-container'
+                }`}
+              >
+                <span className="p-1 rounded-full bg-surface-container-lowest shrink-0">
+                  {nudge.type === 'warning' ? (
+                    <ShieldAlert className="w-3.5 h-3.5 text-error" />
+                  ) : nudge.type === 'success' ? (
+                    <TrendingDown className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                  ) : (
+                    <Sparkles className="w-3.5 h-3.5 text-primary" />
+                  )}
+                </span>
+                <div className="flex-1 leading-normal font-medium">
+                  {nudge.text}
+                </div>
+              </div>
+            ))}
+          </div>
+        );
+      })()}
+
+
+
+      {/* Budget Health Radial Progress Section */}
+      {hasBudget && (
+        <section className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h3 className="font-outfit text-lg text-on-surface font-black tracking-tight">Budget Health</h3>
+            <span className={`text-xs font-semibold px-2.5 py-1 rounded-full border ${
+              (activeExpenses / (activeLimit || 3000)) * 100 > 100 
+                ? 'bg-error/10 text-error border-error/20' 
+                : (activeExpenses / (activeLimit || 3000)) * 100 > 85 
+                  ? 'bg-amber-500/10 text-amber-600 border-amber-500/20'
+                  : 'bg-primary/10 text-primary border-primary/20'
+            }`}>
+              {(activeExpenses / (activeLimit || 3000)) * 100 > 100 
+                ? 'Over Budget' 
+                : (activeExpenses / (activeLimit || 3000)) * 100 > 85 
+                  ? 'Approaching Limit' 
+                  : 'Healthy Budget'
+              }
+            </span>
+          </div>
+
+          <div className="p-5 rounded-2xl bg-surface-container-low border border-outline-variant/30 shadow-sm grid grid-cols-1 md:grid-cols-12 gap-6 items-center">
+            {/* Radial Chart Area */}
+            <div className="md:col-span-5 h-44 relative flex items-center justify-center">
+              <div className="w-40 h-40 relative">
+                <ResponsiveContainer width="100%" height="100%">
+                  <RadialBarChart 
+                    cx="50%" 
+                    cy="50%" 
+                    innerRadius="75%" 
+                    outerRadius="100%" 
+                    barSize={12} 
+                    data={[
+                      {
+                        name: 'Spent',
+                        value: Math.min(100, (activeExpenses / (activeLimit || 3000)) * 100),
+                        fill: (activeExpenses / (activeLimit || 3000)) * 100 > 100 
+                          ? themeError 
+                          : (activeExpenses / (activeLimit || 3000)) * 100 > 85 
+                            ? '#D97706' 
+                            : themeColors.primary
+                      }
+                    ]} 
+                    startAngle={90} 
+                    endAngle={-270}
+                  >
+                    <PolarAngleAxis
+                      type="number"
+                      domain={[0, 100]}
+                      angleAxisId={0}
+                      tick={false}
+                    />
+                    <RadialBar
+                      background={{ fill: 'rgba(0, 0, 0, 0.05)', stroke: 'none', strokeWidth: 0 }}
+                      dataKey="value"
+                      cornerRadius={6}
+                      stroke="none"
+                      strokeWidth={0}
+                      activeShape={false}
+                    />
+                  </RadialBarChart>
+                </ResponsiveContainer>
+                
+                {/* Inner Center Text overlay */}
+                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                  <span className="text-[10px] uppercase font-bold text-on-surface-variant tracking-wider leading-none">
+                    Spent
+                  </span>
+                  <span className={`text-2xl font-black font-mono mt-1 leading-none ${
+                    (activeExpenses / (activeLimit || 3000)) * 100 > 100 ? 'text-error animate-pulse' : 'text-on-surface'
+                  }`}>
+                    {Math.round((activeExpenses / (activeLimit || 3000)) * 100)}%
+                  </span>
+                  <span className="text-[9px] text-on-surface-variant font-medium mt-1 leading-none">
+                    of {formatCurrency(activeLimit || 3000)}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Budget Statistics Area */}
+            <div className="md:col-span-7 space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="p-3 bg-surface-container-high/60 rounded-xl space-y-1">
+                  <span className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider block">Total Spent</span>
+                  <p className="text-base font-extrabold text-on-surface font-mono">{formatCurrency(activeExpenses)}</p>
+                  <span className="text-[9px] text-on-surface-variant/80 block">
+                    {summaryMode === 'monthly' ? 'Incl. Subscriptions' : 'Incl. Subscriptions (Pro-rated)'}
+                  </span>
+                </div>
+                <div className="p-3 bg-surface-container-high/60 rounded-xl space-y-1">
+                  <span className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider block">
+                    {summaryMode === 'monthly' ? 'Monthly Limit' : 'Weekly Limit'}
+                  </span>
+                  <p className="text-base font-extrabold text-on-surface font-mono">{formatCurrency(activeLimit || 3000)}</p>
+                  <span className="text-[9px] text-on-surface-variant/80 block">
+                    {summaryMode === 'monthly' ? 'Configurable in Settings' : 'Estimated (1/4.33 of monthly)'}
+                  </span>
+                </div>
+              </div>
+
+              {/* Narrative Context */}
+              <div className="p-3 rounded-xl bg-primary/5 border border-primary/10 text-xs text-on-surface-variant leading-relaxed">
+                {(activeExpenses / (activeLimit || 3000)) * 100 > 100 ? (
+                  <p>
+                    ⚠️ You have exceeded your {summaryMode} limit by <strong className="text-error font-bold">{formatCurrency(activeExpenses - (activeLimit || 3000))}</strong>. We strongly recommend visiting the settings tab or pruning non-essential subscription costs to stabilize your financial runway.
+                  </p>
+                ) : (activeExpenses / (activeLimit || 3000)) * 100 > 85 ? (
+                  <p>
+                    ⚠️ You have utilized <strong className="font-bold">{Math.round((activeExpenses / (activeLimit || 3000)) * 100)}%</strong> of your {summaryMode} allocation. There is <strong className="font-bold text-primary">{formatCurrency((activeLimit || 3000) - activeExpenses)}</strong> remaining. Try to avoid high-discretionary purchases until the next billing cycle.
+                  </p>
+                ) : (
+                  <p>
+                    🟢 Your {summaryMode} budget health is currently <strong className="text-primary font-bold">Excellent</strong>! You have only spent <strong className="font-bold">{Math.round((activeExpenses / (activeLimit || 3000)) * 100)}%</strong> of your target cap. You have a comfortable buffer of <strong className="font-bold text-primary">{formatCurrency((activeLimit || 3000) - activeExpenses)}</strong> left.
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* ── Visual Summary ─────────────────────────────────────── */}
       <section className="space-y-3">
@@ -1427,8 +1321,8 @@ export default function DashboardTab({
             </span>
           )}
         </div>
-        {/* Card - RizzEat Bento Aesthetic */}
-        <div className="p-4 sm:p-5 rounded-2xl bg-surface-container-low border border-outline-variant/30 shadow-sm rizzeat-bento-card">
+        {/* Card */}
+        <div className="p-4 sm:p-5 rounded-2xl bg-surface-container-low border border-outline-variant/30 shadow-sm">
           {chartData.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-10 text-center space-y-2">
               <div className="p-3 bg-surface-container-high rounded-full text-on-surface-variant">
@@ -1520,12 +1414,7 @@ export default function DashboardTab({
                               {focusedItem.name}
                             </span>
                             <span style={{ fontSize: '14px', fontWeight: 900, fontFamily: 'monospace', color: 'var(--color-on-surface,#1c1b1f)', marginTop: '3px', lineHeight: 1.1, maxWidth: '96px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                              <RollingNumber
-                                value={focusedItem.value}
-                                prefix={getCurrencySymbol(budget?.currency || 'INR')}
-                                locale={getCurrencyLocale(budget?.currency || 'INR')}
-                                duration={500}
-                              />
+                              {formatCurrency(focusedItem.value)}
                             </span>
                             <span style={{ fontSize: '10px', fontWeight: 700, color: focusedItem.color, marginTop: '4px', background: `${focusedItem.color}22`, padding: '1px 6px', borderRadius: '99px', lineHeight: 1.6 }}>
                               {totalSpendingForMonth > 0 ? ((focusedItem.value / totalSpendingForMonth) * 100).toFixed(1) : 0}%
@@ -1537,12 +1426,7 @@ export default function DashboardTab({
                               Total
                             </span>
                             <span style={{ fontSize: '14px', fontWeight: 900, fontFamily: 'monospace', color: 'var(--color-on-surface,#1c1b1f)', marginTop: '3px', lineHeight: 1.1, maxWidth: '96px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                              <RollingNumber
-                                value={totalSpendingForMonth}
-                                prefix={getCurrencySymbol(budget?.currency || 'INR')}
-                                locale={getCurrencyLocale(budget?.currency || 'INR')}
-                                duration={600}
-                              />
+                              {formatCurrency(totalSpendingForMonth)}
                             </span>
                             <span style={{ fontSize: '9px', fontWeight: 500, color: 'var(--color-on-surface-variant,#49454f)', marginTop: '4px', opacity: 0.75 }}>
                               {chartData.length} {chartData.length === 1 ? 'category' : 'categories'}
@@ -1649,12 +1533,12 @@ export default function DashboardTab({
                               </span>
                               <span className="font-mono text-on-surface-variant">{formatCurrency(limitVal)}</span>
                             </div>
-                            <AnimatedProgressBar
-                              percentage={limitVal > 0 ? (item.value / limitVal) * 100 : 0}
-                              heightClassName="h-1"
-                              showThresholdColors={false}
-                              barClassName={isOver ? 'bg-error animate-pulse' : 'bg-primary'}
-                            />
+                            <div className="w-full h-1 bg-surface-container rounded-full overflow-hidden">
+                              <div
+                                className={`h-full rounded-full transition-all duration-500 ${isOver ? 'bg-error animate-pulse' : 'bg-primary'}`}
+                                style={{ width: `${Math.min(100, (item.value / limitVal) * 100)}%` }}
+                              />
+                            </div>
                           </div>
                         )}
                       </div>
@@ -1821,7 +1705,7 @@ export default function DashboardTab({
                   type="submit"
                   className="px-4 py-1.5 bg-primary text-on-primary rounded-lg text-xs font-bold hover:bg-primary/95 transition-colors shadow-xs cursor-pointer"
                 >
-                  <PressSlideText>Save Subscription</PressSlideText>
+                  Save Subscription
                 </button>
               </div>
             </form>
@@ -2266,7 +2150,830 @@ export default function DashboardTab({
     )}
   </section>
 
+      </div>
 
+      {/* ── DESKTOP BENTO COCKPIT (Visible on lg+, Hidden on Mobile) ── */}
+      <div className="hidden lg:block space-y-6 animate-fade-in">
+        
+        {/* ── BENTO ROW 1: Hero Card + Budget Health Ring + Smart Intel ── */}
+        <div className="grid grid-cols-12 gap-6 items-stretch">
+          
+          {/* Bento Cell 1: Luxury Virtual Metallic Card (Col 6) */}
+          <div className="col-span-6 flex flex-col">
+            <div className="p-6 rounded-3xl bg-gradient-to-br from-slate-900 via-[#0D1424] to-[#080D1A] text-white border border-white/10 shadow-2xl relative overflow-hidden flex flex-col justify-between min-h-[300px] rizzeat-bento-card group">
+              {/* Subtle ambient light gradient inside card */}
+              <div className="absolute top-0 right-0 w-80 h-80 bg-primary/10 rounded-full blur-3xl pointer-events-none" />
+              <div className="absolute -bottom-20 -left-20 w-60 h-60 bg-secondary/10 rounded-full blur-2xl pointer-events-none" />
+
+              {/* Trajectory Area Chart Spline (subtle background telemetry) */}
+              {!isHeroFlipped && (
+                <div className="absolute right-0 bottom-14 w-72 h-24 opacity-35 pointer-events-none">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={spendingTrendData}>
+                      <defs>
+                        <linearGradient id="desktopSpline" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor={themeColors.primary} stopOpacity={0.8}/>
+                          <stop offset="95%" stopColor={themeColors.primary} stopOpacity={0}/>
+                        </linearGradient>
+                      </defs>
+                      <Area type="monotone" dataKey="amount" stroke={themeColors.primary} strokeWidth={2.5} fillOpacity={1} fill="url(#desktopSpline)" />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
+
+              {/* Row 1: Card Type + 3D Studio + Mode Toggle */}
+              <div className="relative z-10 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-7 rounded-md bg-gradient-to-r from-amber-300 via-amber-200 to-yellow-400 p-1 flex items-center justify-center shadow-inner">
+                    <div className="w-full h-full border border-amber-600/40 rounded-sm grid grid-cols-2 gap-0.5 opacity-75">
+                      <div className="bg-amber-600/30" />
+                      <div className="bg-amber-600/30" />
+                    </div>
+                  </div>
+                  <div>
+                    <span className="text-[11px] font-black font-mono tracking-wider text-slate-300 uppercase block">SpendTrack Platinum</span>
+                    <span className="text-[9px] text-slate-400 font-mono">3D Dynamic Outflow Engine</span>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      triggerHaptic('medium');
+                      setIs3DModalOpen(true);
+                    }}
+                    title="Open Interactive 3D WebGL Studio"
+                    aria-label="3D WebGL Studio"
+                    className="px-2.5 py-1 rounded-lg bg-gradient-to-r from-primary/20 via-secondary/20 to-primary/20 hover:from-primary/30 hover:to-secondary/30 text-primary border border-primary/40 transition-all cursor-pointer flex items-center gap-1.5 text-xs font-mono font-bold shadow-xs active:scale-95"
+                  >
+                    <Sparkles className="w-3.5 h-3.5" />
+                    <span>3D Studio</span>
+                  </button>
+
+                  <div className="flex items-center bg-white/10 p-0.5 rounded-lg border border-white/10 text-[10px]">
+                    <button
+                      type="button"
+                      onClick={() => setHeroMode('3d')}
+                      className={`px-2 py-0.5 rounded-md font-bold transition-all cursor-pointer ${
+                        heroMode === '3d' ? 'bg-primary text-black shadow-xs' : 'text-slate-300 hover:text-white'
+                      }`}
+                    >
+                      3D Card
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setHeroMode('stats');
+                        setIsHeroFlipped(false);
+                      }}
+                      className={`px-2 py-0.5 rounded-md font-bold transition-all cursor-pointer ${
+                        heroMode === 'stats' && !isHeroFlipped ? 'bg-primary text-black shadow-xs' : 'text-slate-300 hover:text-white'
+                      }`}
+                    >
+                      Stats
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setHeroMode('stats');
+                        setIsHeroFlipped(true);
+                      }}
+                      className={`px-2 py-0.5 rounded-md font-bold transition-all cursor-pointer ${
+                        heroMode === 'stats' && isHeroFlipped ? 'bg-primary text-black shadow-xs' : 'text-slate-300 hover:text-white'
+                      }`}
+                    >
+                      Pace
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Row 2: Content (Amount or Flip Stats or 3D WebGL Card) */}
+              <div className="relative z-10 py-2">
+                {heroMode === '3d' ? (
+                  <div className="h-[180px] w-full flex items-center justify-center">
+                    <ThreeDCardCanvas
+                      balance={activeExpenses}
+                      currencySymbol={getCurrencySymbol(budget?.currency || 'INR')}
+                      cardHolder={profile.name || 'Alexander Chen'}
+                      compact={true}
+                    />
+                  </div>
+                ) : !isHeroFlipped ? (
+                  <div className="space-y-1 py-2">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-bold uppercase tracking-widest text-slate-400">
+                        {summaryMode === 'monthly' ? 'Monthly Committed Outflow' : 'Weekly Committed Outflow'}
+                      </span>
+                      {hasBudget && (
+                        <span className={`text-[9px] font-extrabold px-2 py-0.5 rounded-full border ${
+                          (activeExpenses / (activeLimit || 3000)) * 100 > 100 
+                            ? 'bg-rose-500/20 text-rose-300 border-rose-500/30' 
+                            : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
+                        }`}>
+                          {Math.round((activeExpenses / (activeLimit || 3000)) * 100)}% cap
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-baseline gap-3">
+                      <h2 className="text-4xl sm:text-5xl font-mono font-black tracking-tight text-white drop-shadow-sm">
+                        {formatCurrency(activeExpenses)}
+                      </h2>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-3 gap-3 py-1">
+                    <div className="p-3 bg-white/5 border border-white/10 rounded-2xl">
+                      <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Daily Pace</span>
+                      <p className="font-mono text-base font-black text-white mt-0.5">
+                        {(() => {
+                          const today = new Date().getDate();
+                          const avg = today > 0 ? Math.round(activeExpenses / today) : activeExpenses;
+                          return formatCurrency(avg);
+                        })()}
+                      </p>
+                      <span className="text-[8px] text-slate-400">Avg / day</span>
+                    </div>
+
+                    <div className="p-3 bg-white/5 border border-white/10 rounded-2xl">
+                      <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Top Category</span>
+                      <p className="text-sm font-black text-white truncate mt-0.5">
+                        {chartData.length > 0 ? chartData[0].name : 'None'}
+                      </p>
+                      <span className="text-[8px] text-slate-400">
+                        {chartData.length > 0 ? formatCurrency(chartData[0].value) : '₹0'}
+                      </span>
+                    </div>
+
+                    <div className="p-3 bg-white/5 border border-white/10 rounded-2xl">
+                      <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Remaining Cap</span>
+                      <p className={`font-mono text-base font-black mt-0.5 ${
+                        activeLimit - activeExpenses < 0 ? 'text-rose-400' : 'text-emerald-400'
+                      }`}>
+                        {formatCurrency(activeLimit - activeExpenses)}
+                      </p>
+                      <span className="text-[8px] text-slate-400">
+                        {activeLimit - activeExpenses < 0 ? 'Over limit' : 'Buffer'}
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Row 3: Cardholder info + Quick Actions */}
+              <div className="relative z-10 flex items-center justify-between border-t border-white/10 pt-3.5">
+                <div className="flex items-center gap-4 text-xs font-mono text-slate-300">
+                  <span className="font-bold tracking-wider uppercase">{profile.name || 'Personal Account'}</span>
+                  <span className="text-slate-500">•</span>
+                  <span className="text-[10px] text-slate-400 font-mono">VAL THRU 12/28</span>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={onAddTransactionClick}
+                    className="px-3.5 py-1.5 bg-primary text-on-primary rounded-xl text-xs font-bold hover:bg-primary/90 active:scale-95 transition-all shadow-md flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Log Outflow</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Bento Cell 2: VisionOS Budget Health Radial Gauge / 3D Extruded Donut (Col 3) */}
+          <div className="col-span-3 flex flex-col">
+            <div className="p-5 rounded-3xl bg-surface-container-low/90 backdrop-blur-md border border-outline-variant/30 shadow-sm flex flex-col justify-between h-full rizzeat-bento-card space-y-3">
+              <div className="flex items-center justify-between border-b border-outline-variant/20 dark:border-white/5 pb-2">
+                <div className="flex items-center gap-1.5">
+                  <LucidePieChart className="w-4 h-4 text-primary" />
+                  <h3 className="font-outfit text-xs font-black text-on-surface uppercase tracking-wider">3D Wealth Rings</h3>
+                </div>
+                <div className="flex items-center gap-1 bg-surface-container-high/80 dark:bg-black/50 p-0.5 rounded-lg border border-outline-variant/30 dark:border-white/10 text-[10px]">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      triggerHaptic('light');
+                      setDonutMode('3d');
+                    }}
+                    className={`px-2 py-0.5 rounded-md font-bold transition-all cursor-pointer ${
+                      donutMode === '3d'
+                        ? 'bg-primary text-black shadow-xs'
+                        : 'text-on-surface-variant hover:text-on-surface'
+                    }`}
+                  >
+                    3D WebGL
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      triggerHaptic('light');
+                      setDonutMode('rings');
+                    }}
+                    className={`px-2 py-0.5 rounded-md font-bold transition-all cursor-pointer ${
+                      donutMode === 'rings'
+                        ? 'bg-primary text-black shadow-xs'
+                        : 'text-on-surface-variant hover:text-on-surface'
+                    }`}
+                  >
+                    2D Rings
+                  </button>
+                </div>
+              </div>
+
+              {donutMode === '3d' ? (
+                <div className="h-44 w-full flex items-center justify-center relative overflow-hidden rounded-2xl">
+                  <ThreeDDonutCanvas
+                    categories={rings3dData}
+                    totalSpent={activeExpenses}
+                    totalBudget={activeLimit}
+                    currencySymbol={getCurrencySymbol(budget?.currency || 'INR')}
+                  />
+                </div>
+              ) : (
+                /* Radial Chart */
+                <div className="flex items-center justify-center relative py-1">
+                  <div className="w-32 h-32 relative flex items-center justify-center">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <RadialBarChart 
+                        cx="50%" 
+                        cy="50%" 
+                        innerRadius="75%" 
+                        outerRadius="100%" 
+                        barSize={10} 
+                        data={[
+                          {
+                            name: 'Spent',
+                            value: Math.min(100, (activeExpenses / (activeLimit || 3000)) * 100),
+                            fill: (activeExpenses / (activeLimit || 3000)) * 100 > 100 
+                              ? themeError 
+                              : (activeExpenses / (activeLimit || 3000)) * 100 > 85 
+                                ? '#D97706' 
+                                : themeColors.primary
+                          }
+                        ]} 
+                        startAngle={90} 
+                        endAngle={-270}
+                      >
+                        <PolarAngleAxis
+                          type="number"
+                          domain={[0, 100]}
+                          angleAxisId={0}
+                          tick={false}
+                        />
+                        <RadialBar
+                          background={{ fill: activeIsDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)' }}
+                          dataKey="value"
+                          cornerRadius={6}
+                        />
+                      </RadialBarChart>
+                    </ResponsiveContainer>
+                    <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                      <span className="font-mono text-xl font-black text-on-surface">
+                        {Math.round((activeExpenses / (activeLimit || 3000)) * 100)}%
+                      </span>
+                      <span className="text-[8px] font-bold text-on-surface-variant uppercase tracking-wider">Used</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div className="border-t border-outline-variant/20 pt-2.5 flex justify-between items-center text-xs font-mono">
+                <span className="text-[10px] text-on-surface-variant font-medium">Spent: <strong className="text-on-surface">{formatCurrency(activeExpenses)}</strong></span>
+                <span className="text-[10px] text-on-surface-variant font-medium">Cap: <strong className="text-on-surface">{formatCurrency(activeLimit)}</strong></span>
+              </div>
+            </div>
+          </div>
+
+          {/* Bento Cell 3: Smart Insights Telemetry (Col 3) */}
+          <div className="col-span-3 flex flex-col">
+            <div className="p-5 rounded-3xl bg-surface-container-low/90 backdrop-blur-md border border-outline-variant/30 shadow-sm flex flex-col justify-between h-full rizzeat-bento-card space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1.5">
+                  <Sparkles className="w-4 h-4 text-primary" />
+                  <h3 className="font-outfit text-xs font-black text-on-surface uppercase tracking-wider">Smart Intel</h3>
+                </div>
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => setSmartInsightSlide((prev) => (prev > 0 ? prev - 1 : 2))}
+                    className="p-1 rounded-md hover:bg-surface-container-high text-on-surface-variant cursor-pointer"
+                  >
+                    <ChevronLeft className="w-3 h-3" />
+                  </button>
+                  <span className="text-[9px] font-mono text-on-surface-variant">{smartInsightSlide + 1}/3</span>
+                  <button
+                    type="button"
+                    onClick={() => setSmartInsightSlide((prev) => (prev < 2 ? prev + 1 : 0))}
+                    className="p-1 rounded-md hover:bg-surface-container-high text-on-surface-variant cursor-pointer"
+                  >
+                    <ChevronRight className="w-3 h-3" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Slide content */}
+              <div className="py-2 flex-1 flex flex-col justify-center">
+                {smartInsightSlide === 0 && (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <span className="w-6 h-6 rounded-lg bg-emerald-500/15 text-emerald-600 flex items-center justify-center shrink-0">
+                        <TrendingDown className="w-3.5 h-3.5" />
+                      </span>
+                      <span className="text-xs font-bold text-on-surface">Monthly Velocity</span>
+                    </div>
+                    <p className="text-xs text-on-surface-variant leading-relaxed">
+                      {monthlyDiffPercent <= 0 
+                        ? `Spending is down ${Math.abs(Math.round(monthlyDiffPercent))}% compared to last month. Great pace!`
+                        : `Pace is ${Math.round(monthlyDiffPercent)}% higher than last month. Consider curbing discretionary spending.`
+                      }
+                    </p>
+                  </div>
+                )}
+                {smartInsightSlide === 1 && (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <span className="w-6 h-6 rounded-lg bg-primary/15 text-primary flex items-center justify-center shrink-0">
+                        <Wallet className="w-3.5 h-3.5" />
+                      </span>
+                      <span className="text-xs font-bold text-on-surface">Top Expenditure</span>
+                    </div>
+                    <p className="text-xs text-on-surface-variant leading-relaxed">
+                      {chartData.length > 0 
+                        ? `${chartData[0].name} accounts for ${((chartData[0].value / (totalSpendingForMonth || 1)) * 100).toFixed(0)}% of your monthly outflows.`
+                        : 'No category data recorded yet for this billing cycle.'
+                      }
+                    </p>
+                  </div>
+                )}
+                {smartInsightSlide === 2 && (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <span className="w-6 h-6 rounded-lg bg-purple-500/15 text-purple-600 flex items-center justify-center shrink-0">
+                        <ShieldCheck className="w-3.5 h-3.5" />
+                      </span>
+                      <span className="text-xs font-bold text-on-surface">Active Commitments</span>
+                    </div>
+                    <p className="text-xs text-on-surface-variant leading-relaxed">
+                      {subscriptions.length} recurring subscriptions totalling {formatCurrency(activeSubsTotal)} per month.
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              <div className="border-t border-outline-variant/20 pt-2.5 flex justify-between items-center">
+                <button
+                  type="button"
+                  onClick={onNavigateToInsights}
+                  className="text-[10px] font-bold text-primary hover:underline flex items-center gap-1 cursor-pointer"
+                >
+                  <span>Open Deep Intelligence</span>
+                  <ArrowUpRight className="w-3 h-3" />
+                </button>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        {/* ── BENTO ROW 2: Live Feed + Shortcuts & Presets ── */}
+        <div className="grid grid-cols-12 gap-6 items-start">
+          
+          {/* Left: Recent Transactions Feed (Col 7) */}
+          <div className="col-span-7 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <h3 className="font-outfit text-base text-on-surface font-black tracking-tight">Recent Transactions</h3>
+                {activeCategoryFilter && (
+                  <span className="text-[10px] font-bold bg-primary/10 text-primary border border-primary/20 px-2.5 py-0.5 rounded-full flex items-center gap-1 animate-fade-in">
+                    <span>{activeCategoryFilter}</span>
+                    <button 
+                      onClick={() => setActiveCategoryFilter(null)}
+                      className="hover:text-error transition-colors font-black cursor-pointer text-[12px] pl-0.5"
+                    >
+                      ×
+                    </button>
+                  </span>
+                )}
+              </div>
+              <button 
+                onClick={onNavigateToHistory}
+                className="font-label-lg text-xs text-primary hover:underline flex items-center gap-0.5 cursor-pointer font-bold"
+              >
+                View Ledger
+                <ChevronRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
+
+            <div className="space-y-2">
+              {recentTransactions.length === 0 ? (
+                <div className="p-8 text-center bg-surface-container-low/50 border border-outline-variant/30 rounded-3xl space-y-2">
+                  <p className="text-xs text-on-surface-variant font-medium">No recent transactions logged yet.</p>
+                  <button
+                    onClick={onAddTransactionClick}
+                    className="px-4 py-2 bg-primary text-on-primary text-xs font-bold rounded-xl shadow-xs cursor-pointer hover:bg-primary/90"
+                  >
+                    + Log First Outflow
+                  </button>
+                </div>
+              ) : (
+                recentTransactions.slice(0, 6).map((tx) => {
+                  const config = getCategoryConfig(tx.category);
+                  const IconComponent = config.icon;
+                  const isExpense = tx.amount < 0;
+                  const brand = getBrandInfo(tx.title);
+
+                  return (
+                    <div 
+                      key={tx.id}
+                      onClick={() => setSelectedTx(tx)}
+                      className="flex items-center justify-between p-3 bg-surface-container-low/60 hover:bg-surface-container-low border border-outline-variant/20 hover:border-outline-variant/40 rounded-2xl transition-all cursor-pointer group"
+                    >
+                      <div className="flex items-center gap-3">
+                        {brand ? (
+                          <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold text-sm border shrink-0 ${brand.color}`}>
+                            {brand.letter}
+                          </div>
+                        ) : (
+                          <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${config.bg} shadow-2xs shrink-0`}>
+                            <IconComponent className="w-4.5 h-4.5 text-on-surface" />
+                          </div>
+                        )}
+                        <div className="min-w-0">
+                          <div className="font-title-md text-sm text-on-surface font-bold truncate group-hover:text-primary transition-colors">
+                            {tx.title}
+                          </div>
+                          <div className="text-[11px] text-on-surface-variant font-medium">
+                            {tx.category} • {formatDateLabel(tx.date)}, {tx.time}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="text-right flex flex-col items-end shrink-0">
+                        <div className={`font-mono text-sm font-bold ${isExpense ? 'text-on-surface' : 'text-emerald-600 dark:text-emerald-400'}`}>
+                          {isExpense ? '' : '+'}{formatCurrency(Math.abs(tx.amount))}
+                        </div>
+                        <span className="inline-block px-2 py-0.5 mt-0.5 text-[9px] font-semibold bg-surface-container-highest text-on-surface-variant rounded-md">
+                          {tx.label}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+
+          {/* Right: Quick Action Hub & Presets (Col 5) */}
+          <div className="col-span-5 space-y-4">
+            <div className="p-5 rounded-3xl bg-surface-container-low/60 border border-outline-variant/25 space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-on-surface-variant uppercase tracking-wider flex items-center gap-1.5">
+                  <Zap className="w-3.5 h-3.5 text-primary" />
+                  Quick Actions Hub
+                </span>
+                <span className="text-[10px] text-on-surface-variant font-medium">1-Tap Shortcuts</span>
+              </div>
+
+              <QuickShortcutsWidget
+                onOpenExportAudit={onOpenExportAudit || (() => {})}
+                onOpenSms={() => setIsBankSmsOpen(true)}
+                onOpenCalendar={onOpenCalendar || (() => {})}
+                onOpenAddTx={onAddTransactionClick}
+                onOpenInsights={onNavigateToInsights}
+                onNavigateToSettings={onNavigateToSettings}
+                onScrollToHealthRadar={scrollToHealthRadar}
+                onScrollToNoSpend={scrollToNoSpend}
+              />
+            </div>
+
+            <div className="p-5 rounded-3xl bg-surface-container-low/60 border border-outline-variant/25 space-y-3">
+              <span className="text-xs font-bold text-on-surface-variant uppercase tracking-wider flex items-center gap-1.5">
+                <Sparkles className="w-3.5 h-3.5 text-primary" />
+                Frequent Expense Presets
+              </span>
+              <QuickTemplatesWidget
+                templates={budget?.quickTemplates}
+                currency={budget?.currency || 'INR'}
+                onLogTemplate={(tpl) => {
+                  triggerHaptic('medium');
+                  const now = new Date();
+                  const yyyy = now.getFullYear();
+                  const mm = String(now.getMonth() + 1).padStart(2, '0');
+                  const dd = String(now.getDate()).padStart(2, '0');
+                  const localToday = `${yyyy}-${mm}-${dd}`;
+
+                  if (onAddTransaction) {
+                    onAddTransaction({
+                      title: tpl.title,
+                      amount: -Math.abs(tpl.amount),
+                      category: tpl.category,
+                      date: localToday,
+                      time: now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }),
+                      label: 'Personal'
+                    });
+                  }
+                }}
+              />
+            </div>
+          </div>
+
+        </div>
+
+        {/* ── BENTO ROW 3: Visual Summary Donut + Financial Health 360 Radar & Heatmap ── */}
+        <div className="grid grid-cols-12 gap-6 items-start">
+          
+          {/* Left: Visual Summary SVG Donut (Col 6) */}
+          <div className="col-span-6 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <h3 className="font-outfit text-base text-on-surface font-black tracking-tight">Visual Breakdown</h3>
+                {activeCategoryFilter && (
+                  <button
+                    type="button"
+                    onClick={() => { triggerHaptic('light'); setActiveCategoryFilter(null); setHoveredCategory(null); }}
+                    className="flex items-center gap-1 text-[10px] font-bold text-primary bg-primary/10 hover:bg-primary/20 px-2 py-0.5 rounded-full border border-primary/20 transition-all cursor-pointer"
+                  >
+                    <span>{activeCategoryFilter}</span>
+                    <span className="text-xs leading-none">×</span>
+                  </button>
+                )}
+              </div>
+              <span className="text-xs text-on-surface-variant font-medium bg-surface-container-high px-2.5 py-1 rounded-full border border-outline-variant/20">
+                {formatMonthName(activeMonth)}
+              </span>
+            </div>
+
+            <div className="p-5 rounded-3xl bg-surface-container-low/60 border border-outline-variant/30 shadow-sm rizzeat-bento-card">
+              {chartData.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-12 text-center space-y-2">
+                  <Coins className="w-8 h-8 text-on-surface-variant opacity-40" />
+                  <p className="text-xs font-bold text-on-surface">No expenses recorded for this month</p>
+                </div>
+              ) : (() => {
+                const CX = 90, CY = 90, R_OUTER = 72, R_INNER = 50;
+                const focusedName = hoveredCategory || activeCategoryFilter;
+                const focusedItem = focusedName ? chartData.find(d => d.name === focusedName) : null;
+
+                const slicePath = (s: typeof donutSlices[0], outerR: number, innerR: number) => {
+                  const toR = (d: number) => (d * Math.PI) / 180;
+                  const ox1 = CX + outerR * Math.cos(toR(s.startAngle));
+                  const oy1 = CY + outerR * Math.sin(toR(s.startAngle));
+                  const ox2 = CX + outerR * Math.cos(toR(s.endAngle));
+                  const oy2 = CY + outerR * Math.sin(toR(s.endAngle));
+                  const ix1 = CX + innerR * Math.cos(toR(s.endAngle));
+                  const iy1 = CY + innerR * Math.sin(toR(s.endAngle));
+                  const ix2 = CX + innerR * Math.cos(toR(s.startAngle));
+                  const iy2 = CY + innerR * Math.sin(toR(s.startAngle));
+                  const lg = s.sweep > 180 ? 1 : 0;
+                  return [
+                    `M ${ox1} ${oy1}`,
+                    `A ${outerR} ${outerR} 0 ${lg} 1 ${ox2} ${oy2}`,
+                    `L ${ix1} ${iy1}`,
+                    `A ${innerR} ${innerR} 0 ${lg} 0 ${ix2} ${iy2}`,
+                    'Z'
+                  ].join(' ');
+                };
+
+                return (
+                  <div className="grid grid-cols-1 sm:grid-cols-12 gap-6 items-center">
+                    <div className="sm:col-span-5 h-44 relative flex items-center justify-center">
+                      <svg viewBox="0 0 180 180" className="w-44 h-44 drop-shadow-sm select-none" style={{ overflow: 'visible' }}>
+                        {donutSlices.map((s) => {
+                          const isActive = focusedName === s.name;
+                          const anyFocused = Boolean(focusedName);
+                          const outerR = isActive ? R_OUTER + 5 : R_OUTER;
+                          const innerR = isActive ? R_INNER - 2 : R_INNER;
+                          const d = slicePath(s, outerR, innerR);
+
+                          return (
+                            <path
+                              key={s.name}
+                              d={d}
+                              fill={s.color}
+                              opacity={anyFocused ? (isActive ? 1 : 0.3) : 1}
+                              style={{ transition: 'all 0.2s ease', cursor: 'pointer' }}
+                              onMouseEnter={() => setHoveredCategory(s.name)}
+                              onMouseLeave={() => setHoveredCategory(null)}
+                              onClick={() => {
+                                triggerHaptic('light');
+                                const next = activeCategoryFilter === s.name ? null : s.name;
+                                setActiveCategoryFilter(next);
+                                setHoveredCategory(next);
+                              }}
+                            />
+                          );
+                        })}
+                        <foreignObject x="36" y="36" width="108" height="108">
+                          <div style={{ width: '108px', height: '108px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none', userSelect: 'none', textAlign: 'center', padding: '4px' }}>
+                            {focusedItem ? (
+                              <>
+                                <span style={{ fontSize: '9px', fontWeight: 800, textTransform: 'uppercase', color: focusedItem.color, maxWidth: '96px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                  {focusedItem.name}
+                                </span>
+                                <span style={{ fontSize: '14px', fontWeight: 900, fontFamily: 'monospace', color: 'var(--color-on-surface,#1c1b1f)', marginTop: '2px' }}>
+                                  {formatCurrency(focusedItem.value)}
+                                </span>
+                                <span style={{ fontSize: '10px', fontWeight: 700, color: focusedItem.color, marginTop: '3px', background: `${focusedItem.color}22`, padding: '1px 6px', borderRadius: '99px' }}>
+                                  {totalSpendingForMonth > 0 ? ((focusedItem.value / totalSpendingForMonth) * 100).toFixed(1) : 0}%
+                                </span>
+                              </>
+                            ) : (
+                              <>
+                                <span style={{ fontSize: '9px', fontWeight: 600, textTransform: 'uppercase', color: 'var(--color-on-surface-variant,#49454f)' }}>
+                                  Total
+                                </span>
+                                <span style={{ fontSize: '14px', fontWeight: 900, fontFamily: 'monospace', color: 'var(--color-on-surface,#1c1b1f)', marginTop: '2px' }}>
+                                  {formatCurrency(totalSpendingForMonth)}
+                                </span>
+                                <span style={{ fontSize: '9px', fontWeight: 500, color: 'var(--color-on-surface-variant,#49454f)', marginTop: '3px' }}>
+                                  {chartData.length} categories
+                                </span>
+                              </>
+                            )}
+                          </div>
+                        </foreignObject>
+                      </svg>
+                    </div>
+
+                    <div className="sm:col-span-7 space-y-1.5 max-h-52 overflow-y-auto">
+                      {chartData.map((item) => {
+                        const percent = totalSpendingForMonth > 0 ? ((item.value / totalSpendingForMonth) * 100).toFixed(1) : '0';
+                        const isFocused = focusedName === item.name;
+
+                        return (
+                          <div
+                            key={item.name}
+                            onMouseEnter={() => setHoveredCategory(item.name)}
+                            onMouseLeave={() => setHoveredCategory(null)}
+                            onClick={() => {
+                              triggerHaptic('light');
+                              const next = activeCategoryFilter === item.name ? null : item.name;
+                              setActiveCategoryFilter(next);
+                            }}
+                            className={`p-2 rounded-xl transition-all cursor-pointer flex items-center justify-between ${
+                              isFocused ? 'bg-surface-container-high' : 'hover:bg-surface-container'
+                            }`}
+                          >
+                            <div className="flex items-center gap-2 min-w-0">
+                              <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
+                              <span className="text-xs font-bold text-on-surface truncate">{item.name}</span>
+                            </div>
+                            <div className="text-right flex items-center gap-2">
+                              <span className="text-xs font-mono font-bold text-on-surface">{formatCurrency(item.value)}</span>
+                              <span className="text-[10px] font-mono text-on-surface-variant w-10 text-right">{percent}%</span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+          </div>
+
+          {/* Right: Financial Health 360 Radar & Heatmap (Col 6) */}
+          <div className="col-span-6 space-y-4">
+            <FinancialHealthRadarCard
+              transactions={transactions}
+              budget={budget}
+              subscriptions={subscriptions}
+              currency={budget?.currency || 'INR'}
+              onNavigateToSettings={onNavigateToSettings}
+            />
+            <NoSpendHeatmapCard
+              transactions={transactions}
+              budget={budget}
+            />
+          </div>
+
+        </div>
+
+        {/* ── BENTO ROW 4: Subscriptions & Savings Goals ── */}
+        <div className="grid grid-cols-12 gap-6 items-start">
+          
+          {/* Subscriptions Bento Card (Col 6) */}
+          <div className="col-span-6 space-y-3">
+            <div className="flex items-center justify-between">
+              <h3 className="font-outfit text-base text-on-surface font-black tracking-tight">Recurring Commitments</h3>
+              <button
+                type="button"
+                onClick={() => setIsAddSubOpen(true)}
+                className="text-xs font-bold text-primary hover:underline flex items-center gap-1 cursor-pointer"
+              >
+                <Plus className="w-3 h-3" />
+                <span>Add Subscription</span>
+              </button>
+            </div>
+
+            <div className="p-5 rounded-3xl bg-surface-container-low/60 border border-outline-variant/30 space-y-3 rizzeat-bento-card">
+              <div className="flex justify-between items-center pb-2 border-b border-outline-variant/20 text-xs">
+                <span className="text-on-surface-variant font-medium">Monthly Outflow Rate:</span>
+                <span className="font-mono font-black text-on-surface text-sm">{formatCurrency(activeSubsTotal)}</span>
+              </div>
+
+              <div className="space-y-2 max-h-60 overflow-y-auto">
+                {subscriptions.length === 0 ? (
+                  <p className="text-xs text-on-surface-variant py-4 text-center">No subscriptions recorded.</p>
+                ) : (
+                  subscriptions.map((sub) => {
+                    const brand = getBrandInfo(sub.title);
+                    return (
+                      <div key={sub.id} className="flex items-center justify-between p-2.5 rounded-2xl bg-surface-container hover:bg-surface-container-high transition-colors">
+                        <div className="flex items-center gap-2.5">
+                          {brand ? (
+                            <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold text-xs border shrink-0 ${brand.color}`}>
+                              {brand.letter}
+                            </div>
+                          ) : (
+                            <div className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                              <CreditCard className="w-4 h-4" />
+                            </div>
+                          )}
+                          <div>
+                            <span className="text-xs font-bold text-on-surface block leading-tight">{sub.title}</span>
+                            <span className="text-[10px] text-on-surface-variant">Day {sub.billingDate} • {sub.category}</span>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-3">
+                          <span className="font-mono font-bold text-xs text-on-surface">{formatCurrency(sub.amount)}</span>
+                          <button
+                            type="button"
+                            onClick={() => setSubToDeleteId(sub.id)}
+                            className="p-1 text-on-surface-variant hover:text-error transition-colors cursor-pointer"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Savings Goals Bento Card (Col 6) */}
+          <div className="col-span-6 space-y-3">
+            <div className="flex items-center justify-between">
+              <h3 className="font-outfit text-base text-on-surface font-black tracking-tight">Active Savings Goals</h3>
+              <span className="text-xs text-on-surface-variant font-medium">{savingsGoals.length} Active Targets</span>
+            </div>
+
+            <div className="p-5 rounded-3xl bg-surface-container-low/60 border border-outline-variant/30 space-y-3 rizzeat-bento-card">
+              <div className="space-y-3 max-h-72 overflow-y-auto">
+                {savingsGoals.length === 0 ? (
+                  <p className="text-xs text-on-surface-variant py-4 text-center">No active savings targets set.</p>
+                ) : (
+                  savingsGoals.map((g) => {
+                    const pct = Math.min(100, Math.round((g.currentAmount / g.targetAmount) * 100));
+                    return (
+                      <div key={g.id} className="p-3 bg-surface-container rounded-2xl space-y-2">
+                        <div className="flex justify-between items-center text-xs">
+                          <div className="flex items-center gap-2">
+                            <Target className="w-4 h-4 text-emerald-600" />
+                            <span className="font-bold text-on-surface">{g.title}</span>
+                          </div>
+                          <span className="font-mono font-bold text-emerald-600">{pct}%</span>
+                        </div>
+
+                        <div className="w-full h-1.5 bg-surface-container-highest rounded-full overflow-hidden">
+                          <div className="h-full bg-emerald-500 rounded-full transition-all" style={{ width: `${pct}%` }} />
+                        </div>
+
+                        <div className="flex justify-between text-[10px] font-mono text-on-surface-variant">
+                          <span>Saved: {formatCurrency(g.currentAmount)}</span>
+                          <span>Target: {formatCurrency(g.targetAmount)}</span>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+
+
+
+
+
+      {/* 3D WebGL Titanium Card Studio Modal */}
+      <ThreeDCardModal
+        isOpen={is3DModalOpen}
+        onClose={() => setIs3DModalOpen(false)}
+        balance={activeExpenses}
+        currencySymbol={getCurrencySymbol(budget?.currency || 'INR')}
+        cardHolder={profile.name || 'Alexander Chen'}
+      />
 
       {/* Transaction Detail Bottom Sheet Modal */}
       {selectedTx && (

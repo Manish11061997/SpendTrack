@@ -38,8 +38,7 @@ import {
   DEFAULT_PROFILE, 
   DEFAULT_BUDGET 
 } from './initialData';
-import { formatCurrency, getCurrencySymbol, getCurrencyLocale, isSubscriptionDoubleCounted } from './utils/currency';
-import { RollingNumber, PressSlideText, AnimatedProgressBar, AmbientMeshBackground } from './components/animated';
+import { formatCurrency, isSubscriptionDoubleCounted } from './utils/currency';
 
 // Modular Tab Views
 import DashboardTab from './components/DashboardTab';
@@ -56,9 +55,9 @@ import { PinLockModal } from './components/PinLockModal';
 import { INITIAL_ACHIEVEMENT_BADGES, evaluateBadges, calculateBudgetRollover } from './utils/budgetRollover';
 import { fetchLiveExchangeRates } from './utils/currencyConverter';
 import { checkAlertRulesOnSave } from './utils/alertRulesEngine';
-import { triggerMilestoneConfetti, triggerSuccessBurst } from './utils/celebration';
 
 import { VoiceInputModal } from './components/VoiceInputModal';
+import { ThreeDAtmosphere } from './components/animated/ThreeDAtmosphere';
 
 // Modals (Static imports to ensure zero dynamic chunk loading failures on Android)
 import { CalendarViewModal } from './components/CalendarViewModal';
@@ -927,13 +926,7 @@ export default function App() {
     // 2. Close the form instantly
     setIsAddFormVisible(false);
 
-    // 3. Show success popup immediately & trigger 3D confetti cannon
-    if (withinBudget) {
-      triggerMilestoneConfetti(0.5);
-    } else {
-      triggerSuccessBurst();
-    }
-
+    // 3. Show success popup immediately
     if (isNewTxExpense) {
       setSuccessAnimation({
         isVisible: true,
@@ -1144,32 +1137,6 @@ export default function App() {
     };
   }, [isAddFormVisible, isDrawerOpen, showLogoutConfirm, activeTab]);
 
-  // Desktop keyboard shortcuts (Cmd/Ctrl + 1..4, Cmd/Ctrl + N or K for quick add)
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && !e.shiftKey && !e.altKey) {
-        if (e.key === '1') {
-          e.preventDefault();
-          setActiveTab('dashboard');
-        } else if (e.key === '2') {
-          e.preventDefault();
-          setActiveTab('history');
-        } else if (e.key === '3') {
-          e.preventDefault();
-          setActiveTab('insights');
-        } else if (e.key === '4') {
-          e.preventDefault();
-          setActiveTab('settings');
-        } else if (e.key.toLowerCase() === 'k' || e.key.toLowerCase() === 'n') {
-          e.preventDefault();
-          setIsAddFormVisible(prev => !prev);
-        }
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
-
   useEffect(() => {
     if (!Capacitor.isNativePlatform()) return;
 
@@ -1197,6 +1164,32 @@ export default function App() {
         sub.remove();
       }
     };
+  }, []);
+
+  // Desktop keyboard shortcuts (Cmd/Ctrl + 1..4, Cmd/Ctrl + N or K for quick add)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && !e.shiftKey && !e.altKey) {
+        if (e.key === '1') {
+          e.preventDefault();
+          setActiveTab('dashboard');
+        } else if (e.key === '2') {
+          e.preventDefault();
+          setActiveTab('history');
+        } else if (e.key === '3') {
+          e.preventDefault();
+          setActiveTab('insights');
+        } else if (e.key === '4') {
+          e.preventDefault();
+          setActiveTab('settings');
+        } else if (e.key.toLowerCase() === 'k' || e.key.toLowerCase() === 'n') {
+          e.preventDefault();
+          setIsAddFormVisible(prev => !prev);
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
   // Notifications calculation
@@ -1327,8 +1320,10 @@ export default function App() {
           className="h-screen w-screen overflow-hidden"
         >
           <div className={`h-screen overflow-hidden bg-background text-on-background flex flex-col md:flex-row font-sans relative antialiased selection:bg-primary-container selection:text-on-primary-container ${isPrivacyMode ? 'privacy-blur-mode' : ''}`}>
-            {/* Dynamic 3D ambient lighting orbs */}
-            <AmbientMeshBackground />
+            {/* Interactive WebGL 3D Spatial Atmosphere with Mouse Parallax (Desktop Only) */}
+            <div className="hidden lg:block pointer-events-none fixed inset-0 z-0 overflow-hidden">
+              <ThreeDAtmosphere />
+            </div>
       
       {/* If Add Form is active, render it exclusively in full viewport view */}
       {isAddFormVisible ? (
@@ -1372,50 +1367,79 @@ export default function App() {
               </div>
               
               {/* Navigation links (Styled lists with icons) */}
-              <div className="flex flex-col space-y-1 w-full relative">
-                {([
-                  { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, shortcut: '⌘1' },
-                  { id: 'history', label: 'Transactions', icon: HistoryIcon, shortcut: '⌘2' },
-                  { id: 'insights', label: 'Insights', icon: TrendingUp, shortcut: '⌘3' },
-                  { id: 'settings', label: 'Settings', icon: SettingsIcon, shortcut: '⌘4' },
-                ] as const).map(({ id, label, icon: IconComp, shortcut }) => {
-                  const isActive = activeTab === id;
-                  return (
-                    <button
-                      key={id}
-                      id={`rail-tab-${id}`}
-                      onClick={() => setActiveTab(id as TabType)}
-                      className={`relative flex items-center justify-between px-3.5 py-2.5 rounded-xl transition-all cursor-pointer w-full text-left group select-none ${
-                        isActive
-                          ? 'text-on-primary-container font-bold'
-                          : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-variant/30'
-                      }`}
-                    >
-                      {isActive && (
-                        <motion.div
-                          layoutId="desktop-rail-pill"
-                          className="absolute inset-0 bg-primary-container rounded-xl shadow-xs -z-10"
-                          transition={{ type: 'spring', stiffness: 450, damping: 32 }}
-                        />
-                      )}
-                      <div className="flex items-center gap-3">
-                        <IconComp className={`w-4.5 h-4.5 transition-transform group-hover:scale-110 ${
-                          isActive ? 'text-primary' : 'text-on-surface-variant/80'
-                        }`} />
-                        <span className="text-xs font-semibold tracking-tight">
-                          {label}
-                        </span>
-                      </div>
-                      <span className={`text-[9px] font-mono px-1.5 py-0.5 rounded border transition-colors ${
-                        isActive
-                          ? 'bg-primary/10 border-primary/25 text-primary'
-                          : 'bg-surface-container-high/40 border-outline-variant/20 text-on-surface-variant/60 group-hover:text-on-surface-variant'
-                      }`}>
-                        {shortcut}
-                      </span>
-                    </button>
-                  );
-                })}
+              <div className="flex flex-col space-y-1 w-full">
+                {/* Dashboard Tab */}
+                <button
+                  id="rail-tab-dashboard"
+                  onClick={() => setActiveTab('dashboard')}
+                  className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all cursor-pointer w-full text-left group ${
+                    activeTab === 'dashboard'
+                      ? 'bg-primary-container text-on-primary-container font-bold shadow-xs scale-101'
+                      : 'text-on-surface-variant hover:bg-surface-variant/40 hover:text-on-surface'
+                  }`}
+                >
+                  <LayoutDashboard className={`w-4.5 h-4.5 transition-transform group-hover:scale-105 ${
+                    activeTab === 'dashboard' ? 'text-primary' : 'text-on-surface-variant/80'
+                  }`} />
+                  <span className="text-xs font-semibold tracking-tight select-none">
+                    Dashboard
+                  </span>
+                </button>
+
+                {/* History Tab */}
+                <button
+                  id="rail-tab-history"
+                  onClick={() => setActiveTab('history')}
+                  className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all cursor-pointer w-full text-left group ${
+                    activeTab === 'history'
+                      ? 'bg-primary-container text-on-primary-container font-bold shadow-xs scale-101'
+                      : 'text-on-surface-variant hover:bg-surface-variant/40 hover:text-on-surface'
+                  }`}
+                >
+                  <HistoryIcon className={`w-4.5 h-4.5 transition-transform group-hover:scale-105 ${
+                    activeTab === 'history' ? 'text-primary' : 'text-on-surface-variant/80'
+                  }`} />
+                  <span className="text-xs font-semibold tracking-tight select-none">
+                    Transactions
+                  </span>
+                </button>
+
+                {/* Insights Tab */}
+                <button
+                  id="rail-tab-insights"
+                  onClick={() => setActiveTab('insights')}
+                  className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all cursor-pointer w-full text-left group ${
+                    activeTab === 'insights'
+                      ? 'bg-primary-container text-on-primary-container font-bold shadow-xs scale-101'
+                      : 'text-on-surface-variant hover:bg-surface-variant/40 hover:text-on-surface'
+                  }`}
+                >
+                  <TrendingUp className={`w-4.5 h-4.5 transition-transform group-hover:scale-105 ${
+                    activeTab === 'insights' ? 'text-primary' : 'text-on-surface-variant/80'
+                  }`} />
+                  <span className="text-xs font-semibold tracking-tight select-none">
+                    Insights
+                  </span>
+                </button>
+
+
+                {/* Settings Tab */}
+                <button
+                  id="rail-tab-settings"
+                  onClick={() => setActiveTab('settings')}
+                  className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all cursor-pointer w-full text-left group ${
+                    activeTab === 'settings'
+                      ? 'bg-primary-container text-on-primary-container font-bold shadow-xs scale-101'
+                      : 'text-on-surface-variant hover:bg-surface-variant/40 hover:text-on-surface'
+                  }`}
+                >
+                  <SettingsIcon className={`w-4.5 h-4.5 transition-transform group-hover:scale-105 ${
+                    activeTab === 'settings' ? 'text-primary' : 'text-on-surface-variant/80'
+                  }`} />
+                  <span className="text-xs font-semibold tracking-tight select-none">
+                    Settings
+                  </span>
+                </button>
 
                 {/* Quick Add Log Shortcut Button */}
                 <div className="pt-2 px-1">
@@ -1424,7 +1448,7 @@ export default function App() {
                     className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-primary text-on-primary font-bold text-xs rounded-xl shadow-xs hover:bg-primary/95 transition-all hover:scale-[1.02] active:scale-95 cursor-pointer"
                   >
                     <Plus className="w-4 h-4" />
-                    <PressSlideText>Quick Add Log</PressSlideText>
+                    <span>Quick Add Log</span>
                   </button>
                 </div>
               </div>
@@ -1448,20 +1472,16 @@ export default function App() {
                       <div className="flex justify-between items-center text-[10px] font-bold text-on-surface-variant">
                         <span>Safe Left:</span>
                         <span className={remaining < 0 ? "text-error" : "text-primary font-mono"}>
-                          <RollingNumber
-                            value={remaining}
-                            prefix={getCurrencySymbol(budget?.currency || 'INR')}
-                            locale={getCurrencyLocale(budget?.currency || 'INR')}
-                            duration={600}
-                          />
+                          {formatCurrency(remaining, budget?.currency || 'INR')}
                         </span>
                       </div>
                       
-                      <AnimatedProgressBar
-                        percentage={usagePct}
-                        heightClassName="h-1.5"
-                        showThresholdColors={true}
-                      />
+                      <div className="w-full h-1.5 bg-surface-container-highest rounded-full overflow-hidden">
+                        <div 
+                          className={`h-full rounded-full transition-all duration-300 ${remaining < 0 ? 'bg-error' : usagePct > 85 ? 'bg-amber-500' : 'bg-primary'}`} 
+                          style={{ width: `${Math.min(100, usagePct)}%` }}
+                        />
+                      </div>
                       <div className="flex justify-between text-[8px] font-mono font-bold text-on-surface-variant/75">
                         <span>{usagePct}% spent</span>
                         <span>Cap: {formatCurrency(limit, budget?.currency || 'INR')}</span>
@@ -1522,17 +1542,8 @@ export default function App() {
             </div>
           </nav>
 
-          {/* Main Layout Area — with 3D tactile sheet perspective depth when drawer opens */}
-          <div
-            style={{
-              transform: isDrawerOpen ? 'scale(0.96) translateZ(-40px)' : 'none',
-              transformOrigin: 'center right',
-              borderRadius: isDrawerOpen ? '24px' : '0px',
-              transition: 'transform 0.32s cubic-bezier(0.16, 1, 0.3, 1), border-radius 0.32s cubic-bezier(0.16, 1, 0.3, 1)',
-              willChange: 'transform',
-            }}
-            className="flex-1 flex flex-col min-w-0 h-full overflow-hidden"
-          >
+          {/* Main Layout Area */}
+          <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
             {/* Main Layout Header App Bar — Original Glassmorphic Design */}
             <header className="fixed top-0 md:left-64 left-0 right-0 h-16 bg-surface/80 dark:bg-surface-container-low/80 backdrop-blur-xl border-b border-outline-variant/20 flex items-center justify-between px-3.5 sm:px-5 z-30 transition-all duration-200">
               <div className="flex items-center gap-2.5">
@@ -1586,18 +1597,6 @@ export default function App() {
               </div>
 
               <div className="flex items-center gap-2">
-                {/* RizzEat-inspired Live Sync Indicator Badge */}
-                <div 
-                  title="Live Firestore Cloud Sync Active"
-                  className="rizzeat-pill bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 select-none cursor-default"
-                >
-                  <div className="rizzeat-pulse-dot">
-                    <span className="bg-emerald-400"></span>
-                    <span className="bg-emerald-500"></span>
-                  </div>
-                  <span className="hidden xs:inline">Live</span>
-                </div>
-
                 {/* 1-Tap Lock App Button (Available when PIN protection is configured) */}
                 {pinConfig.isEnabled && (
                   <button
@@ -1648,6 +1647,18 @@ export default function App() {
 
 
 
+                {/* Live Sync Indicator Badge (Desktop) */}
+                <div 
+                  title="Live Firestore Cloud Sync Active"
+                  className="hidden md:flex rizzeat-pill bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 select-none cursor-default"
+                >
+                  <div className="rizzeat-pulse-dot">
+                    <span className="bg-emerald-400"></span>
+                    <span className="bg-emerald-500"></span>
+                  </div>
+                  <span>Live</span>
+                </div>
+
                 {/* Desktop User Profile Chip */}
                 <div className="hidden md:flex items-center gap-2 pl-2 border-l border-outline-variant/30">
                   <div className="flex items-center gap-2 py-1 px-2.5 rounded-xl bg-surface-container border border-outline-variant/30 select-none shadow-2xs">
@@ -1685,7 +1696,7 @@ export default function App() {
             {/* Core Content Layout Area — only this area scrolls, like a native app */}
             <main
               ref={mainScrollRef}
-              className="flex-1 overflow-y-auto overflow-x-hidden px-3 sm:px-6 lg:px-8 pt-20 pb-36 md:pb-12 desktop-subtle-grid"
+              className="flex-1 overflow-y-auto overflow-x-hidden px-3 sm:px-4 lg:px-8 pt-20 pb-36 md:pb-12 lg:desktop-subtle-grid"
               style={{ WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain' } as React.CSSProperties}
             >
 
@@ -1761,7 +1772,7 @@ export default function App() {
                       className="px-2.5 py-0.5 bg-primary text-on-primary font-bold text-[10px] rounded-md shadow-xs hover:bg-primary/95 transition-colors flex items-center gap-0.5 cursor-pointer"
                     >
                       <Plus className="w-3 h-3" />
-                      <PressSlideText>Add Log</PressSlideText>
+                      Add Log
                     </button>
                   </div>
                 </div>
@@ -2038,31 +2049,18 @@ export default function App() {
                             {spentPct}%
                           </span>
                         </div>
-                        <AnimatedProgressBar
-                          percentage={spentPct}
-                          heightClassName="h-2"
-                          showThresholdColors={true}
-                        />
+                        <div className="w-full h-2 bg-surface-container-highest rounded-full overflow-hidden">
+                          <div 
+                            className={`h-full rounded-full transition-all duration-300 ${isOver ? 'bg-error animate-pulse' : 'bg-primary'}`} 
+                            style={{ width: `${Math.min(100, spentPct)}%` }}
+                          />
+                        </div>
                         <div className="flex justify-between items-center text-[10px] font-mono font-semibold">
                           <div className="text-on-surface-variant/80">
-                            Spent: <span className="font-bold text-on-surface">
-                              <RollingNumber
-                                value={monthSpent}
-                                prefix={getCurrencySymbol(budget?.currency || 'INR')}
-                                locale={getCurrencyLocale(budget?.currency || 'INR')}
-                                duration={600}
-                              />
-                            </span>
+                            Spent: <span className="font-bold text-on-surface">{formatCurrency(monthSpent, budget?.currency || 'INR')}</span>
                           </div>
                           <div className="text-right">
-                            Remaining: <span className={`font-bold ${isOver ? 'text-error' : 'text-emerald-600'}`}>
-                              <RollingNumber
-                                value={remaining}
-                                prefix={getCurrencySymbol(budget?.currency || 'INR')}
-                                locale={getCurrencyLocale(budget?.currency || 'INR')}
-                                duration={600}
-                              />
-                            </span>
+                            Remaining: <span className={`font-bold ${isOver ? 'text-error' : 'text-emerald-600'}`}>{formatCurrency(remaining, budget?.currency || 'INR')}</span>
                           </div>
                         </div>
                       </>

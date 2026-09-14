@@ -285,44 +285,19 @@ export default function SettingsTab({
   return (
     <div className="space-y-6 pb-24 animate-fade-in">
       
-      {/* Header Cockpit */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-        <div className="space-y-1">
-          <h2 className="font-outfit text-2xl font-black text-on-surface tracking-tight">Settings Cockpit</h2>
-          <p className="text-sm text-on-surface-variant">Configure your budget rules, profile, security & system preferences.</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="rizzeat-pill bg-primary/10 text-primary border border-primary/20 text-xs">
-            <div className="rizzeat-pulse-dot">
-              <span className="bg-primary/50"></span>
-              <span className="bg-primary"></span>
-            </div>
-            <span>Preferences Synced</span>
-          </span>
-        </div>
+      {/* Header */}
+      <div className="space-y-1">
+        <h2 className="font-outfit text-2xl font-black text-on-surface tracking-tight">Settings</h2>
+        <p className="text-sm text-on-surface-variant">Configure your budget rules, profile, and account details.</p>
       </div>
 
-      {/* 2-Column Responsive Cockpit Grid (Single Column on Mobile, 2 Columns on Desktop) */}
-      <div className="flex flex-col lg:grid lg:grid-cols-2 gap-6 items-start">
-        {/* Left Column: Personal Profile & Financial Engine */}
-        <div className="flex flex-col gap-6 w-full">
-
       {/* Profile Details Section */}
-      <section className="bg-surface-container-low/90 dark:bg-surface-container-low/60 backdrop-blur-md rounded-2xl p-5 border border-outline-variant/30 space-y-4 shadow-sm rizzeat-bento-card">
+      <section className="bg-surface-container-low rounded-2xl p-5 border border-outline-variant/30 space-y-4 shadow-sm">
         <div className="flex items-center justify-between border-b border-outline-variant/10 pb-3">
-          <div className="flex items-center gap-2 flex-wrap">
-            <h3 className="font-outfit text-sm font-black text-primary flex items-center gap-2">
-              <User className="w-5 h-5" />
-              Profile Details
-            </h3>
-            <span className="rizzeat-pill bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 select-none text-[10px]">
-              <div className="rizzeat-pulse-dot">
-                <span className="bg-emerald-400"></span>
-                <span className="bg-emerald-500"></span>
-              </div>
-              <span>Verified Account</span>
-            </span>
-          </div>
+          <h3 className="font-outfit text-sm font-black text-primary flex items-center gap-2">
+            <User className="w-5 h-5" />
+            Profile Details
+          </h3>
           {!isProfileEditing && (
             <button
               id="edit-profile-trigger"
@@ -476,21 +451,12 @@ export default function SettingsTab({
       </section>
 
       {/* Budget Controls Section */}
-      <section className="bg-surface-container-low/90 dark:bg-surface-container-low/60 backdrop-blur-md rounded-2xl p-5 border border-outline-variant/30 space-y-4 shadow-sm rizzeat-bento-card">
+      <section className="bg-surface-container-low rounded-2xl p-5 border border-outline-variant/30 space-y-4 shadow-sm">
         <div className="flex items-center justify-between border-b border-outline-variant/10 pb-3">
-          <div className="flex items-center gap-2 flex-wrap">
-            <h3 className="font-outfit text-sm font-black text-primary flex items-center gap-2">
-              <Wallet className="w-5 h-5" />
-              Budget Controls
-            </h3>
-            <span className="rizzeat-pill bg-primary/10 text-primary border border-primary/20 select-none text-[10px]">
-              <div className="rizzeat-pulse-dot">
-                <span className="bg-primary/50"></span>
-                <span className="bg-primary"></span>
-              </div>
-              <span>{budget?.monthlyLimit ? `${getCurrencySymbol(preferredCurrency)}${budget.monthlyLimit} Cap` : 'Dynamic Cap'}</span>
-            </span>
-          </div>
+          <h3 className="font-outfit text-sm font-black text-primary flex items-center gap-2">
+            <Wallet className="w-5 h-5" />
+            Budget Controls
+          </h3>
           {!isBudgetEditing && (
             <button
               id="edit-budget-trigger"
@@ -883,8 +849,77 @@ export default function SettingsTab({
         )}
       </section>
 
+      {/* Data & Power Tools Section */}
+      <section className="bg-surface-container-low p-5 rounded-2xl border border-outline-variant/30 space-y-4 shadow-sm">
+        <div className="flex items-center gap-3 border-b border-outline-variant/20 pb-3">
+          <div className="w-9 h-9 rounded-xl bg-primary/10 text-primary flex items-center justify-center font-bold shrink-0">
+            <FileText className="w-5 h-5" />
+          </div>
+          <div>
+            <h3 className="font-extrabold text-sm text-on-surface font-sans">Data & Power Tools</h3>
+            <p className="text-[11px] font-semibold text-on-surface-variant">Import bank statements & view achievement milestones.</p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {/* Export CSV */}
+          <button
+            type="button"
+            onClick={() => exportTransactionsToCSV(transactions)}
+            className="flex items-center justify-between p-3.5 bg-surface-container-lowest hover:bg-surface-container border border-outline-variant/30 rounded-2xl transition-all text-left cursor-pointer group"
+          >
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-primary/10 text-primary rounded-xl">
+                <Download className="w-4.5 h-4.5" />
+              </div>
+              <div>
+                <span className="block font-bold text-xs text-on-surface">Export Data (CSV)</span>
+                <span className="block text-[10px] text-on-surface-variant">Download Excel / CSV spreadsheet</span>
+              </div>
+            </div>
+            <span className="text-xs font-bold text-primary group-hover:translate-x-0.5 transition-transform">↓</span>
+          </button>
+
+          {/* CSV Import */}
+          <button
+            type="button"
+            onClick={onOpenCsvImport}
+            className="flex items-center justify-between p-3.5 bg-surface-container-lowest hover:bg-surface-container border border-outline-variant/30 rounded-2xl transition-all text-left cursor-pointer group"
+          >
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 rounded-xl">
+                <FileText className="w-4.5 h-4.5" />
+              </div>
+              <div>
+                <span className="block font-bold text-xs text-on-surface">Import Bank CSV</span>
+                <span className="block text-[10px] text-on-surface-variant">HDFC, SBI, ICICI, Mint</span>
+              </div>
+            </div>
+            <span className="text-xs font-bold text-primary group-hover:translate-x-0.5 transition-transform">→</span>
+          </button>
+
+          {/* Achievement Badges */}
+          <button
+            type="button"
+            onClick={onOpenBadges}
+            className="flex items-center justify-between p-3.5 bg-surface-container-lowest hover:bg-surface-container border border-outline-variant/30 rounded-2xl transition-all text-left cursor-pointer group sm:col-span-2"
+          >
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-amber-500/10 text-amber-600 dark:text-amber-400 rounded-xl">
+                <ShieldCheck className="w-4.5 h-4.5" />
+              </div>
+              <div>
+                <span className="block font-bold text-xs text-on-surface">Financial Badges</span>
+                <span className="block text-[10px] text-on-surface-variant">View unlocked milestones</span>
+              </div>
+            </div>
+            <span className="text-xs font-bold text-primary group-hover:translate-x-0.5 transition-transform">→</span>
+          </button>
+        </div>
+      </section>
+
       {/* Collapsible Standalone Quick Presets Manager Section */}
-      <section className="bg-surface-container-low/90 dark:bg-surface-container-low/60 backdrop-blur-md rounded-2xl border border-outline-variant/30 overflow-hidden shadow-sm transition-all duration-300 rizzeat-bento-card">
+      <section className="bg-surface-container-low rounded-2xl border border-outline-variant/30 overflow-hidden shadow-sm transition-all duration-300">
         <button
           type="button"
           onClick={() => setIsQuickPresetsOpen(!isQuickPresetsOpen)}
@@ -895,16 +930,12 @@ export default function SettingsTab({
               <Zap className="w-5 h-5" />
             </div>
             <div>
-              <div className="flex items-center gap-2 flex-wrap">
-                <h3 className="font-outfit text-sm font-black text-on-surface">1-Tap Quick Presets</h3>
-                <span className="rizzeat-pill bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 text-[10px]">
-                  <div className="rizzeat-pulse-dot">
-                    <span className="bg-amber-400"></span>
-                    <span className="bg-amber-500"></span>
-                  </div>
-                  <span>{quickTemplates.length} Presets</span>
+              <h3 className="font-outfit text-sm font-black text-on-surface flex items-center gap-2">
+                1-Tap Quick Presets Manager
+                <span className="px-2.5 py-0.5 bg-primary/10 text-primary text-[10px] font-bold rounded-full font-mono">
+                  {quickTemplates.length} Presets
                 </span>
-              </div>
+              </h3>
               <p className="text-[11px] text-on-surface-variant font-medium">Configure your favorite 1-tap expense shortcuts for instant logging</p>
             </div>
           </div>
@@ -1010,24 +1041,14 @@ export default function SettingsTab({
           </div>
         )}
       </section>
-      </div>{/* End Left Column */}
-
-      {/* Right Column: Appearance, Alerts, Security & Data */}
-      <div className="flex flex-col gap-6 w-full">
 
       {/* Appearance Section */}
-      <section className="bg-surface-container-low/90 dark:bg-surface-container-low/60 backdrop-blur-md rounded-2xl p-5 border border-outline-variant/30 space-y-4 shadow-sm rizzeat-bento-card">
+      <section className="bg-surface-container-low rounded-2xl p-5 border border-outline-variant/20 space-y-4 shadow-sm">
         <div className="flex items-center justify-between border-b border-outline-variant/10 pb-3">
-          <div className="flex items-center gap-2 flex-wrap">
-            <h3 className="font-outfit text-sm font-black text-primary flex items-center gap-2">
-              <Palette className="w-5 h-5 text-primary" />
-              Theme & Appearance
-            </h3>
-            <span className="rizzeat-pill bg-primary/10 text-primary border border-primary/20 text-[10px]">
-              <span className="w-2 h-2 rounded-full inline-block shrink-0" style={{ backgroundColor: COLOR_PRESETS.find(p => p.id === themePresetId)?.colorHex || '#1A2F4C' }} />
-              <span>{COLOR_PRESETS.find(p => p.id === themePresetId)?.name || 'Oxford Navy'}</span>
-            </span>
-          </div>
+          <h3 className="font-outfit text-sm font-black text-primary flex items-center gap-2">
+            <Palette className="w-5 h-5 text-primary" />
+            Theme & Appearance
+          </h3>
           {!isThemeEditing && (
             <button
               id="edit-theme-trigger"
@@ -1146,25 +1167,12 @@ export default function SettingsTab({
       </section>
 
       {/* Daily Reminders Section */}
-      <section className="bg-surface-container-low/90 dark:bg-surface-container-low/60 backdrop-blur-md rounded-2xl p-5 border border-outline-variant/30 space-y-4 shadow-sm rizzeat-bento-card">
-        <div className="flex items-center justify-between border-b border-outline-variant/10 pb-3">
-          <div className="flex items-center gap-2 flex-wrap">
-            <h3 className="font-outfit text-sm font-black text-primary flex items-center gap-2">
-              <Bell className="w-5 h-5 text-primary" />
-              Daily Reminders & Alerts
-            </h3>
-            <span className={`rizzeat-pill text-[10px] ${
-              dailyReminderEnabled 
-                ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20' 
-                : 'bg-on-surface/5 text-on-surface-variant border border-outline-variant/20'
-            }`}>
-              <div className="rizzeat-pulse-dot">
-                <span className={dailyReminderEnabled ? 'bg-emerald-400' : 'bg-on-surface-variant/40'} />
-                <span className={dailyReminderEnabled ? 'bg-emerald-500' : 'bg-on-surface-variant'} />
-              </div>
-              <span>{dailyReminderEnabled ? `${formatTime12h(reminderTime)} Alert` : 'Disabled'}</span>
-            </span>
-          </div>
+      <section className="bg-surface-container/40 dark:bg-surface-container/20 rounded-3xl p-5 sm:p-6 border border-outline-variant/30 backdrop-blur-md shadow-xs">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-base font-bold text-on-surface flex items-center gap-2">
+            <Bell className="w-5 h-5 text-primary" />
+            Daily Reminders & Alerts
+          </h3>
           {!isReminderEditing && (
             <button
               id="edit-reminder-trigger"
@@ -1327,7 +1335,7 @@ export default function SettingsTab({
       </section>
 
       {/* Security & App Protection Section */}
-      <section className="bg-surface-container-low/90 dark:bg-surface-container-low/60 backdrop-blur-md rounded-2xl p-5 border border-outline-variant/30 space-y-4 shadow-sm rizzeat-bento-card">
+      <section className="bg-surface-container-low rounded-2xl p-5 border border-outline-variant/30 space-y-4 shadow-sm">
         <button
           onClick={() => setIsSecurityOpen(!isSecurityOpen)}
           className="w-full flex items-center justify-between text-left cursor-pointer group"
@@ -1337,19 +1345,13 @@ export default function SettingsTab({
               <Lock className="w-5 h-5" />
             </span>
             <div>
-              <div className="flex items-center gap-2 flex-wrap">
+              <div className="flex items-center gap-2">
                 <h3 className="font-outfit text-sm font-black text-on-surface">Security & App Protection</h3>
-                <span className={`rizzeat-pill text-[10px] ${
-                  pinConfig.isEnabled 
-                    ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20' 
-                    : 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20'
-                }`}>
-                  <div className="rizzeat-pulse-dot">
-                    <span className={pinConfig.isEnabled ? 'bg-emerald-400' : 'bg-amber-400'} />
-                    <span className={pinConfig.isEnabled ? 'bg-emerald-500' : 'bg-amber-500'} />
-                  </div>
-                  <span>{pinConfig.isEnabled ? 'PIN Armed' : 'Setup PIN'}</span>
-                </span>
+                {pinConfig.isEnabled && (
+                  <span className="px-2 py-0.5 bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/25 rounded-full text-[9px] font-extrabold uppercase tracking-wider">
+                    PIN Enabled
+                  </span>
+                )}
               </div>
               <p className="text-[11px] text-on-surface-variant">Biometric PIN lock, background privacy & protection</p>
             </div>
@@ -1473,86 +1475,8 @@ export default function SettingsTab({
         )}
       </section>
 
-      {/* Data & Power Tools Section */}
-      <section className="bg-surface-container-low/90 dark:bg-surface-container-low/60 backdrop-blur-md p-5 rounded-2xl border border-outline-variant/30 space-y-4 shadow-sm rizzeat-bento-card">
-        <div className="flex items-center justify-between border-b border-outline-variant/20 pb-3">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-primary/10 text-primary flex items-center justify-center font-bold shrink-0">
-              <FileText className="w-5 h-5" />
-            </div>
-            <div>
-              <h3 className="font-extrabold text-sm text-on-surface font-sans">Data & Power Tools</h3>
-              <p className="text-[11px] font-semibold text-on-surface-variant">Import bank statements & milestones</p>
-            </div>
-          </div>
-          <span className="rizzeat-pill bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20 text-[10px]">
-            <div className="rizzeat-pulse-dot">
-              <span className="bg-blue-400"></span>
-              <span className="bg-blue-500"></span>
-            </div>
-            <span>3 Utilities</span>
-          </span>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {/* Export CSV */}
-          <button
-            type="button"
-            onClick={() => exportTransactionsToCSV(transactions)}
-            className="flex items-center justify-between p-3.5 bg-surface-container-lowest hover:bg-surface-container border border-outline-variant/30 rounded-2xl transition-all text-left cursor-pointer group"
-          >
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-primary/10 text-primary rounded-xl">
-                <Download className="w-4.5 h-4.5" />
-              </div>
-              <div>
-                <span className="block font-bold text-xs text-on-surface">Export Data (CSV)</span>
-                <span className="block text-[10px] text-on-surface-variant">Download Excel / CSV spreadsheet</span>
-              </div>
-            </div>
-            <span className="text-xs font-bold text-primary group-hover:translate-x-0.5 transition-transform">↓</span>
-          </button>
-
-          {/* CSV Import */}
-          <button
-            type="button"
-            onClick={onOpenCsvImport}
-            className="flex items-center justify-between p-3.5 bg-surface-container-lowest hover:bg-surface-container border border-outline-variant/30 rounded-2xl transition-all text-left cursor-pointer group"
-          >
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 rounded-xl">
-                <FileText className="w-4.5 h-4.5" />
-              </div>
-              <div>
-                <span className="block font-bold text-xs text-on-surface">Import Bank CSV</span>
-                <span className="block text-[10px] text-on-surface-variant">HDFC, SBI, ICICI, Mint</span>
-              </div>
-            </div>
-            <span className="text-xs font-bold text-primary group-hover:translate-x-0.5 transition-transform">→</span>
-          </button>
-
-          {/* Achievement Badges */}
-          <button
-            type="button"
-            onClick={onOpenBadges}
-            className="flex items-center justify-between p-3.5 bg-surface-container-lowest hover:bg-surface-container border border-outline-variant/30 rounded-2xl transition-all text-left cursor-pointer group sm:col-span-2"
-          >
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-amber-500/10 text-amber-600 dark:text-amber-400 rounded-xl">
-                <ShieldCheck className="w-4.5 h-4.5" />
-              </div>
-              <div>
-                <span className="block font-bold text-xs text-on-surface">Financial Badges</span>
-                <span className="block text-[10px] text-on-surface-variant">View unlocked milestones</span>
-              </div>
-            </div>
-            <span className="text-xs font-bold text-primary group-hover:translate-x-0.5 transition-transform">→</span>
-          </button>
-        </div>
-      </section>
-
       {/* Legal & Privacy Section */}
-      <section className="bg-surface-container-low/90 dark:bg-surface-container-low/60 backdrop-blur-md rounded-2xl p-5 border border-outline-variant/30 space-y-4 shadow-sm rizzeat-bento-card">
+      <section className="bg-surface-container-low rounded-2xl p-5 border border-outline-variant/30 space-y-4 shadow-sm">
         <button
           onClick={() => setIsLegalOpen(!isLegalOpen)}
           className="w-full flex items-center justify-between text-left cursor-pointer group"
@@ -1562,12 +1486,7 @@ export default function SettingsTab({
               <ShieldCheck className="w-5 h-5" />
             </span>
             <div>
-              <div className="flex items-center gap-2 flex-wrap">
-                <h3 className="font-outfit text-sm font-black text-on-surface">Legal & Privacy</h3>
-                <span className="rizzeat-pill bg-primary/10 text-primary border border-primary/20 text-[10px]">
-                  <span>V1.0 Compliant</span>
-                </span>
-              </div>
+              <h3 className="font-outfit text-sm font-black text-on-surface">Legal & Privacy</h3>
               <p className="text-[11px] text-on-surface-variant">Terms of Service, Privacy Policy & Disclaimers</p>
             </div>
           </div>
@@ -1610,22 +1529,11 @@ export default function SettingsTab({
       )}
 
       {/* Data Administration */}
-      <section className="bg-surface-container-low/90 dark:bg-surface-container-low/60 backdrop-blur-md rounded-2xl p-5 border border-outline-variant/30 space-y-4 shadow-sm rizzeat-bento-card">
-        <div className="flex items-center justify-between border-b border-outline-variant/10 pb-3">
-          <div className="flex items-center gap-2 flex-wrap">
-            <h3 className="font-outfit text-sm font-black text-error flex items-center gap-2">
-              <Database className="w-5 h-5 text-error" />
-              Data Administration
-            </h3>
-            <span className="rizzeat-pill bg-error/10 text-error border border-error/20 text-[10px]">
-              <div className="rizzeat-pulse-dot">
-                <span className="bg-error/50" />
-                <span className="bg-error" />
-              </div>
-              <span>Ledger Storage</span>
-            </span>
-          </div>
-        </div>
+      <section className="bg-surface-container-low rounded-2xl p-5 border border-outline-variant/30 space-y-4 shadow-sm">
+        <h3 className="font-outfit text-sm font-black text-error flex items-center gap-2">
+          <Database className="w-5 h-5 text-error" />
+          Data Administration
+        </h3>
 
         <div className="space-y-4">
           <div className="p-4 bg-error/5 rounded-xl border border-error/10 flex items-start gap-3">
@@ -1671,26 +1579,12 @@ export default function SettingsTab({
         </div>
       </section>
 
-      </div>{/* End Right Column */}
-      </div>{/* End 2-Column Responsive Cockpit Grid */}
-
-      {/* Account Session (Full Width at Bottom) */}
-      <section className="bg-surface-container-low/90 dark:bg-surface-container-low/60 backdrop-blur-md rounded-2xl p-5 border border-outline-variant/30 space-y-4 shadow-sm rizzeat-bento-card">
-        <div className="flex items-center justify-between border-b border-outline-variant/10 pb-3">
-          <div className="flex items-center gap-2 flex-wrap">
-            <h3 className="font-outfit text-sm font-black text-on-surface flex items-center gap-2">
-              <LogOut className="w-5 h-5 text-error" />
-              Account Session
-            </h3>
-            <span className="rizzeat-pill bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 text-[10px]">
-              <div className="rizzeat-pulse-dot">
-                <span className="bg-emerald-400" />
-                <span className="bg-emerald-500" />
-              </div>
-              <span>Active Session</span>
-            </span>
-          </div>
-        </div>
+      {/* Account Session (Moved to the very bottom) */}
+      <section className="bg-surface-container-low rounded-2xl p-5 border border-outline-variant/30 space-y-4 shadow-sm">
+        <h3 className="font-outfit text-sm font-black text-error flex items-center gap-2">
+          <LogOut className="w-5 h-5 text-error" />
+          Account Session
+        </h3>
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-4 bg-surface-container-lowest rounded-xl border border-outline-variant/25 gap-4">
           <div className="space-y-1">
             <h4 className="font-bold text-sm text-on-surface">Logged in as {profile.name}</h4>
