@@ -1,10 +1,10 @@
-import React, { useRef, useState, useCallback } from 'react';
-import { motion, useReducedMotion } from 'framer-motion';
+import React, { useRef, useCallback } from 'react';
+import { motion, useMotionValue, useSpring, useReducedMotion } from 'framer-motion';
 
 interface TiltCard3DProps {
   children: React.ReactNode;
   className?: string;
-  maxTilt?: number; // max degrees of tilt, default 7
+  maxTilt?: number; // max degrees of tilt, default 6
   perspective?: number; // perspective in px, default 1000
   glareEffect?: boolean;
 }
@@ -12,57 +12,53 @@ interface TiltCard3DProps {
 export const TiltCard3D: React.FC<TiltCard3DProps> = ({
   children,
   className = '',
-  maxTilt = 7,
+  maxTilt = 6,
   perspective = 1000,
   glareEffect = true,
 }) => {
   const cardRef = useRef<HTMLDivElement>(null);
+  const glareRef = useRef<HTMLDivElement>(null);
   const shouldReduceMotion = useReducedMotion();
 
-  const [tilt, setTilt] = useState<{ rotateX: number; rotateY: number; glareX: number; glareY: number; isInteracting: boolean }>({
-    rotateX: 0,
-    rotateY: 0,
-    glareX: 50,
-    glareY: 50,
-    isInteracting: false,
-  });
+  const x = useMotionValue(0);
+  const y = useMotionValue(0);
+  const scale = useMotionValue(1);
+
+  // Smooth springs running off-thread without triggering React component re-renders
+  const rotateX = useSpring(y, { stiffness: 320, damping: 30, mass: 0.4 });
+  const rotateY = useSpring(x, { stiffness: 320, damping: 30, mass: 0.4 });
+  const springScale = useSpring(scale, { stiffness: 320, damping: 30, mass: 0.4 });
 
   const handlePointerMove = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
     if (shouldReduceMotion || !cardRef.current) return;
 
     const rect = cardRef.current.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
+    const px = e.clientX - rect.left;
+    const py = e.clientY - rect.top;
 
-    // Relative -1 to 1 from center
-    const xRatio = (x / rect.width) * 2 - 1;
-    const yRatio = (y / rect.height) * 2 - 1;
+    const xRatio = (px / rect.width) * 2 - 1;
+    const yRatio = (py / rect.height) * 2 - 1;
 
-    // Clamped tilt
-    const rotateY = Math.max(-maxTilt, Math.min(maxTilt, xRatio * maxTilt));
-    const rotateX = Math.max(-maxTilt, Math.min(maxTilt, -yRatio * maxTilt));
+    x.set(Math.max(-maxTilt, Math.min(maxTilt, xRatio * maxTilt)));
+    y.set(Math.max(-maxTilt, Math.min(maxTilt, -yRatio * maxTilt)));
+    scale.set(1.012);
 
-    // Glare percentage
-    const glareX = (x / rect.width) * 100;
-    const glareY = (y / rect.height) * 100;
-
-    setTilt({
-      rotateX,
-      rotateY,
-      glareX,
-      glareY,
-      isInteracting: true,
-    });
-  }, [maxTilt, shouldReduceMotion]);
+    if (glareEffect && glareRef.current) {
+      const gx = (px / rect.width) * 100;
+      const gy = (py / rect.height) * 100;
+      glareRef.current.style.opacity = '0.12';
+      glareRef.current.style.background = `radial-gradient(circle at ${gx}% ${gy}%, rgba(255, 255, 255, 0.85) 0%, rgba(255, 255, 255, 0) 65%)`;
+    }
+  }, [maxTilt, shouldReduceMotion, glareEffect, x, y, scale]);
 
   const handlePointerLeave = useCallback(() => {
-    setTilt(prev => ({
-      ...prev,
-      rotateX: 0,
-      rotateY: 0,
-      isInteracting: false,
-    }));
-  }, []);
+    x.set(0);
+    y.set(0);
+    scale.set(1);
+    if (glareRef.current) {
+      glareRef.current.style.opacity = '0';
+    }
+  }, [x, y, scale]);
 
   if (shouldReduceMotion) {
     return <div className={className}>{children}</div>;
@@ -78,18 +74,10 @@ export const TiltCard3D: React.FC<TiltCard3DProps> = ({
         onPointerMove={handlePointerMove}
         onPointerLeave={handlePointerLeave}
         onPointerCancel={handlePointerLeave}
-        animate={{
-          rotateX: tilt.rotateX,
-          rotateY: tilt.rotateY,
-          scale: tilt.isInteracting ? 1.015 : 1,
-        }}
-        transition={{
-          type: 'spring',
-          stiffness: 300,
-          damping: 25,
-          mass: 0.5,
-        }}
         style={{
+          rotateX,
+          rotateY,
+          scale: springScale,
           transformStyle: 'preserve-3d',
           willChange: 'transform',
         }}
@@ -97,13 +85,13 @@ export const TiltCard3D: React.FC<TiltCard3DProps> = ({
       >
         {children}
 
-        {/* Dynamic Holographic Glare Reflection */}
+        {/* Dynamic Holographic Glare Reflection Layer */}
         {glareEffect && (
           <div
+            ref={glareRef}
             className="absolute inset-0 rounded-2xl pointer-events-none transition-opacity duration-300 z-30"
             style={{
-              opacity: tilt.isInteracting ? 0.14 : 0,
-              background: `radial-gradient(circle at ${tilt.glareX}% ${tilt.glareY}%, rgba(255, 255, 255, 0.9) 0%, rgba(255, 255, 255, 0) 65%)`,
+              opacity: 0,
               mixBlendMode: 'overlay',
             }}
           />

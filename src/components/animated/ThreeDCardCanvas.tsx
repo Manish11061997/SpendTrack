@@ -42,9 +42,9 @@ export const ThreeDCardCanvas: React.FC<ThreeDCardCanvasProps> = ({
       powerPreference: 'high-performance',
     });
     renderer.setSize(width, height);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.25));
     renderer.shadowMap.enabled = true;
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.shadowMap.type = THREE.BasicShadowMap;
     container.appendChild(renderer.domElement);
 
     // 3. Card 3D Rounded Box Geometry (Extruded Shape with Bevel)

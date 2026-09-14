@@ -36,7 +36,7 @@ export const ThreeDCoinCanvas: React.FC<ThreeDCoinCanvasProps> = ({
       powerPreference: 'high-performance',
     });
     renderer.setSize(width, height);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.25));
     renderer.shadowMap.enabled = true;
     container.appendChild(renderer.domElement);
 

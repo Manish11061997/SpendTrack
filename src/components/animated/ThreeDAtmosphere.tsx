@@ -25,11 +25,11 @@ export const ThreeDAtmosphere: React.FC<ThreeDAtmosphereProps> = ({ className = 
     // 2. High-performance alpha WebGL Renderer
     const renderer = new THREE.WebGLRenderer({
       alpha: true,
-      antialias: true,
-      powerPreference: 'low-power',
+      antialias: false,
+      powerPreference: 'high-performance',
     });
     renderer.setSize(width, height);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.25));
     renderer.domElement.style.position = 'absolute';
     renderer.domElement.style.top = '0';
     renderer.domElement.style.left = '0';
@@ -136,14 +136,12 @@ export const ThreeDAtmosphere: React.FC<ThreeDAtmosphereProps> = ({ className = 
         opacity: 0.45,
       }),
       // Translucent Emerald Glass
-      new THREE.MeshPhysicalMaterial({
+      new THREE.MeshStandardMaterial({
         color: 0x059669,
-        metalness: 0.1,
-        roughness: 0.1,
-        transmission: 0.8,
-        thickness: 0.5,
+        metalness: 0.6,
+        roughness: 0.2,
         transparent: true,
-        opacity: 0.35,
+        opacity: 0.45,
       }),
       // Titanium Metallic Ring
       new THREE.MeshStandardMaterial({
