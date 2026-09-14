@@ -230,14 +230,20 @@ export const ThreeDAtmosphere: React.FC<ThreeDAtmosphereProps> = ({ className = 
     };
     document.addEventListener('visibilitychange', handleVisibilityChange);
 
-    // 9. Animation Loop
+    // 9. Animation Loop with 60 FPS Cap for Buttery Performance
     let animationFrameId: number;
     let clock = new THREE.Clock();
+    let lastRenderTime = 0;
+    const targetInterval = 1000 / 60; // 60 FPS cap (approx 16.6ms)
 
-    const animate = () => {
+    const animate = (timestamp: number) => {
       animationFrameId = requestAnimationFrame(animate);
 
       if (!isVisibleRef.current) return;
+
+      // Throttle rendering on high-refresh screens (120Hz/144Hz) to maintain silky 60fps
+      if (timestamp - lastRenderTime < targetInterval) return;
+      lastRenderTime = timestamp;
 
       const delta = clock.getDelta();
       const elapsedTime = clock.getElapsedTime();
@@ -271,7 +277,7 @@ export const ThreeDAtmosphere: React.FC<ThreeDAtmosphereProps> = ({ className = 
       renderer.render(scene, camera);
     };
 
-    animate();
+    animate(0);
 
     // 10. Clean Cleanup on Unmount
     return () => {

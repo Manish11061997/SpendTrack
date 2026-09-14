@@ -58,7 +58,6 @@ import { checkAlertRulesOnSave } from './utils/alertRulesEngine';
 
 import { VoiceInputModal } from './components/VoiceInputModal';
 import { ThreeDAtmosphere } from './components/animated/ThreeDAtmosphere';
-import { AmbientMeshBackground } from './components/animated';
 
 // Modals (Static imports to ensure zero dynamic chunk loading failures on Android)
 import { CalendarViewModal } from './components/CalendarViewModal';
@@ -1324,10 +1323,6 @@ export default function App() {
             {/* Interactive WebGL 3D Spatial Atmosphere with Mouse Parallax (Desktop Only) */}
             <div className="hidden lg:block pointer-events-none fixed inset-0 z-0 overflow-hidden">
               <ThreeDAtmosphere />
-            </div>
-            {/* Breathing Ambient Color Orbs — layered on top of atmosphere (Desktop Only) */}
-            <div className="hidden lg:block pointer-events-none fixed inset-0 z-0">
-              <AmbientMeshBackground />
             </div>
       
       {/* If Add Form is active, render it exclusively in full viewport view */}

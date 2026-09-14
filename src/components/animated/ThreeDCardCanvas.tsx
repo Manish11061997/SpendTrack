@@ -295,26 +295,16 @@ export const ThreeDCardCanvas: React.FC<ThreeDCardCanvasProps> = ({
     scene.add(backRim);
 
     // 8. Interaction Event Listeners (Drag to rotate in 3D)
+    // 8. Interaction Event Listeners (Drag to rotate in 3D - Optimized)
     const onPointerDown = (e: PointerEvent) => {
       isDraggingRef.current = true;
       setIsInteracting(true);
       previousMousePositionRef.current = { x: e.clientX, y: e.clientY };
     };
 
-    const onPointerMove = (e: PointerEvent) => {
-      // Dynamic light moves with cursor
-      const rect = container.getBoundingClientRect();
-      const normX = ((e.clientX - rect.left) / rect.width) * 2 - 1;
-      const normY = -(((e.clientY - rect.top) / rect.height) * 2 - 1);
-      pointLight.position.x = normX * 4;
-      pointLight.position.y = normY * 4;
-
-      if (!isDraggingRef.current) {
-        // Idle hover tilt
-        cardMesh.rotation.y = THREE.MathUtils.lerp(cardMesh.rotation.y, normX * 0.45, 0.08);
-        cardMesh.rotation.x = THREE.MathUtils.lerp(cardMesh.rotation.x, -normY * 0.35 + 0.1, 0.08);
-        return;
-      }
+    // Window pointermove ONLY handles dragging if actively holding mouse button
+    const onWindowPointerMove = (e: PointerEvent) => {
+      if (!isDraggingRef.current) return;
 
       const deltaX = e.clientX - previousMousePositionRef.current.x;
       const deltaY = e.clientY - previousMousePositionRef.current.y;
@@ -326,21 +316,44 @@ export const ThreeDCardCanvas: React.FC<ThreeDCardCanvasProps> = ({
       previousMousePositionRef.current = { x: e.clientX, y: e.clientY };
     };
 
+    // Container hover tilt & dynamic light only fires when cursor is over container
+    const onContainerPointerMove = (e: PointerEvent) => {
+      if (isDraggingRef.current) return;
+
+      const rect = container.getBoundingClientRect();
+      if (!rect.width || !rect.height) return;
+
+      const normX = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+      const normY = -(((e.clientY - rect.top) / rect.height) * 2 - 1);
+      pointLight.position.x = normX * 4;
+      pointLight.position.y = normY * 4;
+
+      cardMesh.rotation.y = THREE.MathUtils.lerp(cardMesh.rotation.y, normX * 0.45, 0.08);
+      cardMesh.rotation.x = THREE.MathUtils.lerp(cardMesh.rotation.x, -normY * 0.35 + 0.1, 0.08);
+    };
+
     const onPointerUp = () => {
       isDraggingRef.current = false;
       setIsInteracting(false);
     };
 
     container.addEventListener('pointerdown', onPointerDown);
-    window.addEventListener('pointermove', onPointerMove);
+    container.addEventListener('pointermove', onContainerPointerMove, { passive: true });
+    window.addEventListener('pointermove', onWindowPointerMove, { passive: true });
     window.addEventListener('pointerup', onPointerUp);
 
-    // 9. Render Loop
+    // 9. Render Loop (60 FPS Capped)
     let animationFrameId: number;
     let clock = new THREE.Clock();
+    let lastRenderTime = 0;
+    const targetInterval = 1000 / 60;
 
-    const animate = () => {
+    const animate = (timestamp: number) => {
       animationFrameId = requestAnimationFrame(animate);
+
+      if (timestamp - lastRenderTime < targetInterval) return;
+      lastRenderTime = timestamp;
+
       const delta = clock.getDelta();
       const elapsedTime = clock.getElapsedTime();
 
@@ -359,7 +372,7 @@ export const ThreeDCardCanvas: React.FC<ThreeDCardCanvasProps> = ({
 
       renderer.render(scene, camera);
     };
-    animate();
+    animate(0);
 
     // 10. Handle Resize
     const handleResize = () => {
@@ -376,7 +389,8 @@ export const ThreeDCardCanvas: React.FC<ThreeDCardCanvasProps> = ({
       cancelAnimationFrame(animationFrameId);
       window.removeEventListener('resize', handleResize);
       container.removeEventListener('pointerdown', onPointerDown);
-      window.removeEventListener('pointermove', onPointerMove);
+      container.removeEventListener('pointermove', onContainerPointerMove);
+      window.removeEventListener('pointermove', onWindowPointerMove);
       window.removeEventListener('pointerup', onPointerUp);
       if (renderer.domElement.parentElement) {
         renderer.domElement.parentElement.removeChild(renderer.domElement);

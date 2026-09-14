@@ -33,6 +33,7 @@ export const ThreeDBarVisualizer: React.FC<ThreeDBarVisualizerProps> = ({
   const previousPointerRef = useRef({ x: 0, y: 0 });
   const velocityRef = useRef({ x: 0, y: 0 });
   const [hoveredBar, setHoveredBar] = useState<CategoryBarData | null>(null);
+  const hoveredBarRef = useRef<CategoryBarData | null>(null);
   const [autoRotate, setAutoRotate] = useState(true);
 
   useEffect(() => {
@@ -184,7 +185,10 @@ export const ThreeDBarVisualizer: React.FC<ThreeDBarVisualizerProps> = ({
       });
     });
 
-    // 6. Interactive Drag Controls
+    // 6. Interactive Drag Controls (Optimized)
+    const raycaster = new THREE.Raycaster();
+    const mouseCoord = new THREE.Vector2();
+
     const onPointerDown = (e: PointerEvent) => {
       isDraggingRef.current = true;
       setAutoRotate(false);
@@ -192,37 +196,56 @@ export const ThreeDBarVisualizer: React.FC<ThreeDBarVisualizerProps> = ({
       velocityRef.current = { x: 0, y: 0 };
     };
 
-    const onPointerMove = (e: PointerEvent) => {
-      if (isDraggingRef.current) {
-        const deltaX = e.clientX - previousPointerRef.current.x;
-        const deltaY = e.clientY - previousPointerRef.current.y;
+    // Window pointermove only fires drag if mouse is actively held down
+    const onWindowPointerMove = (e: PointerEvent) => {
+      if (!isDraggingRef.current) return;
 
-        worldGroup.rotation.y += deltaX * 0.01;
-        worldGroup.rotation.x += deltaY * 0.006;
-        worldGroup.rotation.x = Math.max(-0.2, Math.min(0.6, worldGroup.rotation.x));
+      const deltaX = e.clientX - previousPointerRef.current.x;
+      const deltaY = e.clientY - previousPointerRef.current.y;
 
-        velocityRef.current = {
-          x: deltaX * 0.01,
-          y: deltaY * 0.006,
-        };
+      worldGroup.rotation.y += deltaX * 0.01;
+      worldGroup.rotation.x += deltaY * 0.006;
+      worldGroup.rotation.x = Math.max(-0.2, Math.min(0.6, worldGroup.rotation.x));
 
-        previousPointerRef.current = { x: e.clientX, y: e.clientY };
-      }
+      velocityRef.current = {
+        x: deltaX * 0.01,
+        y: deltaY * 0.006,
+      };
 
-      // Raycaster for pillar hover
+      previousPointerRef.current = { x: e.clientX, y: e.clientY };
+    };
+
+    // Canvas hover raycast only runs when cursor is physically hovering over the bar canvas
+    const onCanvasPointerMove = (e: PointerEvent) => {
+      if (isDraggingRef.current) return;
+
       const rect = renderer.domElement.getBoundingClientRect();
-      const mouseX = ((e.clientX - rect.left) / rect.width) * 2 - 1;
-      const mouseY = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+      if (!rect.width || !rect.height) return;
 
-      const raycaster = new THREE.Raycaster();
-      raycaster.setFromCamera(new THREE.Vector2(mouseX, mouseY), camera);
+      mouseCoord.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+      mouseCoord.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+
+      raycaster.setFromCamera(mouseCoord, camera);
 
       const intersects = raycaster.intersectObjects(barMeshes.map(b => b.mesh));
       if (intersects.length > 0) {
         const hitMesh = intersects[0].object as THREE.Mesh;
         const hitData = hitMesh.userData.category as CategoryBarData;
-        setHoveredBar(hitData);
+        if (hoveredBarRef.current?.name !== hitData.name) {
+          hoveredBarRef.current = hitData;
+          setHoveredBar(hitData);
+        }
       } else {
+        if (hoveredBarRef.current !== null) {
+          hoveredBarRef.current = null;
+          setHoveredBar(null);
+        }
+      }
+    };
+
+    const onCanvasPointerLeave = () => {
+      if (hoveredBarRef.current !== null) {
+        hoveredBarRef.current = null;
         setHoveredBar(null);
       }
     };
@@ -233,7 +256,9 @@ export const ThreeDBarVisualizer: React.FC<ThreeDBarVisualizerProps> = ({
 
     const domElem = renderer.domElement;
     domElem.addEventListener('pointerdown', onPointerDown);
-    window.addEventListener('pointermove', onPointerMove);
+    domElem.addEventListener('pointermove', onCanvasPointerMove, { passive: true });
+    domElem.addEventListener('pointerleave', onCanvasPointerLeave);
+    window.addEventListener('pointermove', onWindowPointerMove, { passive: true });
     window.addEventListener('pointerup', onPointerUp);
 
     // 7. Resize Observer
@@ -249,11 +274,16 @@ export const ThreeDBarVisualizer: React.FC<ThreeDBarVisualizerProps> = ({
     });
     resizeObserver.observe(container);
 
-    // 8. Render Animation Loop
+    // 8. Render Animation Loop (60 FPS Capped)
     let animationFrameId: number;
+    let lastRenderTime = 0;
+    const targetInterval = 1000 / 60;
 
-    const animate = () => {
+    const animate = (timestamp: number) => {
       animationFrameId = requestAnimationFrame(animate);
+
+      if (timestamp - lastRenderTime < targetInterval) return;
+      lastRenderTime = timestamp;
 
       if (!isDraggingRef.current) {
         velocityRef.current.x *= 0.88;
@@ -269,8 +299,9 @@ export const ThreeDBarVisualizer: React.FC<ThreeDBarVisualizerProps> = ({
       }
 
       // Smooth, Weighted Hover Glow & Lift
+      const currentHovered = hoveredBarRef.current;
       barMeshes.forEach((item) => {
-        const isHovered = hoveredBar && hoveredBar.name === item.data.name;
+        const isHovered = currentHovered && currentHovered.name === item.data.name;
         const capMat = item.cap.material as THREE.MeshStandardMaterial;
         const targetIntensity = isHovered ? 1.2 : 0.75;
         capMat.emissiveIntensity = THREE.MathUtils.lerp(capMat.emissiveIntensity, targetIntensity, 0.12);
@@ -283,13 +314,15 @@ export const ThreeDBarVisualizer: React.FC<ThreeDBarVisualizerProps> = ({
       renderer.render(scene, camera);
     };
 
-    animate();
+    animate(0);
 
     // 9. Cleanup on Unmount
     return () => {
       cancelAnimationFrame(animationFrameId);
       domElem.removeEventListener('pointerdown', onPointerDown);
-      window.removeEventListener('pointermove', onPointerMove);
+      domElem.removeEventListener('pointermove', onCanvasPointerMove);
+      domElem.removeEventListener('pointerleave', onCanvasPointerLeave);
+      window.removeEventListener('pointermove', onWindowPointerMove);
       window.removeEventListener('pointerup', onPointerUp);
       resizeObserver.disconnect();
 
@@ -311,7 +344,7 @@ export const ThreeDBarVisualizer: React.FC<ThreeDBarVisualizerProps> = ({
       ringMat.dispose();
       renderer.dispose();
     };
-  }, [categories, autoRotate, hoveredBar]);
+  }, [categories, autoRotate]);
 
   return (
     <div className={`relative w-full flex flex-col items-center justify-center select-none ${className}`}>

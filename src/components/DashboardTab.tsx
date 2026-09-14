@@ -6,7 +6,6 @@ import { formatCurrency as formatCustomCurrency, getCurrencySymbol, getCurrencyL
 import { COLOR_PRESETS } from '../theme';
 import { triggerHaptic } from '../utils/haptics';
 import { ThreeDDonutCanvas, ThreeDCardCanvas, TiltCard3D, FlipCard3D, Card3D, RollingNumber } from './animated';
-import { BorderBeam } from './ui/BorderBeam';
 import { ThreeDCardModal } from './ThreeDCardModal';
 import { QuickShortcutsWidget } from './QuickShortcutsWidget';
 import { FinancialHealthRadarCard } from './FinancialHealthRadarCard';
@@ -2159,18 +2158,17 @@ export default function DashboardTab({
         {/* ── BENTO ROW 1: Hero Card + Budget Health Ring + Smart Intel ── */}
         <div className="grid grid-cols-12 gap-6 items-stretch">
           
-          {/* Bento Cell 1: Luxury Virtual Metallic Card (Col 6) */}
-          <div className="col-span-6 flex flex-col">
-            <TiltCard3D maxTilt={6} glareEffect={true} className="h-full">
-            <div className="p-6 rounded-3xl bg-gradient-to-br from-slate-900 via-[#0D1424] to-[#080D1A] text-white border border-white/10 shadow-2xl relative overflow-hidden flex flex-col justify-between min-h-[300px] rizzeat-bento-card group">
-              <BorderBeam size={280} duration={12} colorFrom="var(--primary, #10B981)" colorTo="var(--secondary, #06B6D4)" />
+          {/* Bento Cell 1: Compact Luxury Virtual Metallic Card (Col 5) */}
+          <div className="col-span-5 flex flex-col">
+            <TiltCard3D maxTilt={5} glareEffect={true} className="h-full">
+            <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-br from-slate-900 via-[#0D1424] to-[#080D1A] text-white border border-white/10 hover:border-white/20 shadow-xl relative overflow-hidden flex flex-col justify-between min-h-[220px] rizzeat-bento-card group transition-colors">
               {/* Subtle ambient light gradient inside card */}
-              <div className="absolute top-0 right-0 w-80 h-80 bg-primary/10 rounded-full blur-3xl pointer-events-none" />
-              <div className="absolute -bottom-20 -left-20 w-60 h-60 bg-secondary/10 rounded-full blur-2xl pointer-events-none" />
+              <div className="absolute top-0 right-0 w-48 h-48 bg-primary/10 rounded-full blur-3xl pointer-events-none" />
+              <div className="absolute -bottom-16 -left-16 w-36 h-36 bg-secondary/10 rounded-full blur-2xl pointer-events-none" />
 
               {/* Trajectory Area Chart Spline (subtle background telemetry) */}
               {!isHeroFlipped && (
-                <div className="absolute right-0 bottom-14 w-72 h-24 opacity-35 pointer-events-none">
+                <div className="absolute right-0 bottom-10 w-44 h-16 opacity-20 pointer-events-none">
                   <ResponsiveContainer width="100%" height="100%">
                     <AreaChart data={spendingTrendData}>
                       <defs>
@@ -2179,7 +2177,7 @@ export default function DashboardTab({
                           <stop offset="95%" stopColor={themeColors.primary} stopOpacity={0}/>
                         </linearGradient>
                       </defs>
-                      <Area type="monotone" dataKey="amount" stroke={themeColors.primary} strokeWidth={2.5} fillOpacity={1} fill="url(#desktopSpline)" />
+                      <Area type="monotone" dataKey="amount" stroke={themeColors.primary} strokeWidth={2} fillOpacity={1} fill="url(#desktopSpline)" />
                     </AreaChart>
                   </ResponsiveContainer>
                 </div>
@@ -2187,20 +2185,20 @@ export default function DashboardTab({
 
               {/* Row 1: Card Type + 3D Studio + Mode Toggle */}
               <div className="relative z-10 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-7 rounded-md bg-gradient-to-r from-amber-300 via-amber-200 to-yellow-400 p-1 flex items-center justify-center shadow-inner">
-                    <div className="w-full h-full border border-amber-600/40 rounded-sm grid grid-cols-2 gap-0.5 opacity-75">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-6 rounded-md bg-gradient-to-r from-amber-300 via-amber-200 to-yellow-400 p-0.5 flex items-center justify-center shadow-inner">
+                    <div className="w-full h-full border border-amber-600/40 rounded-xs grid grid-cols-2 gap-0.5 opacity-75">
                       <div className="bg-amber-600/30" />
                       <div className="bg-amber-600/30" />
                     </div>
                   </div>
                   <div>
-                    <span className="text-[11px] font-black font-mono tracking-wider text-slate-300 uppercase block">SpendTrack Platinum</span>
-                    <span className="text-[9px] text-slate-400 font-mono">3D Dynamic Outflow Engine</span>
+                    <span className="text-[10px] font-black font-mono tracking-wider text-slate-300 uppercase block">SpendTrack Platinum</span>
+                    <span className="text-[8px] text-slate-400 font-mono">Dynamic Outflow</span>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1.5">
                   <button
                     type="button"
                     onClick={() => {
@@ -2209,21 +2207,21 @@ export default function DashboardTab({
                     }}
                     title="Open Interactive 3D WebGL Studio"
                     aria-label="3D WebGL Studio"
-                    className="px-2.5 py-1 rounded-lg bg-gradient-to-r from-primary/20 via-secondary/20 to-primary/20 hover:from-primary/30 hover:to-secondary/30 text-primary border border-primary/40 transition-all cursor-pointer flex items-center gap-1.5 text-xs font-mono font-bold shadow-xs active:scale-95"
+                    className="px-2 py-0.5 rounded-md bg-primary/20 hover:bg-primary/30 text-primary border border-primary/40 transition-all cursor-pointer flex items-center gap-1 text-[11px] font-mono font-bold shadow-2xs active:scale-95"
                   >
-                    <Sparkles className="w-3.5 h-3.5" />
+                    <Sparkles className="w-3 h-3" />
                     <span>3D Studio</span>
                   </button>
 
-                  <div className="flex items-center bg-white/10 p-0.5 rounded-lg border border-white/10 text-[10px]">
+                  <div className="flex items-center bg-white/10 p-0.5 rounded-md border border-white/10 text-[9px]">
                     <button
                       type="button"
                       onClick={() => setHeroMode('3d')}
-                      className={`px-2 py-0.5 rounded-md font-bold transition-all cursor-pointer ${
-                        heroMode === '3d' ? 'bg-primary text-black shadow-xs' : 'text-slate-300 hover:text-white'
+                      className={`px-1.5 py-0.5 rounded-sm font-bold transition-all cursor-pointer ${
+                        heroMode === '3d' ? 'bg-primary text-black shadow-2xs' : 'text-slate-300 hover:text-white'
                       }`}
                     >
-                      3D Card
+                      3D
                     </button>
                     <button
                       type="button"
@@ -2231,8 +2229,8 @@ export default function DashboardTab({
                         setHeroMode('stats');
                         setIsHeroFlipped(false);
                       }}
-                      className={`px-2 py-0.5 rounded-md font-bold transition-all cursor-pointer ${
-                        heroMode === 'stats' && !isHeroFlipped ? 'bg-primary text-black shadow-xs' : 'text-slate-300 hover:text-white'
+                      className={`px-1.5 py-0.5 rounded-sm font-bold transition-all cursor-pointer ${
+                        heroMode === 'stats' && !isHeroFlipped ? 'bg-primary text-black shadow-2xs' : 'text-slate-300 hover:text-white'
                       }`}
                     >
                       Stats
@@ -2243,8 +2241,8 @@ export default function DashboardTab({
                         setHeroMode('stats');
                         setIsHeroFlipped(true);
                       }}
-                      className={`px-2 py-0.5 rounded-md font-bold transition-all cursor-pointer ${
-                        heroMode === 'stats' && isHeroFlipped ? 'bg-primary text-black shadow-xs' : 'text-slate-300 hover:text-white'
+                      className={`px-1.5 py-0.5 rounded-sm font-bold transition-all cursor-pointer ${
+                        heroMode === 'stats' && isHeroFlipped ? 'bg-primary text-black shadow-2xs' : 'text-slate-300 hover:text-white'
                       }`}
                     >
                       Pace
@@ -2254,9 +2252,9 @@ export default function DashboardTab({
               </div>
 
               {/* Row 2: Content (Amount or Flip Stats or 3D WebGL Card) */}
-              <div className="relative z-10 py-2">
+              <div className="relative z-10 py-1.5">
                 {heroMode === '3d' ? (
-                  <div className="h-[180px] w-full flex items-center justify-center">
+                  <div className="h-[140px] w-full flex items-center justify-center">
                     <ThreeDCardCanvas
                       balance={activeExpenses}
                       currencySymbol={getCurrencySymbol(budget?.currency || 'INR')}
@@ -2268,15 +2266,15 @@ export default function DashboardTab({
                   <FlipCard3D
                     isFlipped={isHeroFlipped}
                     onFlipChange={setIsHeroFlipped}
-                    className="min-h-[90px]"
+                    className="min-h-[75px]"
                     front={
-                      <div className="space-y-1 py-2">
+                      <div className="space-y-1 py-1">
                         <div className="flex items-center gap-2">
-                          <span className="text-xs font-bold uppercase tracking-widest text-slate-400">
+                          <span className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-slate-400">
                             {summaryMode === 'monthly' ? 'Monthly Committed Outflow' : 'Weekly Committed Outflow'}
                           </span>
                           {hasBudget && (
-                            <span className={`text-[9px] font-extrabold px-2 py-0.5 rounded-full border ${
+                            <span className={`text-[8px] sm:text-[9px] font-extrabold px-1.5 py-0.5 rounded-full border ${
                               (activeExpenses / (activeLimit || 3000)) * 100 > 100 
                                 ? 'bg-rose-500/20 text-rose-300 border-rose-500/30' 
                                 : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
@@ -2285,8 +2283,8 @@ export default function DashboardTab({
                             </span>
                           )}
                         </div>
-                        <div className="flex items-baseline gap-3">
-                          <h2 className="text-4xl sm:text-5xl font-mono font-black tracking-tight text-white drop-shadow-sm flex items-center">
+                        <div className="flex items-baseline gap-2">
+                          <h2 className="text-2xl sm:text-3xl font-mono font-black tracking-tight text-white drop-shadow-xs flex items-center">
                             <RollingNumber
                               value={activeExpenses}
                               prefix={getCurrencySymbol(budget?.currency || 'INR')}
@@ -2298,38 +2296,38 @@ export default function DashboardTab({
                       </div>
                     }
                     back={
-                      <div className="grid grid-cols-3 gap-3 py-1">
-                        <div className="p-3 bg-white/5 border border-white/10 rounded-2xl">
-                          <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Daily Pace</span>
-                          <p className="font-mono text-base font-black text-white mt-0.5">
+                      <div className="grid grid-cols-3 gap-2 py-1">
+                        <div className="p-2 bg-white/5 border border-white/10 rounded-xl">
+                          <span className="text-[8px] font-bold text-slate-400 uppercase tracking-wider block">Daily Pace</span>
+                          <p className="font-mono text-xs sm:text-sm font-black text-white mt-0.5 truncate">
                             {(() => {
                               const today = new Date().getDate();
                               const avg = today > 0 ? Math.round(activeExpenses / today) : activeExpenses;
                               return formatCurrency(avg);
                             })()}
                           </p>
-                          <span className="text-[8px] text-slate-400">Avg / day</span>
+                          <span className="text-[7px] text-slate-400">Avg / day</span>
                         </div>
 
-                        <div className="p-3 bg-white/5 border border-white/10 rounded-2xl">
-                          <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Top Category</span>
-                          <p className="text-sm font-black text-white truncate mt-0.5">
+                        <div className="p-2 bg-white/5 border border-white/10 rounded-xl">
+                          <span className="text-[8px] font-bold text-slate-400 uppercase tracking-wider block">Top Category</span>
+                          <p className="text-xs sm:text-sm font-black text-white truncate mt-0.5">
                             {chartData.length > 0 ? chartData[0].name : 'None'}
                           </p>
-                          <span className="text-[8px] text-slate-400">
+                          <span className="text-[7px] text-slate-400">
                             {chartData.length > 0 ? formatCurrency(chartData[0].value) : '₹0'}
                           </span>
                         </div>
 
-                        <div className="p-3 bg-white/5 border border-white/10 rounded-2xl">
-                          <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Remaining Cap</span>
-                          <p className={`font-mono text-base font-black mt-0.5 ${
+                        <div className="p-2 bg-white/5 border border-white/10 rounded-xl">
+                          <span className="text-[8px] font-bold text-slate-400 uppercase tracking-wider block">Buffer</span>
+                          <p className={`font-mono text-xs sm:text-sm font-black mt-0.5 truncate ${
                             activeLimit - activeExpenses < 0 ? 'text-rose-400' : 'text-emerald-400'
                           }`}>
                             {formatCurrency(activeLimit - activeExpenses)}
                           </p>
-                          <span className="text-[8px] text-slate-400">
-                            {activeLimit - activeExpenses < 0 ? 'Over limit' : 'Buffer'}
+                          <span className="text-[7px] text-slate-400">
+                            {activeLimit - activeExpenses < 0 ? 'Over' : 'Remaining'}
                           </span>
                         </div>
                       </div>
@@ -2339,18 +2337,18 @@ export default function DashboardTab({
               </div>
 
               {/* Row 3: Cardholder info + Quick Actions */}
-              <div className="relative z-10 flex items-center justify-between border-t border-white/10 pt-3.5">
-                <div className="flex items-center gap-4 text-xs font-mono text-slate-300">
+              <div className="relative z-10 flex items-center justify-between border-t border-white/10 pt-2.5">
+                <div className="flex items-center gap-3 text-[11px] font-mono text-slate-300">
                   <span className="font-bold tracking-wider uppercase">{profile.name || 'Personal Account'}</span>
                   <span className="text-slate-500">•</span>
-                  <span className="text-[10px] text-slate-400 font-mono">VAL THRU 12/28</span>
+                  <span className="text-[9px] text-slate-400 font-mono">12/28</span>
                 </div>
 
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
                     onClick={onAddTransactionClick}
-                    className="px-3.5 py-1.5 bg-primary text-on-primary rounded-xl text-xs font-bold hover:bg-primary/90 active:scale-95 transition-all shadow-md flex items-center gap-1.5 cursor-pointer"
+                    className="px-3 py-1.5 bg-primary text-on-primary rounded-xl text-xs font-bold hover:bg-primary/90 active:scale-95 transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
                   >
                     <Plus className="w-3.5 h-3.5" />
                     <span>Log Outflow</span>
@@ -2361,10 +2359,10 @@ export default function DashboardTab({
             </TiltCard3D>
           </div>
 
-          {/* Bento Cell 2: VisionOS Budget Health Radial Gauge / 3D Extruded Donut (Col 3) */}
-          <div className="col-span-3 flex flex-col">
+          {/* Bento Cell 2: VisionOS Budget Health Radial Gauge / 3D Extruded Donut (Col 4) */}
+          <div className="col-span-4 flex flex-col">
             <TiltCard3D maxTilt={5} glareEffect={true} className="h-full">
-            <div className="p-5 rounded-3xl bg-surface-container-low/90 backdrop-blur-md border border-outline-variant/30 shadow-sm flex flex-col justify-between h-full rizzeat-bento-card space-y-3">
+            <div className="p-4 sm:p-5 rounded-2xl bg-surface-container-low/95 border border-outline-variant/30 shadow-xs flex flex-col justify-between h-full rizzeat-bento-card space-y-2.5">
               <div className="flex items-center justify-between border-b border-outline-variant/20 dark:border-white/5 pb-2">
                 <div className="flex items-center gap-1.5">
                   <LucidePieChart className="w-4 h-4 text-primary" />
@@ -2379,7 +2377,7 @@ export default function DashboardTab({
                     }}
                     className={`px-2 py-0.5 rounded-md font-bold transition-all cursor-pointer ${
                       donutMode === '3d'
-                        ? 'bg-primary text-black shadow-xs'
+                        ? 'bg-primary text-black shadow-2xs'
                         : 'text-on-surface-variant hover:text-on-surface'
                     }`}
                   >
@@ -2393,7 +2391,7 @@ export default function DashboardTab({
                     }}
                     className={`px-2 py-0.5 rounded-md font-bold transition-all cursor-pointer ${
                       donutMode === 'rings'
-                        ? 'bg-primary text-black shadow-xs'
+                        ? 'bg-primary text-black shadow-2xs'
                         : 'text-on-surface-variant hover:text-on-surface'
                     }`}
                   >
@@ -2403,7 +2401,7 @@ export default function DashboardTab({
               </div>
 
               {donutMode === '3d' ? (
-                <div className="h-44 w-full flex items-center justify-center relative overflow-hidden rounded-2xl">
+                <div className="h-44 w-full flex items-center justify-center relative overflow-hidden rounded-xl">
                   <ThreeDDonutCanvas
                     categories={rings3dData}
                     totalSpent={activeExpenses}
@@ -2459,7 +2457,7 @@ export default function DashboardTab({
                 </div>
               )}
 
-              <div className="border-t border-outline-variant/20 pt-2.5 flex justify-between items-center text-xs font-mono">
+              <div className="border-t border-outline-variant/20 pt-2 flex justify-between items-center text-xs font-mono">
                 <span className="text-[10px] text-on-surface-variant font-medium">Spent: <strong className="text-on-surface">{formatCurrency(activeExpenses)}</strong></span>
                 <span className="text-[10px] text-on-surface-variant font-medium">Cap: <strong className="text-on-surface">{formatCurrency(activeLimit)}</strong></span>
               </div>
@@ -2470,8 +2468,7 @@ export default function DashboardTab({
           {/* Bento Cell 3: Smart Insights Telemetry (Col 3) */}
           <div className="col-span-3 flex flex-col">
             <TiltCard3D maxTilt={5} glareEffect={true} className="h-full">
-            <div className="p-5 rounded-3xl bg-surface-container-low/90 backdrop-blur-md border border-outline-variant/30 shadow-sm flex flex-col justify-between h-full rizzeat-bento-card space-y-3 relative overflow-hidden">
-              <BorderBeam size={200} duration={14} colorFrom="var(--secondary, #06B6D4)" colorTo="var(--primary, #10B981)" />
+            <div className="p-4 sm:p-5 rounded-2xl bg-surface-container-low/95 border border-outline-variant/30 shadow-xs flex flex-col justify-between h-full rizzeat-bento-card space-y-2.5 relative overflow-hidden">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-1.5">
                   <Sparkles className="w-4 h-4 text-primary" />
@@ -2497,16 +2494,16 @@ export default function DashboardTab({
               </div>
 
               {/* Slide content */}
-              <div className="py-2 flex-1 flex flex-col justify-center">
+              <div className="py-1.5 flex-1 flex flex-col justify-center">
                 {smartInsightSlide === 0 && (
-                  <div className="space-y-2">
+                  <div className="space-y-1.5">
                     <div className="flex items-center gap-2">
-                      <span className="w-6 h-6 rounded-lg bg-emerald-500/15 text-emerald-600 flex items-center justify-center shrink-0">
-                        <TrendingDown className="w-3.5 h-3.5" />
+                      <span className="w-5 h-5 rounded-md bg-emerald-500/15 text-emerald-600 flex items-center justify-center shrink-0">
+                        <TrendingDown className="w-3 h-3" />
                       </span>
                       <span className="text-xs font-bold text-on-surface">Monthly Velocity</span>
                     </div>
-                    <p className="text-xs text-on-surface-variant leading-relaxed">
+                    <p className="text-[11px] text-on-surface-variant leading-relaxed">
                       {monthlyDiffPercent <= 0 
                         ? `Spending is down ${Math.abs(Math.round(monthlyDiffPercent))}% compared to last month. Great pace!`
                         : `Pace is ${Math.round(monthlyDiffPercent)}% higher than last month. Consider curbing discretionary spending.`
@@ -2515,14 +2512,14 @@ export default function DashboardTab({
                   </div>
                 )}
                 {smartInsightSlide === 1 && (
-                  <div className="space-y-2">
+                  <div className="space-y-1.5">
                     <div className="flex items-center gap-2">
-                      <span className="w-6 h-6 rounded-lg bg-primary/15 text-primary flex items-center justify-center shrink-0">
-                        <Wallet className="w-3.5 h-3.5" />
+                      <span className="w-5 h-5 rounded-md bg-primary/15 text-primary flex items-center justify-center shrink-0">
+                        <Wallet className="w-3 h-3" />
                       </span>
                       <span className="text-xs font-bold text-on-surface">Top Expenditure</span>
                     </div>
-                    <p className="text-xs text-on-surface-variant leading-relaxed">
+                    <p className="text-[11px] text-on-surface-variant leading-relaxed">
                       {chartData.length > 0 
                         ? `${chartData[0].name} accounts for ${((chartData[0].value / (totalSpendingForMonth || 1)) * 100).toFixed(0)}% of your monthly outflows.`
                         : 'No category data recorded yet for this billing cycle.'
@@ -2531,21 +2528,21 @@ export default function DashboardTab({
                   </div>
                 )}
                 {smartInsightSlide === 2 && (
-                  <div className="space-y-2">
+                  <div className="space-y-1.5">
                     <div className="flex items-center gap-2">
-                      <span className="w-6 h-6 rounded-lg bg-purple-500/15 text-purple-600 flex items-center justify-center shrink-0">
-                        <ShieldCheck className="w-3.5 h-3.5" />
+                      <span className="w-5 h-5 rounded-md bg-purple-500/15 text-purple-600 flex items-center justify-center shrink-0">
+                        <ShieldCheck className="w-3 h-3" />
                       </span>
                       <span className="text-xs font-bold text-on-surface">Active Commitments</span>
                     </div>
-                    <p className="text-xs text-on-surface-variant leading-relaxed">
+                    <p className="text-[11px] text-on-surface-variant leading-relaxed">
                       {subscriptions.length} recurring subscriptions totalling {formatCurrency(activeSubsTotal)} per month.
                     </p>
                   </div>
                 )}
               </div>
 
-              <div className="border-t border-outline-variant/20 pt-2.5 flex justify-between items-center">
+              <div className="border-t border-outline-variant/20 pt-2 flex justify-between items-center">
                 <button
                   type="button"
                   onClick={onNavigateToInsights}

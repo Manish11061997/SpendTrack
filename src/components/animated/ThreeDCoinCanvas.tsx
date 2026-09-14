@@ -223,12 +223,17 @@ export const ThreeDCoinCanvas: React.FC<ThreeDCoinCanvasProps> = ({
     });
     resizeObserver.observe(container);
 
-    // 8. Animation Loop
+    // 8. Animation Loop (60 FPS Capped)
     let animationFrameId: number;
     let clock = new THREE.Clock();
+    let lastRenderTime = 0;
+    const targetInterval = 1000 / 60;
 
-    const animate = () => {
+    const animate = (timestamp: number) => {
       animationFrameId = requestAnimationFrame(animate);
+
+      if (timestamp - lastRenderTime < targetInterval) return;
+      lastRenderTime = timestamp;
 
       if (!isDraggingRef.current && !isFlippingRef.current) {
         // Heavy gold momentum decay
@@ -256,7 +261,7 @@ export const ThreeDCoinCanvas: React.FC<ThreeDCoinCanvasProps> = ({
       renderer.render(scene, camera);
     };
 
-    animate();
+    animate(0);
 
     // 9. Cleanup on Unmount
     return () => {

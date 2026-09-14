@@ -37,6 +37,7 @@ export const ThreeDDonutCanvas: React.FC<ThreeDDonutCanvasProps> = ({
   const previousPointerRef = useRef({ x: 0, y: 0 });
   const velocityRef = useRef({ x: 0, y: 0 });
   const [hoveredSlice, setHoveredSlice] = useState<CategoryRingData | null>(null);
+  const hoveredSliceRef = useRef<CategoryRingData | null>(null);
   const [autoRotate, setAutoRotate] = useState(true);
 
   const overallPct = totalBudget > 0 ? Math.min(100, Math.round((totalSpent / totalBudget) * 100)) : 68;
@@ -203,7 +204,10 @@ export const ThreeDDonutCanvas: React.FC<ThreeDDonutCanvasProps> = ({
     const rimMesh = new THREE.Mesh(rimGeo, rimMat);
     donutGroup.add(rimMesh);
 
-    // 6. Interactive Drag & Spin Controls
+    // 6. Interactive Drag & Spin Controls (Optimized)
+    const raycaster = new THREE.Raycaster();
+    const mouseCoord = new THREE.Vector2();
+
     const onPointerDown = (e: PointerEvent) => {
       isDraggingRef.current = true;
       setAutoRotate(false);
@@ -211,39 +215,58 @@ export const ThreeDDonutCanvas: React.FC<ThreeDDonutCanvasProps> = ({
       velocityRef.current = { x: 0, y: 0 };
     };
 
-    const onPointerMove = (e: PointerEvent) => {
-      if (isDraggingRef.current) {
-        const deltaX = e.clientX - previousPointerRef.current.x;
-        const deltaY = e.clientY - previousPointerRef.current.y;
+    // Window pointermove only fires drag if mouse is actively held down
+    const onWindowPointerMove = (e: PointerEvent) => {
+      if (!isDraggingRef.current) return;
 
-        donutGroup.rotation.y += deltaX * 0.012;
-        donutGroup.rotation.x += deltaY * 0.012;
+      const deltaX = e.clientX - previousPointerRef.current.x;
+      const deltaY = e.clientY - previousPointerRef.current.y;
 
-        // Clamp pitch so it doesn't flip completely upside down
-        donutGroup.rotation.x = Math.max(-0.8, Math.min(1.2, donutGroup.rotation.x));
+      donutGroup.rotation.y += deltaX * 0.012;
+      donutGroup.rotation.x += deltaY * 0.012;
 
-        velocityRef.current = {
-          x: deltaX * 0.012,
-          y: deltaY * 0.012,
-        };
+      // Clamp pitch so it doesn't flip completely upside down
+      donutGroup.rotation.x = Math.max(-0.8, Math.min(1.2, donutGroup.rotation.x));
 
-        previousPointerRef.current = { x: e.clientX, y: e.clientY };
-      }
+      velocityRef.current = {
+        x: deltaX * 0.012,
+        y: deltaY * 0.012,
+      };
 
-      // Raycast for hover detection
+      previousPointerRef.current = { x: e.clientX, y: e.clientY };
+    };
+
+    // Local canvas hover raycast (only runs when cursor is physically hovering over donut canvas)
+    const onCanvasPointerMove = (e: PointerEvent) => {
+      if (isDraggingRef.current) return;
+
       const rect = renderer.domElement.getBoundingClientRect();
-      const mouseX = ((e.clientX - rect.left) / rect.width) * 2 - 1;
-      const mouseY = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+      if (!rect.width || !rect.height) return;
 
-      const raycaster = new THREE.Raycaster();
-      raycaster.setFromCamera(new THREE.Vector2(mouseX, mouseY), camera);
+      mouseCoord.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+      mouseCoord.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+
+      raycaster.setFromCamera(mouseCoord, camera);
 
       const intersects = raycaster.intersectObjects(slices.map(s => s.mesh));
       if (intersects.length > 0) {
         const hitMesh = intersects[0].object as THREE.Mesh;
         const hitData = hitMesh.userData.category as CategoryRingData;
-        setHoveredSlice(hitData);
+        if (hoveredSliceRef.current?.name !== hitData.name) {
+          hoveredSliceRef.current = hitData;
+          setHoveredSlice(hitData);
+        }
       } else {
+        if (hoveredSliceRef.current !== null) {
+          hoveredSliceRef.current = null;
+          setHoveredSlice(null);
+        }
+      }
+    };
+
+    const onCanvasPointerLeave = () => {
+      if (hoveredSliceRef.current !== null) {
+        hoveredSliceRef.current = null;
         setHoveredSlice(null);
       }
     };
@@ -254,7 +277,9 @@ export const ThreeDDonutCanvas: React.FC<ThreeDDonutCanvasProps> = ({
 
     const domElem = renderer.domElement;
     domElem.addEventListener('pointerdown', onPointerDown);
-    window.addEventListener('pointermove', onPointerMove);
+    domElem.addEventListener('pointermove', onCanvasPointerMove, { passive: true });
+    domElem.addEventListener('pointerleave', onCanvasPointerLeave);
+    window.addEventListener('pointermove', onWindowPointerMove, { passive: true });
     window.addEventListener('pointerup', onPointerUp);
 
     // 7. Resize Observer
@@ -270,12 +295,18 @@ export const ThreeDDonutCanvas: React.FC<ThreeDDonutCanvasProps> = ({
     });
     resizeObserver.observe(container);
 
-    // 8. Render Animation Loop
+    // 8. Render Animation Loop (60 FPS Capped)
     let animationFrameId: number;
     let clock = new THREE.Clock();
+    let lastRenderTime = 0;
+    const targetInterval = 1000 / 60;
 
-    const animate = () => {
+    const animate = (timestamp: number) => {
       animationFrameId = requestAnimationFrame(animate);
+
+      if (timestamp - lastRenderTime < targetInterval) return;
+      lastRenderTime = timestamp;
+
       const delta = clock.getDelta();
 
       // Weighted Hydraulic Inertia & Damping
@@ -295,8 +326,9 @@ export const ThreeDDonutCanvas: React.FC<ThreeDDonutCanvasProps> = ({
       }
 
       // Smooth, Weighted Slice Pop on Hover
+      const currentHovered = hoveredSliceRef.current;
       slices.forEach((item) => {
-        const isHovered = hoveredSlice && hoveredSlice.name === item.data.name;
+        const isHovered = currentHovered && currentHovered.name === item.data.name;
         const targetLift = isHovered ? 0.15 : 0;
         const targetScale = isHovered ? 1.03 : 1.0;
 
@@ -312,13 +344,15 @@ export const ThreeDDonutCanvas: React.FC<ThreeDDonutCanvasProps> = ({
       renderer.render(scene, camera);
     };
 
-    animate();
+    animate(0);
 
     // 9. Cleanup on Unmount
     return () => {
       cancelAnimationFrame(animationFrameId);
       domElem.removeEventListener('pointerdown', onPointerDown);
-      window.removeEventListener('pointermove', onPointerMove);
+      domElem.removeEventListener('pointermove', onCanvasPointerMove);
+      domElem.removeEventListener('pointerleave', onCanvasPointerLeave);
+      window.removeEventListener('pointermove', onWindowPointerMove);
       window.removeEventListener('pointerup', onPointerUp);
       resizeObserver.disconnect();
 
@@ -337,7 +371,7 @@ export const ThreeDDonutCanvas: React.FC<ThreeDDonutCanvasProps> = ({
       rimMat.dispose();
       renderer.dispose();
     };
-  }, [categories, autoRotate, hoveredSlice]);
+  }, [categories, autoRotate]);
 
   return (
     <div className={`relative w-full h-full flex flex-col items-center justify-center select-none ${className}`}>
