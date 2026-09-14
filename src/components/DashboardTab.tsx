@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Sector, RadialBarChart, RadialBar, PolarAngleAxis, AreaChart, Area } from 'recharts';
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Sector, RadialBarChart, RadialBar, PolarAngleAxis, AreaChart, Area, XAxis } from 'recharts';
 import { Transaction, UserProfile, BudgetConfig, Subscription } from '../types';
 import { formatCurrency as formatCustomCurrency, getCurrencySymbol, getCurrencyLocale, isSubscriptionDoubleCounted, parseRawAmount } from '../utils/currency';
 import { COLOR_PRESETS } from '../theme';
@@ -156,7 +156,10 @@ export default function DashboardTab({
   const [smartInsightSlide, setSmartInsightSlide] = useState<number>(0);
   const [is3DModalOpen, setIs3DModalOpen] = useState<boolean>(false);
   const [heroMode, setHeroMode] = useState<'stats' | '3d'>('stats');
-  const [donutMode, setDonutMode] = useState<'3d' | 'rings'>('3d');
+  const [donutMode, setDonutMode] = useState<'3d' | 'rings'>('rings');
+  const [desktopCashflowTimeframe, setDesktopCashflowTimeframe] = useState<'7d' | '30d' | 'month'>('month');
+  const [desktopCommitmentTab, setDesktopCommitmentTab] = useState<'subs' | 'goals'>('subs');
+  const [desktopHealthTab, setDesktopHealthTab] = useState<'radar' | 'heatmap'>('radar');
 
   // Subscription inline form states
   const [isAddSubOpen, setIsAddSubOpen] = useState(false);
@@ -762,6 +765,27 @@ export default function DashboardTab({
     return data;
   }, [currentMonthTxs]);
 
+  const filteredCashflowData = useMemo(() => {
+    if (desktopCashflowTimeframe === '7d') {
+      return spendingTrendData.slice(-7);
+    }
+    if (desktopCashflowTimeframe === '30d') {
+      return spendingTrendData.slice(-30);
+    }
+    return spendingTrendData;
+  }, [spendingTrendData, desktopCashflowTimeframe]);
+
+  // Executive KPI values for Desktop Cockpit
+  const currentDayOfMonth = new Date().getDate();
+  const daysInCurrentMonth = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate();
+  const daysLeftInMonth = Math.max(0, daysInCurrentMonth - currentDayOfMonth);
+  const dailyPaceValue = currentDayOfMonth > 0 ? Math.round(activeExpenses / currentDayOfMonth) : activeExpenses;
+  const safeToSpendValue = activeLimit - activeExpenses;
+  const budgetUsagePercent = activeLimit > 0 ? Math.round((activeExpenses / activeLimit) * 100) : 0;
+  const totalSavedGoals = savingsGoals.reduce((sum, g) => sum + (g.currentAmount || 0), 0);
+  const totalTargetGoals = savingsGoals.reduce((sum, g) => sum + (g.targetAmount || 0), 0);
+  const savingsGoalsProgressPct = totalTargetGoals > 0 ? Math.min(100, Math.round((totalSavedGoals / totalTargetGoals) * 100)) : 0;
+
   const rings3dData = useMemo(() => {
     const total = chartData.reduce((sum, c) => sum + c.value, 0);
     if (chartData.length === 0) {
@@ -782,7 +806,7 @@ export default function DashboardTab({
   }, [chartData]);
 
   return (
-    <div className="w-full max-w-[1440px] mx-auto space-y-4 sm:space-y-6 pb-12 animate-fade-in">
+    <div className="w-full max-w-[1440px] mx-auto pb-10">
       
       {/* ── MOBILE NATIVE LAYOUT (Visible on Mobile, Hidden on lg+) — Exact 100% 2 Days Back (Commit 63b751d) ── */}
       <div className="lg:hidden space-y-3.5 sm:space-y-5 pb-20">
@@ -2152,426 +2176,444 @@ export default function DashboardTab({
 
       </div>
 
-      {/* ── DESKTOP BENTO COCKPIT (Visible on lg+, Hidden on Mobile) ── */}
-      <div className="hidden lg:block space-y-6 animate-fade-in">
+      {/* ── DESKTOP EXECUTIVE FINTECH COCKPIT (Visible on lg+, Hidden on Mobile) ── */}
+      <div className="hidden lg:block space-y-3.5 animate-fade-in">
         
-        {/* ── BENTO ROW 1: Hero Card + Budget Health Ring + Smart Intel ── */}
-        <div className="grid grid-cols-12 gap-6 items-stretch">
+        {/* ── ROW 1: EXECUTIVE KPI STAT BAR (4-Card Uniform Grid) ── */}
+        <div className="grid grid-cols-4 gap-3.5 items-stretch">
           
-          {/* Bento Cell 1: Compact Luxury Virtual Metallic Card (Col 5) */}
-          <div className="col-span-5 flex flex-col">
-            <TiltCard3D maxTilt={5} glareEffect={true} className="h-full">
-            <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-br from-slate-900 via-[#0D1424] to-[#080D1A] text-white border border-white/10 hover:border-white/20 shadow-xl relative overflow-hidden flex flex-col justify-between min-h-[220px] rizzeat-bento-card group transition-colors">
-              {/* Subtle ambient light gradient inside card */}
-              <div className="absolute top-0 right-0 w-48 h-48 bg-primary/10 rounded-full blur-3xl pointer-events-none" />
-              <div className="absolute -bottom-16 -left-16 w-36 h-36 bg-secondary/10 rounded-full blur-2xl pointer-events-none" />
-
-              {/* Trajectory Area Chart Spline (subtle background telemetry) */}
-              {!isHeroFlipped && (
-                <div className="absolute right-0 bottom-10 w-44 h-16 opacity-20 pointer-events-none">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={spendingTrendData}>
-                      <defs>
-                        <linearGradient id="desktopSpline" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor={themeColors.primary} stopOpacity={0.8}/>
-                          <stop offset="95%" stopColor={themeColors.primary} stopOpacity={0}/>
-                        </linearGradient>
-                      </defs>
-                      <Area type="monotone" dataKey="amount" stroke={themeColors.primary} strokeWidth={2} fillOpacity={1} fill="url(#desktopSpline)" />
-                    </AreaChart>
-                  </ResponsiveContainer>
+          {/* Card 1: Monthly Committed Outflow */}
+          <div className="rounded-xl p-3.5 bg-surface-container-low/95 dark:bg-[#0B101D] border border-outline-variant/25 hover:border-primary/40 transition-colors shadow-2xs group flex flex-col justify-between">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-6 h-6 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
+                  <CreditCard className="w-3.5 h-3.5" />
                 </div>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-on-surface-variant font-mono">
+                  Monthly Outflow
+                </span>
+              </div>
+              {hasBudget && (
+                <span className={`text-[9px] font-mono font-bold px-2 py-0.5 rounded-full border ${
+                  budgetUsagePercent > 100 
+                    ? 'bg-rose-500/15 text-rose-500 border-rose-500/30' 
+                    : budgetUsagePercent > 80 
+                      ? 'bg-amber-500/15 text-amber-500 border-amber-500/30' 
+                      : 'bg-emerald-500/15 text-emerald-500 border-emerald-500/30'
+                }`}>
+                  {budgetUsagePercent}% Cap
+                </span>
               )}
+            </div>
 
-              {/* Row 1: Card Type + 3D Studio + Mode Toggle */}
-              <div className="relative z-10 flex items-center justify-between">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-6 rounded-md bg-gradient-to-r from-amber-300 via-amber-200 to-yellow-400 p-0.5 flex items-center justify-center shadow-inner">
-                    <div className="w-full h-full border border-amber-600/40 rounded-xs grid grid-cols-2 gap-0.5 opacity-75">
-                      <div className="bg-amber-600/30" />
-                      <div className="bg-amber-600/30" />
-                    </div>
-                  </div>
-                  <div>
-                    <span className="text-[10px] font-black font-mono tracking-wider text-slate-300 uppercase block">SpendTrack Platinum</span>
-                    <span className="text-[8px] text-slate-400 font-mono">Dynamic Outflow</span>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-1.5">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      triggerHaptic('medium');
-                      setIs3DModalOpen(true);
-                    }}
-                    title="Open Interactive 3D WebGL Studio"
-                    aria-label="3D WebGL Studio"
-                    className="px-2 py-0.5 rounded-md bg-primary/20 hover:bg-primary/30 text-primary border border-primary/40 transition-all cursor-pointer flex items-center gap-1 text-[11px] font-mono font-bold shadow-2xs active:scale-95"
-                  >
-                    <Sparkles className="w-3 h-3" />
-                    <span>3D Studio</span>
-                  </button>
-
-                  <div className="flex items-center bg-white/10 p-0.5 rounded-md border border-white/10 text-[9px]">
-                    <button
-                      type="button"
-                      onClick={() => setHeroMode('3d')}
-                      className={`px-1.5 py-0.5 rounded-sm font-bold transition-all cursor-pointer ${
-                        heroMode === '3d' ? 'bg-primary text-black shadow-2xs' : 'text-slate-300 hover:text-white'
-                      }`}
-                    >
-                      3D
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setHeroMode('stats');
-                        setIsHeroFlipped(false);
-                      }}
-                      className={`px-1.5 py-0.5 rounded-sm font-bold transition-all cursor-pointer ${
-                        heroMode === 'stats' && !isHeroFlipped ? 'bg-primary text-black shadow-2xs' : 'text-slate-300 hover:text-white'
-                      }`}
-                    >
-                      Stats
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setHeroMode('stats');
-                        setIsHeroFlipped(true);
-                      }}
-                      className={`px-1.5 py-0.5 rounded-sm font-bold transition-all cursor-pointer ${
-                        heroMode === 'stats' && isHeroFlipped ? 'bg-primary text-black shadow-2xs' : 'text-slate-300 hover:text-white'
-                      }`}
-                    >
-                      Pace
-                    </button>
-                  </div>
-                </div>
+            <div className="mt-2.5">
+              <div className="text-xl font-black font-mono tracking-tight text-on-surface flex items-baseline gap-1">
+                <RollingNumber
+                  value={activeExpenses}
+                  prefix={getCurrencySymbol(budget?.currency || 'INR')}
+                  locale={getCurrencyLocale(budget?.currency || 'INR')}
+                  duration={500}
+                />
               </div>
-
-              {/* Row 2: Content (Amount or Flip Stats or 3D WebGL Card) */}
-              <div className="relative z-10 py-1.5">
-                {heroMode === '3d' ? (
-                  <div className="h-[140px] w-full flex items-center justify-center">
-                    <ThreeDCardCanvas
-                      balance={activeExpenses}
-                      currencySymbol={getCurrencySymbol(budget?.currency || 'INR')}
-                      cardHolder={profile.name || 'Alexander Chen'}
-                      compact={true}
-                    />
-                  </div>
-                ) : (
-                  <FlipCard3D
-                    isFlipped={isHeroFlipped}
-                    onFlipChange={setIsHeroFlipped}
-                    className="min-h-[75px]"
-                    front={
-                      <div className="space-y-1 py-1">
-                        <div className="flex items-center gap-2">
-                          <span className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-slate-400">
-                            {summaryMode === 'monthly' ? 'Monthly Committed Outflow' : 'Weekly Committed Outflow'}
-                          </span>
-                          {hasBudget && (
-                            <span className={`text-[8px] sm:text-[9px] font-extrabold px-1.5 py-0.5 rounded-full border ${
-                              (activeExpenses / (activeLimit || 3000)) * 100 > 100 
-                                ? 'bg-rose-500/20 text-rose-300 border-rose-500/30' 
-                                : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
-                            }`}>
-                              {Math.round((activeExpenses / (activeLimit || 3000)) * 100)}% cap
-                            </span>
-                          )}
-                        </div>
-                        <div className="flex items-baseline gap-2">
-                          <h2 className="text-2xl sm:text-3xl font-mono font-black tracking-tight text-white drop-shadow-xs flex items-center">
-                            <RollingNumber
-                              value={activeExpenses}
-                              prefix={getCurrencySymbol(budget?.currency || 'INR')}
-                              locale={getCurrencyLocale(budget?.currency || 'INR')}
-                              duration={700}
-                            />
-                          </h2>
-                        </div>
-                      </div>
-                    }
-                    back={
-                      <div className="grid grid-cols-3 gap-2 py-1">
-                        <div className="p-2 bg-white/5 border border-white/10 rounded-xl">
-                          <span className="text-[8px] font-bold text-slate-400 uppercase tracking-wider block">Daily Pace</span>
-                          <p className="font-mono text-xs sm:text-sm font-black text-white mt-0.5 truncate">
-                            {(() => {
-                              const today = new Date().getDate();
-                              const avg = today > 0 ? Math.round(activeExpenses / today) : activeExpenses;
-                              return formatCurrency(avg);
-                            })()}
-                          </p>
-                          <span className="text-[7px] text-slate-400">Avg / day</span>
-                        </div>
-
-                        <div className="p-2 bg-white/5 border border-white/10 rounded-xl">
-                          <span className="text-[8px] font-bold text-slate-400 uppercase tracking-wider block">Top Category</span>
-                          <p className="text-xs sm:text-sm font-black text-white truncate mt-0.5">
-                            {chartData.length > 0 ? chartData[0].name : 'None'}
-                          </p>
-                          <span className="text-[7px] text-slate-400">
-                            {chartData.length > 0 ? formatCurrency(chartData[0].value) : '₹0'}
-                          </span>
-                        </div>
-
-                        <div className="p-2 bg-white/5 border border-white/10 rounded-xl">
-                          <span className="text-[8px] font-bold text-slate-400 uppercase tracking-wider block">Buffer</span>
-                          <p className={`font-mono text-xs sm:text-sm font-black mt-0.5 truncate ${
-                            activeLimit - activeExpenses < 0 ? 'text-rose-400' : 'text-emerald-400'
-                          }`}>
-                            {formatCurrency(activeLimit - activeExpenses)}
-                          </p>
-                          <span className="text-[7px] text-slate-400">
-                            {activeLimit - activeExpenses < 0 ? 'Over' : 'Remaining'}
-                          </span>
-                        </div>
-                      </div>
-                    }
-                  />
-                )}
-              </div>
-
-              {/* Row 3: Cardholder info + Quick Actions */}
-              <div className="relative z-10 flex items-center justify-between border-t border-white/10 pt-2.5">
-                <div className="flex items-center gap-3 text-[11px] font-mono text-slate-300">
-                  <span className="font-bold tracking-wider uppercase">{profile.name || 'Personal Account'}</span>
-                  <span className="text-slate-500">•</span>
-                  <span className="text-[9px] text-slate-400 font-mono">12/28</span>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={onAddTransactionClick}
-                    className="px-3 py-1.5 bg-primary text-on-primary rounded-xl text-xs font-bold hover:bg-primary/90 active:scale-95 transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                    <span>Log Outflow</span>
-                  </button>
-                </div>
+              <div className="mt-1.5 flex items-center justify-between text-[10px] text-on-surface-variant">
+                <span className="flex items-center gap-1 font-mono">
+                  {monthlyDiffPercent <= 0 ? (
+                    <span className="text-emerald-500 flex items-center gap-0.5 font-bold">
+                      <TrendingDown className="w-3 h-3" />
+                      {Math.abs(Math.round(monthlyDiffPercent))}% vs last mo
+                    </span>
+                  ) : (
+                    <span className="text-amber-500 flex items-center gap-0.5 font-bold">
+                      <TrendingUp className="w-3 h-3" />
+                      +{Math.round(monthlyDiffPercent)}% vs last mo
+                    </span>
+                  )}
+                </span>
+                <span className="font-mono text-[10px] text-on-surface-variant">
+                  Cap: <strong className="text-on-surface font-semibold">{formatCurrency(activeLimit)}</strong>
+                </span>
               </div>
             </div>
-            </TiltCard3D>
           </div>
 
-          {/* Bento Cell 2: VisionOS Budget Health Radial Gauge / 3D Extruded Donut (Col 4) */}
-          <div className="col-span-4 flex flex-col">
-            <TiltCard3D maxTilt={5} glareEffect={true} className="h-full">
-            <div className="p-4 sm:p-5 rounded-2xl bg-surface-container-low/95 border border-outline-variant/30 shadow-xs flex flex-col justify-between h-full rizzeat-bento-card space-y-2.5">
-              <div className="flex items-center justify-between border-b border-outline-variant/20 dark:border-white/5 pb-2">
-                <div className="flex items-center gap-1.5">
-                  <LucidePieChart className="w-4 h-4 text-primary" />
-                  <h3 className="font-outfit text-xs font-black text-on-surface uppercase tracking-wider">3D Wealth Rings</h3>
+          {/* Card 2: Safe-to-Spend Liquidity */}
+          <div className="rounded-xl p-3.5 bg-surface-container-low/95 dark:bg-[#0B101D] border border-outline-variant/25 hover:border-secondary/40 transition-colors shadow-2xs group flex flex-col justify-between">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-6 h-6 rounded-lg bg-secondary/10 flex items-center justify-center text-secondary">
+                  <ShieldCheck className="w-3.5 h-3.5" />
                 </div>
-                <div className="flex items-center gap-1 bg-surface-container-high/80 dark:bg-black/50 p-0.5 rounded-lg border border-outline-variant/30 dark:border-white/10 text-[10px]">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      triggerHaptic('light');
-                      setDonutMode('3d');
-                    }}
-                    className={`px-2 py-0.5 rounded-md font-bold transition-all cursor-pointer ${
-                      donutMode === '3d'
-                        ? 'bg-primary text-black shadow-2xs'
-                        : 'text-on-surface-variant hover:text-on-surface'
-                    }`}
-                  >
-                    3D WebGL
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      triggerHaptic('light');
-                      setDonutMode('rings');
-                    }}
-                    className={`px-2 py-0.5 rounded-md font-bold transition-all cursor-pointer ${
-                      donutMode === 'rings'
-                        ? 'bg-primary text-black shadow-2xs'
-                        : 'text-on-surface-variant hover:text-on-surface'
-                    }`}
-                  >
-                    2D Rings
-                  </button>
-                </div>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-on-surface-variant font-mono">
+                  Safe to Spend
+                </span>
               </div>
+              <span className="text-[9px] font-mono font-bold px-2 py-0.5 rounded-full bg-surface-container-high text-on-surface-variant border border-outline-variant/30">
+                {daysLeftInMonth}d left
+              </span>
+            </div>
 
-              {donutMode === '3d' ? (
-                <div className="h-44 w-full flex items-center justify-center relative overflow-hidden rounded-xl">
-                  <ThreeDDonutCanvas
-                    categories={rings3dData}
-                    totalSpent={activeExpenses}
-                    totalBudget={activeLimit}
-                    currencySymbol={getCurrencySymbol(budget?.currency || 'INR')}
-                  />
-                </div>
-              ) : (
-                /* Radial Chart */
-                <div className="flex items-center justify-center relative py-1">
-                  <div className="w-32 h-32 relative flex items-center justify-center">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <RadialBarChart 
-                        cx="50%" 
-                        cy="50%" 
-                        innerRadius="75%" 
-                        outerRadius="100%" 
-                        barSize={10} 
-                        data={[
-                          {
-                            name: 'Spent',
-                            value: Math.min(100, (activeExpenses / (activeLimit || 3000)) * 100),
-                            fill: (activeExpenses / (activeLimit || 3000)) * 100 > 100 
-                              ? themeError 
-                              : (activeExpenses / (activeLimit || 3000)) * 100 > 85 
-                                ? '#D97706' 
-                                : themeColors.primary
-                          }
-                        ]} 
-                        startAngle={90} 
-                        endAngle={-270}
-                      >
-                        <PolarAngleAxis
-                          type="number"
-                          domain={[0, 100]}
-                          angleAxisId={0}
-                          tick={false}
-                        />
-                        <RadialBar
-                          background={{ fill: activeIsDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)' }}
-                          dataKey="value"
-                          cornerRadius={6}
-                        />
-                      </RadialBarChart>
-                    </ResponsiveContainer>
-                    <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                      <span className="font-mono text-xl font-black text-on-surface">
-                        {Math.round((activeExpenses / (activeLimit || 3000)) * 100)}%
-                      </span>
-                      <span className="text-[8px] font-bold text-on-surface-variant uppercase tracking-wider">Used</span>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              <div className="border-t border-outline-variant/20 pt-2 flex justify-between items-center text-xs font-mono">
-                <span className="text-[10px] text-on-surface-variant font-medium">Spent: <strong className="text-on-surface">{formatCurrency(activeExpenses)}</strong></span>
-                <span className="text-[10px] text-on-surface-variant font-medium">Cap: <strong className="text-on-surface">{formatCurrency(activeLimit)}</strong></span>
+            <div className="mt-2.5">
+              <div className={`text-xl font-black font-mono tracking-tight flex items-baseline gap-1 ${
+                safeToSpendValue < 0 ? 'text-rose-500' : 'text-emerald-500 dark:text-emerald-400'
+              }`}>
+                <RollingNumber
+                  value={Math.abs(safeToSpendValue)}
+                  prefix={`${safeToSpendValue < 0 ? '-' : ''}${getCurrencySymbol(budget?.currency || 'INR')}`}
+                  locale={getCurrencyLocale(budget?.currency || 'INR')}
+                  duration={500}
+                />
+              </div>
+              <div className="mt-1.5 flex items-center justify-between text-[10px] text-on-surface-variant">
+                <span className="font-mono">
+                  {daysLeftInMonth > 0 ? `${formatCurrency(Math.max(0, Math.round(safeToSpendValue / daysLeftInMonth)))} / day` : 'Cycle ended'}
+                </span>
+                <span className="font-mono text-emerald-500 font-bold">
+                  {safeToSpendValue >= 0 ? 'Liquid Reserve' : 'Deficit'}
+                </span>
               </div>
             </div>
-            </TiltCard3D>
           </div>
 
-          {/* Bento Cell 3: Smart Insights Telemetry (Col 3) */}
-          <div className="col-span-3 flex flex-col">
-            <TiltCard3D maxTilt={5} glareEffect={true} className="h-full">
-            <div className="p-4 sm:p-5 rounded-2xl bg-surface-container-low/95 border border-outline-variant/30 shadow-xs flex flex-col justify-between h-full rizzeat-bento-card space-y-2.5 relative overflow-hidden">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-1.5">
-                  <Sparkles className="w-4 h-4 text-primary" />
-                  <h3 className="font-outfit text-xs font-black text-on-surface uppercase tracking-wider">Smart Intel</h3>
+          {/* Card 3: Daily Burn Velocity */}
+          <div className="rounded-xl p-3.5 bg-surface-container-low/95 dark:bg-[#0B101D] border border-outline-variant/25 hover:border-tertiary/40 transition-colors shadow-2xs group flex flex-col justify-between">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-6 h-6 rounded-lg bg-tertiary/10 flex items-center justify-center text-tertiary">
+                  <Activity className="w-3.5 h-3.5" />
                 </div>
-                <div className="flex items-center gap-1">
-                  <button
-                    type="button"
-                    onClick={() => setSmartInsightSlide((prev) => (prev > 0 ? prev - 1 : 2))}
-                    className="p-1 rounded-md hover:bg-surface-container-high text-on-surface-variant cursor-pointer"
-                  >
-                    <ChevronLeft className="w-3 h-3" />
-                  </button>
-                  <span className="text-[9px] font-mono text-on-surface-variant">{smartInsightSlide + 1}/3</span>
-                  <button
-                    type="button"
-                    onClick={() => setSmartInsightSlide((prev) => (prev < 2 ? prev + 1 : 0))}
-                    className="p-1 rounded-md hover:bg-surface-container-high text-on-surface-variant cursor-pointer"
-                  >
-                    <ChevronRight className="w-3 h-3" />
-                  </button>
-                </div>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-on-surface-variant font-mono">
+                  Daily Velocity
+                </span>
               </div>
+              <span className="text-[9px] font-mono font-bold px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">
+                Day {currentDayOfMonth}/{daysInCurrentMonth}
+              </span>
+            </div>
 
-              {/* Slide content */}
-              <div className="py-1.5 flex-1 flex flex-col justify-center">
-                {smartInsightSlide === 0 && (
-                  <div className="space-y-1.5">
-                    <div className="flex items-center gap-2">
-                      <span className="w-5 h-5 rounded-md bg-emerald-500/15 text-emerald-600 flex items-center justify-center shrink-0">
-                        <TrendingDown className="w-3 h-3" />
-                      </span>
-                      <span className="text-xs font-bold text-on-surface">Monthly Velocity</span>
-                    </div>
-                    <p className="text-[11px] text-on-surface-variant leading-relaxed">
-                      {monthlyDiffPercent <= 0 
-                        ? `Spending is down ${Math.abs(Math.round(monthlyDiffPercent))}% compared to last month. Great pace!`
-                        : `Pace is ${Math.round(monthlyDiffPercent)}% higher than last month. Consider curbing discretionary spending.`
-                      }
-                    </p>
-                  </div>
-                )}
-                {smartInsightSlide === 1 && (
-                  <div className="space-y-1.5">
-                    <div className="flex items-center gap-2">
-                      <span className="w-5 h-5 rounded-md bg-primary/15 text-primary flex items-center justify-center shrink-0">
-                        <Wallet className="w-3 h-3" />
-                      </span>
-                      <span className="text-xs font-bold text-on-surface">Top Expenditure</span>
-                    </div>
-                    <p className="text-[11px] text-on-surface-variant leading-relaxed">
-                      {chartData.length > 0 
-                        ? `${chartData[0].name} accounts for ${((chartData[0].value / (totalSpendingForMonth || 1)) * 100).toFixed(0)}% of your monthly outflows.`
-                        : 'No category data recorded yet for this billing cycle.'
-                      }
-                    </p>
-                  </div>
-                )}
-                {smartInsightSlide === 2 && (
-                  <div className="space-y-1.5">
-                    <div className="flex items-center gap-2">
-                      <span className="w-5 h-5 rounded-md bg-purple-500/15 text-purple-600 flex items-center justify-center shrink-0">
-                        <ShieldCheck className="w-3 h-3" />
-                      </span>
-                      <span className="text-xs font-bold text-on-surface">Active Commitments</span>
-                    </div>
-                    <p className="text-[11px] text-on-surface-variant leading-relaxed">
-                      {subscriptions.length} recurring subscriptions totalling {formatCurrency(activeSubsTotal)} per month.
-                    </p>
-                  </div>
-                )}
+            <div className="mt-2.5">
+              <div className="text-xl font-black font-mono tracking-tight text-on-surface flex items-baseline gap-1">
+                <RollingNumber
+                  value={dailyPaceValue}
+                  prefix={getCurrencySymbol(budget?.currency || 'INR')}
+                  locale={getCurrencyLocale(budget?.currency || 'INR')}
+                  duration={500}
+                />
               </div>
-
-              <div className="border-t border-outline-variant/20 pt-2 flex justify-between items-center">
-                <button
-                  type="button"
-                  onClick={onNavigateToInsights}
-                  className="text-[10px] font-bold text-primary hover:underline flex items-center gap-1 cursor-pointer"
-                >
-                  <span>Open Deep Intelligence</span>
-                  <ArrowUpRight className="w-3 h-3" />
-                </button>
+              <div className="mt-1.5 flex items-center justify-between text-[10px] text-on-surface-variant">
+                <span className="font-mono">
+                  Burn rate / day
+                </span>
+                <span className="font-mono">
+                  Target: <strong className="text-on-surface font-semibold">{formatCurrency(Math.round(activeLimit / daysInCurrentMonth))}</strong>
+                </span>
               </div>
             </div>
-            </TiltCard3D>
+          </div>
+
+          {/* Card 4: Savings Goals */}
+          <div className="rounded-xl p-3.5 bg-surface-container-low/95 dark:bg-[#0B101D] border border-outline-variant/25 hover:border-emerald-500/40 transition-colors shadow-2xs group flex flex-col justify-between">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-6 h-6 rounded-lg bg-emerald-500/10 flex items-center justify-center text-emerald-500">
+                  <Target className="w-3.5 h-3.5" />
+                </div>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-on-surface-variant font-mono">
+                  Savings Goals
+                </span>
+              </div>
+              <span className="text-[9px] font-mono font-bold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-500 border border-emerald-500/25">
+                {savingsGoalsProgressPct}% Funded
+              </span>
+            </div>
+
+            <div className="mt-2.5">
+              <div className="text-xl font-black font-mono tracking-tight text-on-surface flex items-baseline gap-1">
+                <RollingNumber
+                  value={totalSavedGoals}
+                  prefix={getCurrencySymbol(budget?.currency || 'INR')}
+                  locale={getCurrencyLocale(budget?.currency || 'INR')}
+                  duration={500}
+                />
+              </div>
+              <div className="mt-1.5 space-y-1">
+                <div className="w-full h-1 bg-surface-container-highest rounded-full overflow-hidden">
+                  <div 
+                    className="h-full bg-gradient-to-r from-emerald-500 to-teal-400 rounded-full transition-all duration-500" 
+                    style={{ width: `${savingsGoalsProgressPct}%` }} 
+                  />
+                </div>
+                <div className="flex items-center justify-between text-[9px] text-on-surface-variant font-mono">
+                  <span>{savingsGoals.length} Active Targets</span>
+                  <span>Goal: {formatCurrency(totalTargetGoals)}</span>
+                </div>
+              </div>
+            </div>
           </div>
 
         </div>
 
-        {/* ── BENTO ROW 2: Live Feed + Shortcuts & Presets ── */}
-        <div className="grid grid-cols-12 gap-6 items-start">
+        {/* ── ROW 2: FINANCIAL INTELLIGENCE CENTER (Col 8 + Col 4 Grid) ── */}
+        <div className="grid grid-cols-12 gap-3.5 items-stretch">
           
-          {/* Left: Recent Transactions Feed (Col 7) */}
-          <div className="col-span-7 space-y-3">
-            <div className="flex items-center justify-between">
+          {/* Col 8: Cashflow Trajectory Wave & Command Pulse */}
+          <div className="col-span-8 flex flex-col rounded-xl bg-surface-container-low/95 dark:bg-[#0B101D] border border-outline-variant/25 p-4 shadow-2xs justify-between">
+            <div className="flex items-center justify-between pb-2 border-b border-outline-variant/15">
               <div className="flex items-center gap-2">
-                <h3 className="font-outfit text-base text-on-surface font-black tracking-tight">Recent Transactions</h3>
+                <div className="w-6 h-6 rounded-md bg-primary/10 flex items-center justify-center text-primary">
+                  <Activity className="w-3.5 h-3.5" />
+                </div>
+                <div>
+                  <h3 className="font-outfit text-xs font-black text-on-surface uppercase tracking-wider">Cashflow Wave</h3>
+                  <span className="text-[10px] text-on-surface-variant font-mono">
+                    Window Spend: <strong className="text-on-surface">{formatCurrency(filteredCashflowData.reduce((s, d) => s + d.amount, 0))}</strong>
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                {/* Timeframe selector: 7D / 30D / Month */}
+                <div className="flex items-center bg-surface-container-high/80 dark:bg-black/40 p-0.5 rounded-lg border border-outline-variant/30 text-[10px]">
+                  {(['7d', '30d', 'month'] as const).map((tf) => (
+                    <button
+                      key={tf}
+                      type="button"
+                      onClick={() => {
+                        triggerHaptic('light');
+                        setDesktopCashflowTimeframe(tf);
+                      }}
+                      className={`px-2 py-0.5 rounded-md font-bold transition-all cursor-pointer capitalize ${
+                        desktopCashflowTimeframe === tf 
+                          ? 'bg-primary text-on-primary shadow-2xs' 
+                          : 'text-on-surface-variant hover:text-on-surface'
+                      }`}
+                    >
+                      {tf === '7d' ? '7D' : tf === '30d' ? '30D' : 'Month'}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Primary CTA: Log Outflow */}
+                <button
+                  type="button"
+                  onClick={onAddTransactionClick}
+                  className="px-3 py-1 bg-primary text-on-primary rounded-lg text-xs font-bold hover:bg-primary/90 active:scale-95 transition-all shadow-2xs flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Log Outflow</span>
+                  <kbd className="text-[9px] font-mono opacity-80 bg-black/20 px-1 rounded">⌘N</kbd>
+                </button>
+              </div>
+            </div>
+
+            {/* Trajectory Area Chart */}
+            <div className="py-1.5 h-[160px] w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={filteredCashflowData} margin={{ top: 6, right: 10, left: -24, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="desktopCashflowWave" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor={themeColors.primary} stopOpacity={0.35}/>
+                      <stop offset="95%" stopColor={themeColors.primary} stopOpacity={0.0}/>
+                    </linearGradient>
+                  </defs>
+                  <XAxis 
+                    dataKey="day" 
+                    stroke="none" 
+                    tick={{ fontSize: 9, fill: activeIsDark ? '#94A3B8' : '#64748B' }} 
+                    tickLine={false} 
+                    axisLine={false} 
+                  />
+                  <Tooltip 
+                    content={({ active, payload }) => {
+                      if (active && payload && payload.length) {
+                        const data = payload[0].payload;
+                        return (
+                          <div className="p-2 bg-surface-container-lowest/95 backdrop-blur-md rounded-xl border border-outline-variant/40 shadow-lg text-[11px] font-mono">
+                            <span className="text-on-surface-variant block">Day {data.day}</span>
+                            <span className="font-bold text-on-surface">{formatCurrency(data.amount)}</span>
+                          </div>
+                        );
+                      }
+                      return null;
+                    }}
+                  />
+                  <Area 
+                    type="monotone" 
+                    dataKey="amount" 
+                    stroke={themeColors.primary} 
+                    strokeWidth={2} 
+                    fill="url(#desktopCashflowWave)" 
+                    activeDot={{ r: 4, fill: themeColors.primary, stroke: '#fff', strokeWidth: 1.5 }}
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+
+            <div className="pt-2 border-t border-outline-variant/15 flex items-center justify-between text-[10px] font-mono text-on-surface-variant">
+              <div className="flex items-center gap-4">
+                <span>Avg Daily Burn: <strong className="text-on-surface">{formatCurrency(Math.round(filteredCashflowData.reduce((s, d) => s + d.amount, 0) / (filteredCashflowData.length || 1)))}</strong></span>
+                <span>Data Points: <strong className="text-on-surface">{filteredCashflowData.length} days</strong></span>
+              </div>
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    triggerHaptic('medium');
+                    setIs3DModalOpen(true);
+                  }}
+                  className="text-primary hover:underline font-bold flex items-center gap-1 cursor-pointer"
+                >
+                  <Sparkles className="w-3 h-3" />
+                  <span>3D Card Studio</span>
+                </button>
+                <span>•</span>
+                <button
+                  type="button"
+                  onClick={onNavigateToInsights}
+                  className="text-primary hover:underline font-bold flex items-center gap-0.5 cursor-pointer"
+                >
+                  <span>Intelligence Matrix</span>
+                  <ArrowUpRight className="w-3 h-3" />
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Col 4: Unified Wealth Rings & Category Breakdown */}
+          <div className="col-span-4 flex flex-col rounded-xl bg-surface-container-low/95 dark:bg-[#0B101D] border border-outline-variant/25 p-4 shadow-2xs justify-between space-y-2">
+            <div className="flex items-center justify-between pb-2 border-b border-outline-variant/15">
+              <div className="flex items-center gap-2">
+                <div className="w-6 h-6 rounded-md bg-secondary/10 flex items-center justify-center text-secondary">
+                  <LucidePieChart className="w-3.5 h-3.5" />
+                </div>
+                <h3 className="font-outfit text-xs font-black text-on-surface uppercase tracking-wider">Wealth Rings</h3>
+              </div>
+              <div className="flex items-center gap-1 bg-surface-container-high/80 dark:bg-black/40 p-0.5 rounded-lg border border-outline-variant/30 text-[10px]">
+                <button
+                  type="button"
+                  onClick={() => {
+                    triggerHaptic('light');
+                    setDonutMode('rings');
+                  }}
+                  className={`px-2 py-0.5 rounded-md font-bold transition-all cursor-pointer ${
+                    donutMode === 'rings'
+                      ? 'bg-primary text-on-primary shadow-2xs'
+                      : 'text-on-surface-variant hover:text-on-surface'
+                  }`}
+                >
+                  2D Gauge
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    triggerHaptic('light');
+                    setDonutMode('3d');
+                  }}
+                  className={`px-2 py-0.5 rounded-md font-bold transition-all cursor-pointer ${
+                    donutMode === '3d'
+                      ? 'bg-primary text-on-primary shadow-2xs'
+                      : 'text-on-surface-variant hover:text-on-surface'
+                  }`}
+                >
+                  3D WebGL
+                </button>
+              </div>
+            </div>
+
+            {donutMode === '3d' ? (
+              <div className="h-36 w-full flex items-center justify-center relative overflow-hidden rounded-xl">
+                <ThreeDDonutCanvas
+                  categories={rings3dData}
+                  totalSpent={activeExpenses}
+                  totalBudget={activeLimit}
+                  currencySymbol={getCurrencySymbol(budget?.currency || 'INR')}
+                />
+              </div>
+            ) : (
+              <div className="flex items-center justify-center relative py-0.5">
+                <div className="w-28 h-28 relative flex items-center justify-center">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <RadialBarChart 
+                      cx="50%" 
+                      cy="50%" 
+                      innerRadius="75%" 
+                      outerRadius="100%" 
+                      barSize={9} 
+                      data={[
+                        {
+                          name: 'Spent',
+                          value: Math.min(100, (activeExpenses / (activeLimit || 3000)) * 100),
+                          fill: (activeExpenses / (activeLimit || 3000)) * 100 > 100 
+                            ? themeError 
+                            : (activeExpenses / (activeLimit || 3000)) * 100 > 85 
+                              ? '#D97706' 
+                              : themeColors.primary
+                        }
+                      ]} 
+                      startAngle={90} 
+                      endAngle={-270}
+                    >
+                      <PolarAngleAxis
+                        type="number"
+                        domain={[0, 100]}
+                        angleAxisId={0}
+                        tick={false}
+                      />
+                      <RadialBar
+                        background={{ fill: activeIsDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)' }}
+                        dataKey="value"
+                        cornerRadius={5}
+                      />
+                    </RadialBarChart>
+                  </ResponsiveContainer>
+                  <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                    <span className="font-mono text-lg font-black text-on-surface">
+                      {Math.round((activeExpenses / (activeLimit || 3000)) * 100)}%
+                    </span>
+                    <span className="text-[7px] font-bold text-on-surface-variant uppercase tracking-wider">Used</span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Top 3 Categories Breakdown */}
+            <div className="pt-2 border-t border-outline-variant/15 space-y-1">
+              {chartData.slice(0, 3).map((c) => {
+                const pct = totalSpendingForMonth > 0 ? Math.round((c.value / totalSpendingForMonth) * 100) : 0;
+                return (
+                  <div key={c.name} className="flex items-center justify-between text-[10px] font-mono">
+                    <div className="flex items-center gap-1.5 truncate">
+                      <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: c.color }} />
+                      <span className="text-on-surface font-medium truncate">{c.name}</span>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className="font-bold text-on-surface">{formatCurrency(c.value)}</span>
+                      <span className="text-on-surface-variant text-[9px] w-6 text-right">{pct}%</span>
+                    </div>
+                  </div>
+                );
+              })}
+              {chartData.length === 0 && (
+                <span className="text-on-surface-variant text-[10px]">No category data logged yet</span>
+              )}
+            </div>
+          </div>
+
+        </div>
+
+        {/* ── ROW 3: OPERATIONS LEDGER & COMMITMENTS HUB (Col 7 + Col 5 Grid) ── */}
+        <div className="grid grid-cols-12 gap-3.5 items-stretch">
+          
+          {/* Left: Recent Transactions Live Feed (Col 7) */}
+          <div className="col-span-7 flex flex-col justify-between rounded-xl bg-surface-container-low/95 dark:bg-[#0B101D] border border-outline-variant/25 p-4 shadow-2xs h-[360px]">
+            <div className="flex items-center justify-between pb-2 border-b border-outline-variant/15">
+              <div className="flex items-center gap-2">
+                <h3 className="font-outfit text-xs font-black text-on-surface uppercase tracking-wider">Recent Transactions</h3>
                 {activeCategoryFilter && (
-                  <span className="text-[10px] font-bold bg-primary/10 text-primary border border-primary/20 px-2.5 py-0.5 rounded-full flex items-center gap-1 animate-fade-in">
+                  <span className="text-[9px] font-bold bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 rounded-full flex items-center gap-1 animate-fade-in">
                     <span>{activeCategoryFilter}</span>
                     <button 
                       onClick={() => setActiveCategoryFilter(null)}
-                      className="hover:text-error transition-colors font-black cursor-pointer text-[12px] pl-0.5"
+                      className="hover:text-error transition-colors font-black cursor-pointer text-[11px] pl-0.5"
                     >
                       ×
                     </button>
@@ -2580,101 +2622,455 @@ export default function DashboardTab({
               </div>
               <button 
                 onClick={onNavigateToHistory}
-                className="font-label-lg text-xs text-primary hover:underline flex items-center gap-0.5 cursor-pointer font-bold"
+                className="text-xs text-primary hover:underline flex items-center gap-0.5 cursor-pointer font-bold"
               >
                 View Ledger
                 <ChevronRight className="w-3.5 h-3.5" />
               </button>
             </div>
 
-            <div className="space-y-2">
+            <div className="h-[295px] overflow-y-auto space-y-1.5 pr-1 py-1">
               {recentTransactions.length === 0 ? (
-                <div className="p-8 text-center bg-surface-container-low/50 border border-outline-variant/30 rounded-3xl space-y-2">
+                <div className="h-full flex flex-col items-center justify-center text-center space-y-2">
                   <p className="text-xs text-on-surface-variant font-medium">No recent transactions logged yet.</p>
                   <button
                     onClick={onAddTransactionClick}
-                    className="px-4 py-2 bg-primary text-on-primary text-xs font-bold rounded-xl shadow-xs cursor-pointer hover:bg-primary/90"
+                    className="px-3 py-1.5 bg-primary text-on-primary text-xs font-bold rounded-xl shadow-xs cursor-pointer hover:bg-primary/90"
                   >
                     + Log First Outflow
                   </button>
                 </div>
               ) : (
-                recentTransactions.slice(0, 6).map((tx) => {
+                recentTransactions.slice(0, 7).map((tx) => {
                   const config = getCategoryConfig(tx.category);
                   const IconComponent = config.icon;
                   const isExpense = tx.amount < 0;
                   const brand = getBrandInfo(tx.title);
 
                   return (
-                    <Card3D key={tx.id} depth={4} scaleOnHover={1.015} glare={true} className="rounded-2xl">
-                      <div 
-                        onClick={() => setSelectedTx(tx)}
-                        className="flex items-center justify-between p-3 bg-surface-container-low/60 hover:bg-surface-container-low border border-outline-variant/20 hover:border-outline-variant/40 rounded-2xl transition-all cursor-pointer group"
-                      >
-                        <div className="flex items-center gap-3">
-                          {brand ? (
-                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold text-sm border shrink-0 ${brand.color}`}>
-                              {brand.letter}
-                            </div>
-                          ) : (
-                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${config.bg} shadow-2xs shrink-0`}>
-                              <IconComponent className="w-4.5 h-4.5 text-on-surface" />
-                            </div>
-                          )}
-                          <div className="min-w-0">
-                            <div className="font-title-md text-sm text-on-surface font-bold truncate group-hover:text-primary transition-colors">
-                              {tx.title}
-                            </div>
-                            <div className="text-[11px] text-on-surface-variant font-medium">
-                              {tx.category} • {formatDateLabel(tx.date)}, {tx.time}
-                            </div>
+                    <div 
+                      key={tx.id}
+                      onClick={() => setSelectedTx(tx)}
+                      className="flex items-center justify-between p-2 rounded-xl bg-surface-container/60 hover:bg-surface-container border border-outline-variant/20 hover:border-outline-variant/40 transition-colors cursor-pointer group shadow-2xs"
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        {brand ? (
+                          <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold text-xs border shrink-0 ${brand.color}`}>
+                            {brand.letter}
                           </div>
-                        </div>
-
-                        <div className="text-right flex flex-col items-end shrink-0">
-                          <div className={`font-mono text-sm font-bold ${isExpense ? 'text-on-surface' : 'text-emerald-600 dark:text-emerald-400'}`}>
-                            {isExpense ? '' : '+'}{formatCurrency(Math.abs(tx.amount))}
+                        ) : (
+                          <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${config.bg} shadow-2xs shrink-0`}>
+                            <IconComponent className="w-3.5 h-3.5 text-on-surface" />
                           </div>
-                          <span className="inline-block px-2 py-0.5 mt-0.5 text-[9px] font-semibold bg-surface-container-highest text-on-surface-variant rounded-md">
-                            {tx.label}
-                          </span>
+                        )}
+                        <div className="min-w-0">
+                          <div className="text-xs text-on-surface font-bold truncate group-hover:text-primary transition-colors">
+                            {tx.title}
+                          </div>
+                          <div className="text-[10px] text-on-surface-variant font-medium">
+                            {tx.category} • {formatDateLabel(tx.date)}, {tx.time}
+                          </div>
                         </div>
                       </div>
-                    </Card3D>
+
+                      <div className="text-right flex flex-col items-end shrink-0 pl-2">
+                        <div className={`font-mono text-xs font-bold ${isExpense ? 'text-on-surface' : 'text-emerald-600 dark:text-emerald-400'}`}>
+                          {isExpense ? '' : '+'}{formatCurrency(Math.abs(tx.amount))}
+                        </div>
+                        <span className="inline-block px-1.5 py-0.2 mt-0.5 text-[8px] font-semibold bg-surface-container-highest text-on-surface-variant rounded">
+                          {tx.label}
+                        </span>
+                      </div>
+                    </div>
                   );
                 })
               )}
             </div>
           </div>
 
-          {/* Right: Quick Action Hub & Presets (Col 5) */}
-          <div className="col-span-5 space-y-4">
-            <TiltCard3D maxTilt={4} glareEffect={true} className="h-full">
-            <div className="p-5 rounded-3xl bg-surface-container-low/60 border border-outline-variant/25 space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-on-surface-variant uppercase tracking-wider flex items-center gap-1.5">
-                  <Zap className="w-3.5 h-3.5 text-primary" />
-                  Quick Actions Hub
-                </span>
-                <span className="text-[10px] text-on-surface-variant font-medium">1-Tap Shortcuts</span>
+          {/* Right: Commitments & Savings Hub (Col 5) */}
+          <div className="col-span-5 flex flex-col justify-between rounded-xl bg-surface-container-low/95 dark:bg-[#0B101D] border border-outline-variant/25 p-4 shadow-2xs h-[360px]">
+            <div className="flex items-center justify-between pb-2 border-b border-outline-variant/15">
+              {/* Tab Selector: Subscriptions vs Goals */}
+              <div className="flex items-center bg-surface-container-high/80 dark:bg-black/40 p-0.5 rounded-lg border border-outline-variant/30 text-[11px]">
+                <button
+                  type="button"
+                  onClick={() => {
+                    triggerHaptic('light');
+                    setDesktopCommitmentTab('subs');
+                  }}
+                  className={`px-2.5 py-0.5 rounded-md font-bold transition-all cursor-pointer flex items-center gap-1 ${
+                    desktopCommitmentTab === 'subs'
+                      ? 'bg-primary text-on-primary shadow-2xs'
+                      : 'text-on-surface-variant hover:text-on-surface'
+                  }`}
+                >
+                  <CreditCard className="w-3 h-3" />
+                  <span>Subs ({subscriptions.length})</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    triggerHaptic('light');
+                    setDesktopCommitmentTab('goals');
+                  }}
+                  className={`px-2.5 py-0.5 rounded-md font-bold transition-all cursor-pointer flex items-center gap-1 ${
+                    desktopCommitmentTab === 'goals'
+                      ? 'bg-primary text-on-primary shadow-2xs'
+                      : 'text-on-surface-variant hover:text-on-surface'
+                  }`}
+                >
+                  <Target className="w-3 h-3" />
+                  <span>Goals ({savingsGoals.length})</span>
+                </button>
               </div>
 
-              <QuickShortcutsWidget
-                onOpenExportAudit={onOpenExportAudit || (() => {})}
-                onOpenSms={() => setIsBankSmsOpen(true)}
-                onOpenCalendar={onOpenCalendar || (() => {})}
-                onOpenAddTx={onAddTransactionClick}
-                onOpenInsights={onNavigateToInsights}
-                onNavigateToSettings={onNavigateToSettings}
-                onScrollToHealthRadar={scrollToHealthRadar}
-                onScrollToNoSpend={scrollToNoSpend}
-              />
+              {desktopCommitmentTab === 'subs' ? (
+                <button
+                  type="button"
+                  onClick={() => setIsAddSubOpen(!isAddSubOpen)}
+                  className="text-xs font-bold text-primary hover:underline flex items-center gap-0.5 cursor-pointer"
+                >
+                  {isAddSubOpen ? <X className="w-3.5 h-3.5" /> : <Plus className="w-3.5 h-3.5" />}
+                  <span>{isAddSubOpen ? 'Close' : 'Add'}</span>
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setIsAddGoalOpen(!isAddGoalOpen)}
+                  className="text-xs font-bold text-primary hover:underline flex items-center gap-0.5 cursor-pointer"
+                >
+                  {isAddGoalOpen ? <X className="w-3.5 h-3.5" /> : <Plus className="w-3.5 h-3.5" />}
+                  <span>{isAddGoalOpen ? 'Close' : 'Add'}</span>
+                </button>
+              )}
             </div>
 
-            <div className="p-5 rounded-3xl bg-surface-container-low/60 border border-outline-variant/25 space-y-3">
-              <span className="text-xs font-bold text-on-surface-variant uppercase tracking-wider flex items-center gap-1.5">
+            <div className="h-[295px] flex flex-col justify-between pt-1">
+              {desktopCommitmentTab === 'subs' ? (
+                <>
+                  <div className="flex justify-between items-center pb-1.5 text-[11px] font-mono">
+                    <span className="text-on-surface-variant font-medium">Monthly Outflow Rate:</span>
+                    <span className="font-black text-on-surface">{formatCurrency(activeSubsTotal)}</span>
+                  </div>
+
+                  {/* Inline Subscription Add Form if open */}
+                  {isAddSubOpen && (
+                    <div className="p-2.5 rounded-xl bg-surface-container-high border border-outline-variant/50 shadow-sm space-y-2 mb-2">
+                      <form onSubmit={handleAddSubSubmit} className="space-y-2">
+                        <div className="grid grid-cols-2 gap-2">
+                          <input 
+                            type="text"
+                            value={newSubTitle}
+                            onChange={(e) => setNewSubTitle(e.target.value)}
+                            placeholder="Title (e.g. Netflix)"
+                            className="w-full px-2 py-1 bg-surface-container-lowest border border-outline-variant rounded-md text-xs text-on-surface"
+                          />
+                          <input 
+                            type="number"
+                            step="0.01"
+                            value={newSubAmount}
+                            onChange={(e) => setNewSubAmount(e.target.value)}
+                            placeholder="Cost / mo"
+                            className="w-full px-2 py-1 bg-surface-container-lowest border border-outline-variant rounded-md text-xs text-on-surface font-mono"
+                          />
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                          <select
+                            value={newSubCategory}
+                            onChange={(e) => setNewSubCategory(e.target.value as any)}
+                            className="w-full px-2 py-1 bg-surface-container-lowest border border-outline-variant rounded-md text-xs text-on-surface"
+                          >
+                            {['Food', 'Transport', 'Rent', 'Shopping', 'Other'].map((cat) => (
+                              <option key={cat} value={cat}>{cat}</option>
+                            ))}
+                          </select>
+                          <input 
+                            type="number"
+                            min="1"
+                            max="31"
+                            value={newSubDate}
+                            onChange={(e) => setNewSubDate(e.target.value)}
+                            placeholder="Day (1-31)"
+                            className="w-full px-2 py-1 bg-surface-container-lowest border border-outline-variant rounded-md text-xs text-on-surface font-mono"
+                          />
+                        </div>
+                        {subError && <p className="text-[10px] text-rose-500 font-medium">{subError}</p>}
+                        <button
+                          type="submit"
+                          className="w-full py-1 bg-primary text-on-primary rounded-md text-xs font-bold hover:bg-primary/90 cursor-pointer"
+                        >
+                          Save Subscription
+                        </button>
+                      </form>
+                    </div>
+                  )}
+
+                  <div className="flex-1 overflow-y-auto space-y-1.5 pr-1">
+                    {subscriptions.length === 0 ? (
+                      <p className="text-xs text-on-surface-variant py-8 text-center">No subscriptions recorded.</p>
+                    ) : (
+                      subscriptions.map((sub) => {
+                        const brand = getBrandInfo(sub.title);
+                        return (
+                          <div key={sub.id} className="flex items-center justify-between p-2 rounded-xl bg-surface-container/60 hover:bg-surface-container transition-colors">
+                            <div className="flex items-center gap-2">
+                              {brand ? (
+                                <div className={`w-7 h-7 rounded-lg flex items-center justify-center font-bold text-[10px] border shrink-0 ${brand.color}`}>
+                                  {brand.letter}
+                                </div>
+                              ) : (
+                                <div className="w-7 h-7 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                                  <CreditCard className="w-3.5 h-3.5" />
+                                </div>
+                              )}
+                              <div>
+                                <span className="text-xs font-bold text-on-surface block leading-tight">{sub.title}</span>
+                                <span className="text-[9px] text-on-surface-variant">Day {sub.billingDate} • {sub.category}</span>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-2">
+                              <span className="font-mono font-bold text-xs text-on-surface">{formatCurrency(sub.amount)}</span>
+                              <button
+                                type="button"
+                                onClick={() => setSubToDeleteId(sub.id)}
+                                className="p-1 text-on-surface-variant hover:text-error transition-colors cursor-pointer"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="flex justify-between items-center pb-1.5 text-[11px] font-mono">
+                    <span className="text-on-surface-variant font-medium">Total Saved:</span>
+                    <span className="font-black text-on-surface">
+                      {formatCurrency(totalSavedGoals)} / {formatCurrency(totalTargetGoals)}
+                    </span>
+                  </div>
+
+                  {/* Inline Goal Add Form if open */}
+                  {isAddGoalOpen && (
+                    <div className="p-2.5 rounded-xl bg-surface-container-high border border-outline-variant/50 shadow-sm space-y-2 mb-2">
+                      <form onSubmit={handleAddGoalSubmit} className="space-y-2">
+                        <div className="grid grid-cols-2 gap-2">
+                          <input 
+                            type="text"
+                            value={newGoalTitle}
+                            onChange={(e) => setNewGoalTitle(e.target.value)}
+                            placeholder="Goal Title"
+                            className="w-full px-2 py-1 bg-surface-container-lowest border border-outline-variant rounded-md text-xs text-on-surface"
+                          />
+                          <input 
+                            type="number"
+                            step="1"
+                            value={newGoalTarget}
+                            onChange={(e) => setNewGoalTarget(e.target.value)}
+                            placeholder="Target Amount"
+                            className="w-full px-2 py-1 bg-surface-container-lowest border border-outline-variant rounded-md text-xs text-on-surface font-mono"
+                          />
+                        </div>
+                        {goalError && <p className="text-[10px] text-rose-500 font-medium">{goalError}</p>}
+                        <button
+                          type="submit"
+                          className="w-full py-1 bg-primary text-on-primary rounded-md text-xs font-bold hover:bg-primary/90 cursor-pointer"
+                        >
+                          Save Goal
+                        </button>
+                      </form>
+                    </div>
+                  )}
+
+                  <div className="flex-1 overflow-y-auto space-y-2 pr-1">
+                    {savingsGoals.length === 0 ? (
+                      <p className="text-xs text-on-surface-variant py-8 text-center">No active savings targets set.</p>
+                    ) : (
+                      savingsGoals.map((g) => {
+                        const pct = Math.min(100, Math.round((g.currentAmount / (g.targetAmount || 1)) * 100));
+                        return (
+                          <div key={g.id} className="p-2 bg-surface-container/60 rounded-xl space-y-1">
+                            <div className="flex justify-between items-center text-xs">
+                              <div className="flex items-center gap-1.5">
+                                <Target className="w-3.5 h-3.5 text-emerald-600" />
+                                <span className="font-bold text-on-surface">{g.title}</span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <span className="font-mono font-bold text-emerald-600 text-[11px]">{pct}%</span>
+                                <button
+                                  type="button"
+                                  onClick={() => setGoalToDeleteId(g.id)}
+                                  className="text-on-surface-variant hover:text-error transition-colors cursor-pointer"
+                                >
+                                  <Trash2 className="w-3 h-3" />
+                                </button>
+                              </div>
+                            </div>
+
+                            <div className="w-full h-1 bg-surface-container-highest rounded-full overflow-hidden">
+                              <div className="h-full bg-emerald-500 rounded-full transition-all duration-300" style={{ width: `${pct}%` }} />
+                            </div>
+
+                            <div className="flex justify-between text-[9px] font-mono text-on-surface-variant">
+                              <span>Saved: {formatCurrency(g.currentAmount)}</span>
+                              <span>Target: {formatCurrency(g.targetAmount)}</span>
+                            </div>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+
+        </div>
+
+        {/* ── ROW 4: FINANCIAL HEALTH 360 & QUICK COMMAND CENTER (Col 6 + Col 6 Grid) ── */}
+        <div className="grid grid-cols-12 gap-3.5 items-stretch">
+          
+          {/* Left: Financial Health & Discipline Hub (Col 6) */}
+          <div className="col-span-6 flex flex-col justify-between rounded-xl bg-surface-container-low/95 dark:bg-[#0B101D] border border-outline-variant/25 p-4 shadow-2xs h-[360px]">
+            <div className="flex items-center justify-between pb-2 border-b border-outline-variant/15">
+              <div className="flex items-center bg-surface-container-high/80 dark:bg-black/40 p-0.5 rounded-lg border border-outline-variant/30 text-[11px]">
+                <button
+                  type="button"
+                  onClick={() => {
+                    triggerHaptic('light');
+                    setDesktopHealthTab('radar');
+                  }}
+                  className={`px-3 py-0.5 rounded-md font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                    desktopHealthTab === 'radar'
+                      ? 'bg-primary text-on-primary shadow-2xs'
+                      : 'text-on-surface-variant hover:text-on-surface'
+                  }`}
+                >
+                  <ShieldCheck className="w-3.5 h-3.5" />
+                  <span>360° Health Radar</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    triggerHaptic('light');
+                    setDesktopHealthTab('heatmap');
+                  }}
+                  className={`px-3 py-0.5 rounded-md font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                    desktopHealthTab === 'heatmap'
+                      ? 'bg-primary text-on-primary shadow-2xs'
+                      : 'text-on-surface-variant hover:text-on-surface'
+                  }`}
+                >
+                  <Calendar className="w-3.5 h-3.5" />
+                  <span>No-Spend Streak Heatmap</span>
+                </button>
+              </div>
+
+              <span className="text-[10px] text-on-surface-variant font-mono">
+                {formatMonthName(activeMonth)}
+              </span>
+            </div>
+
+            {/* Content area: perfectly fills the 295px body with zero overflow or dead gap */}
+            <div className="h-[295px] overflow-y-auto pt-1 flex items-center justify-center">
+              {desktopHealthTab === 'radar' ? (
+                <div ref={healthRadarRef} className="w-full h-full">
+                  <FinancialHealthRadarCard
+                    transactions={transactions}
+                    budget={budget}
+                    subscriptions={subscriptions}
+                    currency={budget?.currency || 'INR'}
+                    onNavigateToSettings={onNavigateToSettings}
+                  />
+                </div>
+              ) : (
+                <div ref={noSpendRef} className="w-full h-full">
+                  <NoSpendHeatmapCard
+                    transactions={transactions}
+                    budget={budget}
+                  />
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Right: Quick Command & Presets Hub (Col 6) */}
+          <div className="col-span-6 flex flex-col justify-between rounded-xl bg-surface-container-low/95 dark:bg-[#0B101D] border border-outline-variant/25 p-4 shadow-2xs h-[360px] space-y-2">
+            {/* Top AI Smart Insight Stream */}
+            <div className="pb-2 border-b border-outline-variant/15 flex items-center justify-between">
+              <div className="flex items-center gap-1.5">
                 <Sparkles className="w-3.5 h-3.5 text-primary" />
-                Frequent Expense Presets
+                <span className="text-xs font-bold text-on-surface uppercase tracking-wider font-outfit">AI Smart Intel</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => setSmartInsightSlide((prev) => (prev > 0 ? prev - 1 : 2))}
+                  className="p-1 rounded hover:bg-surface-container-high text-on-surface-variant cursor-pointer"
+                >
+                  <ChevronLeft className="w-3 h-3" />
+                </button>
+                <span className="text-[9px] font-mono text-on-surface-variant">{smartInsightSlide + 1}/3</span>
+                <button
+                  type="button"
+                  onClick={() => setSmartInsightSlide((prev) => (prev < 2 ? prev + 1 : 0))}
+                  className="p-1 rounded hover:bg-surface-container-high text-on-surface-variant cursor-pointer"
+                >
+                  <ChevronRight className="w-3 h-3" />
+                </button>
+              </div>
+            </div>
+
+            {/* Smart Insight Slide Text */}
+            <div className="p-2 rounded-lg bg-surface-container/60 border border-outline-variant/20 text-xs">
+              {smartInsightSlide === 0 && (
+                <div className="flex items-center gap-2">
+                  <span className="w-5 h-5 rounded-md bg-emerald-500/15 text-emerald-600 flex items-center justify-center shrink-0">
+                    <TrendingDown className="w-3 h-3" />
+                  </span>
+                  <p className="text-[11px] text-on-surface-variant leading-snug">
+                    {monthlyDiffPercent <= 0 
+                      ? `Spending is down ${Math.abs(Math.round(monthlyDiffPercent))}% compared to last month. Excellent pace!`
+                      : `Pace is ${Math.round(monthlyDiffPercent)}% higher than last month. Watch discretionary outflows.`
+                    }
+                  </p>
+                </div>
+              )}
+              {smartInsightSlide === 1 && (
+                <div className="flex items-center gap-2">
+                  <span className="w-5 h-5 rounded-md bg-primary/15 text-primary flex items-center justify-center shrink-0">
+                    <Wallet className="w-3 h-3" />
+                  </span>
+                  <p className="text-[11px] text-on-surface-variant leading-snug">
+                    {chartData.length > 0 
+                      ? `${chartData[0].name} represents ${((chartData[0].value / (totalSpendingForMonth || 1)) * 100).toFixed(0)}% of your monthly expenditure.`
+                      : 'No category transactions recorded for this billing cycle yet.'
+                    }
+                  </p>
+                </div>
+              )}
+              {smartInsightSlide === 2 && (
+                <div className="flex items-center gap-2">
+                  <span className="w-5 h-5 rounded-md bg-purple-500/15 text-purple-600 flex items-center justify-center shrink-0">
+                    <ShieldCheck className="w-3 h-3" />
+                  </span>
+                  <p className="text-[11px] text-on-surface-variant leading-snug">
+                    {subscriptions.length} recurring commitments totaling {formatCurrency(activeSubsTotal)} / month.
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Frequent Presets Quick Fire */}
+            <div className="space-y-1">
+              <span className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider font-mono flex items-center gap-1">
+                <Zap className="w-3 h-3 text-primary" />
+                1-Tap Frequent Presets
               </span>
               <QuickTemplatesWidget
                 templates={budget?.quickTemplates}
@@ -2700,312 +3096,28 @@ export default function DashboardTab({
                 }}
               />
             </div>
-            </TiltCard3D>
-          </div>
 
-        </div>
-
-        {/* ── BENTO ROW 3: Visual Summary Donut + Financial Health 360 Radar & Heatmap ── */}
-        <div className="grid grid-cols-12 gap-6 items-start">
-          
-          {/* Left: Visual Summary SVG Donut (Col 6) */}
-          <div className="col-span-6 space-y-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <h3 className="font-outfit text-base text-on-surface font-black tracking-tight">Visual Breakdown</h3>
-                {activeCategoryFilter && (
-                  <button
-                    type="button"
-                    onClick={() => { triggerHaptic('light'); setActiveCategoryFilter(null); setHoveredCategory(null); }}
-                    className="flex items-center gap-1 text-[10px] font-bold text-primary bg-primary/10 hover:bg-primary/20 px-2 py-0.5 rounded-full border border-primary/20 transition-all cursor-pointer"
-                  >
-                    <span>{activeCategoryFilter}</span>
-                    <span className="text-xs leading-none">×</span>
-                  </button>
-                )}
-              </div>
-              <span className="text-xs text-on-surface-variant font-medium bg-surface-container-high px-2.5 py-1 rounded-full border border-outline-variant/20">
-                {formatMonthName(activeMonth)}
+            {/* 1-Tap Action Shortcuts */}
+            <div className="pt-2 border-t border-outline-variant/15 space-y-1">
+              <span className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider font-mono">
+                Action Shortcuts
               </span>
-            </div>
-
-            <TiltCard3D maxTilt={4} glareEffect={true} className="h-full">
-            <div className="p-5 rounded-3xl bg-surface-container-low/60 border border-outline-variant/30 shadow-sm rizzeat-bento-card">
-              {chartData.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-12 text-center space-y-2">
-                  <Coins className="w-8 h-8 text-on-surface-variant opacity-40" />
-                  <p className="text-xs font-bold text-on-surface">No expenses recorded for this month</p>
-                </div>
-              ) : (() => {
-                const CX = 90, CY = 90, R_OUTER = 72, R_INNER = 50;
-                const focusedName = hoveredCategory || activeCategoryFilter;
-                const focusedItem = focusedName ? chartData.find(d => d.name === focusedName) : null;
-
-                const slicePath = (s: typeof donutSlices[0], outerR: number, innerR: number) => {
-                  const toR = (d: number) => (d * Math.PI) / 180;
-                  const ox1 = CX + outerR * Math.cos(toR(s.startAngle));
-                  const oy1 = CY + outerR * Math.sin(toR(s.startAngle));
-                  const ox2 = CX + outerR * Math.cos(toR(s.endAngle));
-                  const oy2 = CY + outerR * Math.sin(toR(s.endAngle));
-                  const ix1 = CX + innerR * Math.cos(toR(s.endAngle));
-                  const iy1 = CY + innerR * Math.sin(toR(s.endAngle));
-                  const ix2 = CX + innerR * Math.cos(toR(s.startAngle));
-                  const iy2 = CY + innerR * Math.sin(toR(s.startAngle));
-                  const lg = s.sweep > 180 ? 1 : 0;
-                  return [
-                    `M ${ox1} ${oy1}`,
-                    `A ${outerR} ${outerR} 0 ${lg} 1 ${ox2} ${oy2}`,
-                    `L ${ix1} ${iy1}`,
-                    `A ${innerR} ${innerR} 0 ${lg} 0 ${ix2} ${iy2}`,
-                    'Z'
-                  ].join(' ');
-                };
-
-                return (
-                  <div className="grid grid-cols-1 sm:grid-cols-12 gap-6 items-center">
-                    <div className="sm:col-span-5 h-44 relative flex items-center justify-center">
-                      <svg viewBox="0 0 180 180" className="w-44 h-44 drop-shadow-sm select-none" style={{ overflow: 'visible' }}>
-                        {donutSlices.map((s) => {
-                          const isActive = focusedName === s.name;
-                          const anyFocused = Boolean(focusedName);
-                          const outerR = isActive ? R_OUTER + 5 : R_OUTER;
-                          const innerR = isActive ? R_INNER - 2 : R_INNER;
-                          const d = slicePath(s, outerR, innerR);
-
-                          return (
-                            <path
-                              key={s.name}
-                              d={d}
-                              fill={s.color}
-                              opacity={anyFocused ? (isActive ? 1 : 0.3) : 1}
-                              style={{ transition: 'all 0.2s ease', cursor: 'pointer' }}
-                              onMouseEnter={() => setHoveredCategory(s.name)}
-                              onMouseLeave={() => setHoveredCategory(null)}
-                              onClick={() => {
-                                triggerHaptic('light');
-                                const next = activeCategoryFilter === s.name ? null : s.name;
-                                setActiveCategoryFilter(next);
-                                setHoveredCategory(next);
-                              }}
-                            />
-                          );
-                        })}
-                        <foreignObject x="36" y="36" width="108" height="108">
-                          <div style={{ width: '108px', height: '108px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none', userSelect: 'none', textAlign: 'center', padding: '4px' }}>
-                            {focusedItem ? (
-                              <>
-                                <span style={{ fontSize: '9px', fontWeight: 800, textTransform: 'uppercase', color: focusedItem.color, maxWidth: '96px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                  {focusedItem.name}
-                                </span>
-                                <span style={{ fontSize: '14px', fontWeight: 900, fontFamily: 'monospace', color: 'var(--color-on-surface,#1c1b1f)', marginTop: '2px' }}>
-                                  <RollingNumber
-                                    value={focusedItem.value}
-                                    prefix={getCurrencySymbol(budget?.currency || 'INR')}
-                                    locale={getCurrencyLocale(budget?.currency || 'INR')}
-                                    duration={450}
-                                  />
-                                </span>
-                                <span style={{ fontSize: '10px', fontWeight: 700, color: focusedItem.color, marginTop: '3px', background: `${focusedItem.color}22`, padding: '1px 6px', borderRadius: '99px' }}>
-                                  {totalSpendingForMonth > 0 ? ((focusedItem.value / totalSpendingForMonth) * 100).toFixed(1) : 0}%
-                                </span>
-                              </>
-                            ) : (
-                              <>
-                                <span style={{ fontSize: '9px', fontWeight: 600, textTransform: 'uppercase', color: 'var(--color-on-surface-variant,#49454f)' }}>
-                                  Total
-                                </span>
-                                <span style={{ fontSize: '14px', fontWeight: 900, fontFamily: 'monospace', color: 'var(--color-on-surface,#1c1b1f)', marginTop: '2px' }}>
-                                  <RollingNumber
-                                    value={totalSpendingForMonth}
-                                    prefix={getCurrencySymbol(budget?.currency || 'INR')}
-                                    locale={getCurrencyLocale(budget?.currency || 'INR')}
-                                    duration={500}
-                                  />
-                                </span>
-                                <span style={{ fontSize: '9px', fontWeight: 500, color: 'var(--color-on-surface-variant,#49454f)', marginTop: '3px' }}>
-                                  {chartData.length} categories
-                                </span>
-                              </>
-                            )}
-                          </div>
-                        </foreignObject>
-                      </svg>
-                    </div>
-
-                    <div className="sm:col-span-7 space-y-1.5 max-h-52 overflow-y-auto">
-                      {chartData.map((item) => {
-                        const percent = totalSpendingForMonth > 0 ? ((item.value / totalSpendingForMonth) * 100).toFixed(1) : '0';
-                        const isFocused = focusedName === item.name;
-
-                        return (
-                          <div
-                            key={item.name}
-                            onMouseEnter={() => setHoveredCategory(item.name)}
-                            onMouseLeave={() => setHoveredCategory(null)}
-                            onClick={() => {
-                              triggerHaptic('light');
-                              const next = activeCategoryFilter === item.name ? null : item.name;
-                              setActiveCategoryFilter(next);
-                            }}
-                            className={`p-2 rounded-xl transition-all cursor-pointer flex items-center justify-between ${
-                              isFocused ? 'bg-surface-container-high' : 'hover:bg-surface-container'
-                            }`}
-                          >
-                            <div className="flex items-center gap-2 min-w-0">
-                              <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
-                              <span className="text-xs font-bold text-on-surface truncate">{item.name}</span>
-                            </div>
-                            <div className="text-right flex items-center gap-2">
-                              <span className="text-xs font-mono font-bold text-on-surface">{formatCurrency(item.value)}</span>
-                              <span className="text-[10px] font-mono text-on-surface-variant w-10 text-right">{percent}%</span>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                );
-              })()}
-            </div>
-            </TiltCard3D>
-          </div>
-
-          {/* Right: Financial Health 360 Radar & Heatmap (Col 6) */}
-          <div className="col-span-6 space-y-4">
-            <TiltCard3D maxTilt={4} glareEffect={true}>
-              <FinancialHealthRadarCard
-                transactions={transactions}
-                budget={budget}
-                subscriptions={subscriptions}
-                currency={budget?.currency || 'INR'}
+              <QuickShortcutsWidget
+                onOpenExportAudit={onOpenExportAudit || (() => {})}
+                onOpenSms={() => setIsBankSmsOpen(true)}
+                onOpenCalendar={onOpenCalendar || (() => {})}
+                onOpenAddTx={onAddTransactionClick}
+                onOpenInsights={onNavigateToInsights}
                 onNavigateToSettings={onNavigateToSettings}
+                onScrollToHealthRadar={scrollToHealthRadar}
+                onScrollToNoSpend={scrollToNoSpend}
               />
-            </TiltCard3D>
-            <TiltCard3D maxTilt={4} glareEffect={true}>
-              <NoSpendHeatmapCard
-                transactions={transactions}
-                budget={budget}
-              />
-            </TiltCard3D>
-          </div>
-
-        </div>
-
-        {/* ── BENTO ROW 4: Subscriptions & Savings Goals ── */}
-        <div className="grid grid-cols-12 gap-6 items-start">
-          
-          {/* Subscriptions Bento Card (Col 6) */}
-          <div className="col-span-6 space-y-3">
-            <div className="flex items-center justify-between">
-              <h3 className="font-outfit text-base text-on-surface font-black tracking-tight">Recurring Commitments</h3>
-              <button
-                type="button"
-                onClick={() => setIsAddSubOpen(true)}
-                className="text-xs font-bold text-primary hover:underline flex items-center gap-1 cursor-pointer"
-              >
-                <Plus className="w-3 h-3" />
-                <span>Add Subscription</span>
-              </button>
             </div>
-
-            <TiltCard3D maxTilt={4} glareEffect={true} className="h-full">
-            <div className="p-5 rounded-3xl bg-surface-container-low/60 border border-outline-variant/30 space-y-3 rizzeat-bento-card">
-              <div className="flex justify-between items-center pb-2 border-b border-outline-variant/20 text-xs">
-                <span className="text-on-surface-variant font-medium">Monthly Outflow Rate:</span>
-                <span className="font-mono font-black text-on-surface text-sm">{formatCurrency(activeSubsTotal)}</span>
-              </div>
-
-              <div className="space-y-2 max-h-60 overflow-y-auto">
-                {subscriptions.length === 0 ? (
-                  <p className="text-xs text-on-surface-variant py-4 text-center">No subscriptions recorded.</p>
-                ) : (
-                  subscriptions.map((sub) => {
-                    const brand = getBrandInfo(sub.title);
-                    return (
-                      <div key={sub.id} className="flex items-center justify-between p-2.5 rounded-2xl bg-surface-container hover:bg-surface-container-high transition-colors">
-                        <div className="flex items-center gap-2.5">
-                          {brand ? (
-                            <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold text-xs border shrink-0 ${brand.color}`}>
-                              {brand.letter}
-                            </div>
-                          ) : (
-                            <div className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
-                              <CreditCard className="w-4 h-4" />
-                            </div>
-                          )}
-                          <div>
-                            <span className="text-xs font-bold text-on-surface block leading-tight">{sub.title}</span>
-                            <span className="text-[10px] text-on-surface-variant">Day {sub.billingDate} • {sub.category}</span>
-                          </div>
-                        </div>
-
-                        <div className="flex items-center gap-3">
-                          <span className="font-mono font-bold text-xs text-on-surface">{formatCurrency(sub.amount)}</span>
-                          <button
-                            type="button"
-                            onClick={() => setSubToDeleteId(sub.id)}
-                            className="p-1 text-on-surface-variant hover:text-error transition-colors cursor-pointer"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  })
-                )}
-              </div>
-            </div>
-            </TiltCard3D>
-          </div>
-
-          {/* Savings Goals Bento Card (Col 6) */}
-          <div className="col-span-6 space-y-3">
-            <div className="flex items-center justify-between">
-              <h3 className="font-outfit text-base text-on-surface font-black tracking-tight">Active Savings Goals</h3>
-              <span className="text-xs text-on-surface-variant font-medium">{savingsGoals.length} Active Targets</span>
-            </div>
-
-            <TiltCard3D maxTilt={4} glareEffect={true} className="h-full">
-            <div className="p-5 rounded-3xl bg-surface-container-low/60 border border-outline-variant/30 space-y-3 rizzeat-bento-card">
-              <div className="space-y-3 max-h-72 overflow-y-auto">
-                {savingsGoals.length === 0 ? (
-                  <p className="text-xs text-on-surface-variant py-4 text-center">No active savings targets set.</p>
-                ) : (
-                  savingsGoals.map((g) => {
-                    const pct = Math.min(100, Math.round((g.currentAmount / g.targetAmount) * 100));
-                    return (
-                      <div key={g.id} className="p-3 bg-surface-container rounded-2xl space-y-2">
-                        <div className="flex justify-between items-center text-xs">
-                          <div className="flex items-center gap-2">
-                            <Target className="w-4 h-4 text-emerald-600" />
-                            <span className="font-bold text-on-surface">{g.title}</span>
-                          </div>
-                          <span className="font-mono font-bold text-emerald-600">{pct}%</span>
-                        </div>
-
-                        <div className="w-full h-1.5 bg-surface-container-highest rounded-full overflow-hidden">
-                          <div className="h-full bg-emerald-500 rounded-full transition-all" style={{ width: `${pct}%` }} />
-                        </div>
-
-                        <div className="flex justify-between text-[10px] font-mono text-on-surface-variant">
-                          <span>Saved: {formatCurrency(g.currentAmount)}</span>
-                          <span>Target: {formatCurrency(g.targetAmount)}</span>
-                        </div>
-                      </div>
-                    );
-                  })
-                )}
-              </div>
-            </div>
-            </TiltCard3D>
           </div>
 
         </div>
 
       </div>
-
-
-
 
 
       {/* 3D WebGL Titanium Card Studio Modal */}

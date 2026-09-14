@@ -57,7 +57,6 @@ import { fetchLiveExchangeRates } from './utils/currencyConverter';
 import { checkAlertRulesOnSave } from './utils/alertRulesEngine';
 
 import { VoiceInputModal } from './components/VoiceInputModal';
-import { ThreeDAtmosphere } from './components/animated/ThreeDAtmosphere';
 
 // Modals (Static imports to ensure zero dynamic chunk loading failures on Android)
 import { CalendarViewModal } from './components/CalendarViewModal';
@@ -1320,9 +1319,10 @@ export default function App() {
           className="h-screen w-screen overflow-hidden"
         >
           <div className={`h-screen overflow-hidden bg-background text-on-background flex flex-col md:flex-row font-sans relative antialiased selection:bg-primary-container selection:text-on-primary-container ${isPrivacyMode ? 'privacy-blur-mode' : ''}`}>
-            {/* Interactive WebGL 3D Spatial Atmosphere with Mouse Parallax (Desktop Only) */}
-            <div className="hidden lg:block pointer-events-none fixed inset-0 z-0 overflow-hidden">
-              <ThreeDAtmosphere />
+            {/* Subtle high-performance CSS ambient light gradients (Desktop Only) */}
+            <div className="hidden lg:block pointer-events-none fixed inset-0 z-0 overflow-hidden opacity-30">
+              <div className="absolute -top-32 -left-32 w-96 h-96 rounded-full bg-primary/10 blur-3xl" />
+              <div className="absolute top-1/3 -right-32 w-96 h-96 rounded-full bg-secondary/8 blur-3xl" />
             </div>
       
       {/* If Add Form is active, render it exclusively in full viewport view */}
@@ -1594,9 +1594,33 @@ export default function App() {
                     </>
                   )}
                 </div>
+
+                {/* Global Command / Search input (Desktop) */}
+                <div 
+                  onClick={() => setActiveTab('history')}
+                  className="hidden xl:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-surface-container-low border border-outline-variant/30 text-on-surface-variant hover:border-primary/40 hover:text-on-surface cursor-pointer transition-all w-60 shadow-2xs group ml-3"
+                >
+                  <Search className="w-3.5 h-3.5 text-on-surface-variant group-hover:text-primary transition-colors" />
+                  <span className="text-xs text-on-surface-variant/80 flex-1 truncate">Search transactions...</span>
+                  <kbd className="px-1.5 py-0.5 rounded-md bg-surface-container text-[10px] font-mono font-bold text-on-surface-variant border border-outline-variant/30">⌘K</kbd>
+                </div>
               </div>
 
               <div className="flex items-center gap-2">
+                {/* Desktop Net Safe-to-Spend Pill */}
+                {budget && Number(budget.monthlyLimit) > 0 && (() => {
+                  const today = new Date();
+                  const currentMonthKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
+                  const monthSpent = Math.abs(transactions.filter(t => t && t.date && typeof t.date === 'string' && t.date.startsWith(currentMonthKey) && Number(t.amount) < 0).reduce((sum, t) => sum + (Number(t.amount) || 0), 0));
+                  const limit = Number(budget.monthlyLimit);
+                  const safeLeft = limit - monthSpent;
+                  return (
+                    <div className="hidden lg:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-primary/10 border border-primary/25 text-xs font-mono select-none">
+                      <span className="text-[10px] uppercase font-bold text-primary tracking-wider">Safe Left:</span>
+                      <strong className={`font-bold ${safeLeft < 0 ? 'text-rose-500' : 'text-primary'}`}>{formatCurrency(safeLeft, budget?.currency || 'INR')}</strong>
+                    </div>
+                  );
+                })()}
                 {/* 1-Tap Lock App Button (Available when PIN protection is configured) */}
                 {pinConfig.isEnabled && (
                   <button
