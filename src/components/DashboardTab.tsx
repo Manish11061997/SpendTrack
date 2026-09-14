@@ -5,7 +5,7 @@ import { Transaction, UserProfile, BudgetConfig, Subscription } from '../types';
 import { formatCurrency as formatCustomCurrency, getCurrencySymbol, getCurrencyLocale, isSubscriptionDoubleCounted, parseRawAmount } from '../utils/currency';
 import { COLOR_PRESETS } from '../theme';
 import { triggerHaptic } from '../utils/haptics';
-import { ThreeDDonutCanvas, ThreeDCardCanvas } from './animated';
+import { ThreeDDonutCanvas, ThreeDCardCanvas, TiltCard3D, FlipCard3D } from './animated';
 import { ThreeDCardModal } from './ThreeDCardModal';
 import { QuickShortcutsWidget } from './QuickShortcutsWidget';
 import { FinancialHealthRadarCard } from './FinancialHealthRadarCard';
@@ -2160,6 +2160,7 @@ export default function DashboardTab({
           
           {/* Bento Cell 1: Luxury Virtual Metallic Card (Col 6) */}
           <div className="col-span-6 flex flex-col">
+            <TiltCard3D maxTilt={6} glareEffect={true} className="h-full">
             <div className="p-6 rounded-3xl bg-gradient-to-br from-slate-900 via-[#0D1424] to-[#080D1A] text-white border border-white/10 shadow-2xl relative overflow-hidden flex flex-col justify-between min-h-[300px] rizzeat-bento-card group">
               {/* Subtle ambient light gradient inside card */}
               <div className="absolute top-0 right-0 w-80 h-80 bg-primary/10 rounded-full blur-3xl pointer-events-none" />
@@ -2261,64 +2262,72 @@ export default function DashboardTab({
                       compact={true}
                     />
                   </div>
-                ) : !isHeroFlipped ? (
-                  <div className="space-y-1 py-2">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-bold uppercase tracking-widest text-slate-400">
-                        {summaryMode === 'monthly' ? 'Monthly Committed Outflow' : 'Weekly Committed Outflow'}
-                      </span>
-                      {hasBudget && (
-                        <span className={`text-[9px] font-extrabold px-2 py-0.5 rounded-full border ${
-                          (activeExpenses / (activeLimit || 3000)) * 100 > 100 
-                            ? 'bg-rose-500/20 text-rose-300 border-rose-500/30' 
-                            : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
-                        }`}>
-                          {Math.round((activeExpenses / (activeLimit || 3000)) * 100)}% cap
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex items-baseline gap-3">
-                      <h2 className="text-4xl sm:text-5xl font-mono font-black tracking-tight text-white drop-shadow-sm">
-                        {formatCurrency(activeExpenses)}
-                      </h2>
-                    </div>
-                  </div>
                 ) : (
-                  <div className="grid grid-cols-3 gap-3 py-1">
-                    <div className="p-3 bg-white/5 border border-white/10 rounded-2xl">
-                      <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Daily Pace</span>
-                      <p className="font-mono text-base font-black text-white mt-0.5">
-                        {(() => {
-                          const today = new Date().getDate();
-                          const avg = today > 0 ? Math.round(activeExpenses / today) : activeExpenses;
-                          return formatCurrency(avg);
-                        })()}
-                      </p>
-                      <span className="text-[8px] text-slate-400">Avg / day</span>
-                    </div>
+                  <FlipCard3D
+                    isFlipped={isHeroFlipped}
+                    onFlipChange={setIsHeroFlipped}
+                    className="min-h-[90px]"
+                    front={
+                      <div className="space-y-1 py-2">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-bold uppercase tracking-widest text-slate-400">
+                            {summaryMode === 'monthly' ? 'Monthly Committed Outflow' : 'Weekly Committed Outflow'}
+                          </span>
+                          {hasBudget && (
+                            <span className={`text-[9px] font-extrabold px-2 py-0.5 rounded-full border ${
+                              (activeExpenses / (activeLimit || 3000)) * 100 > 100 
+                                ? 'bg-rose-500/20 text-rose-300 border-rose-500/30' 
+                                : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
+                            }`}>
+                              {Math.round((activeExpenses / (activeLimit || 3000)) * 100)}% cap
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-baseline gap-3">
+                          <h2 className="text-4xl sm:text-5xl font-mono font-black tracking-tight text-white drop-shadow-sm">
+                            {formatCurrency(activeExpenses)}
+                          </h2>
+                        </div>
+                      </div>
+                    }
+                    back={
+                      <div className="grid grid-cols-3 gap-3 py-1">
+                        <div className="p-3 bg-white/5 border border-white/10 rounded-2xl">
+                          <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Daily Pace</span>
+                          <p className="font-mono text-base font-black text-white mt-0.5">
+                            {(() => {
+                              const today = new Date().getDate();
+                              const avg = today > 0 ? Math.round(activeExpenses / today) : activeExpenses;
+                              return formatCurrency(avg);
+                            })()}
+                          </p>
+                          <span className="text-[8px] text-slate-400">Avg / day</span>
+                        </div>
 
-                    <div className="p-3 bg-white/5 border border-white/10 rounded-2xl">
-                      <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Top Category</span>
-                      <p className="text-sm font-black text-white truncate mt-0.5">
-                        {chartData.length > 0 ? chartData[0].name : 'None'}
-                      </p>
-                      <span className="text-[8px] text-slate-400">
-                        {chartData.length > 0 ? formatCurrency(chartData[0].value) : '₹0'}
-                      </span>
-                    </div>
+                        <div className="p-3 bg-white/5 border border-white/10 rounded-2xl">
+                          <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Top Category</span>
+                          <p className="text-sm font-black text-white truncate mt-0.5">
+                            {chartData.length > 0 ? chartData[0].name : 'None'}
+                          </p>
+                          <span className="text-[8px] text-slate-400">
+                            {chartData.length > 0 ? formatCurrency(chartData[0].value) : '₹0'}
+                          </span>
+                        </div>
 
-                    <div className="p-3 bg-white/5 border border-white/10 rounded-2xl">
-                      <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Remaining Cap</span>
-                      <p className={`font-mono text-base font-black mt-0.5 ${
-                        activeLimit - activeExpenses < 0 ? 'text-rose-400' : 'text-emerald-400'
-                      }`}>
-                        {formatCurrency(activeLimit - activeExpenses)}
-                      </p>
-                      <span className="text-[8px] text-slate-400">
-                        {activeLimit - activeExpenses < 0 ? 'Over limit' : 'Buffer'}
-                      </span>
-                    </div>
-                  </div>
+                        <div className="p-3 bg-white/5 border border-white/10 rounded-2xl">
+                          <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Remaining Cap</span>
+                          <p className={`font-mono text-base font-black mt-0.5 ${
+                            activeLimit - activeExpenses < 0 ? 'text-rose-400' : 'text-emerald-400'
+                          }`}>
+                            {formatCurrency(activeLimit - activeExpenses)}
+                          </p>
+                          <span className="text-[8px] text-slate-400">
+                            {activeLimit - activeExpenses < 0 ? 'Over limit' : 'Buffer'}
+                          </span>
+                        </div>
+                      </div>
+                    }
+                  />
                 )}
               </div>
 
@@ -2342,10 +2351,12 @@ export default function DashboardTab({
                 </div>
               </div>
             </div>
+            </TiltCard3D>
           </div>
 
           {/* Bento Cell 2: VisionOS Budget Health Radial Gauge / 3D Extruded Donut (Col 3) */}
           <div className="col-span-3 flex flex-col">
+            <TiltCard3D maxTilt={5} glareEffect={true} className="h-full">
             <div className="p-5 rounded-3xl bg-surface-container-low/90 backdrop-blur-md border border-outline-variant/30 shadow-sm flex flex-col justify-between h-full rizzeat-bento-card space-y-3">
               <div className="flex items-center justify-between border-b border-outline-variant/20 dark:border-white/5 pb-2">
                 <div className="flex items-center gap-1.5">
@@ -2446,10 +2457,12 @@ export default function DashboardTab({
                 <span className="text-[10px] text-on-surface-variant font-medium">Cap: <strong className="text-on-surface">{formatCurrency(activeLimit)}</strong></span>
               </div>
             </div>
+            </TiltCard3D>
           </div>
 
           {/* Bento Cell 3: Smart Insights Telemetry (Col 3) */}
           <div className="col-span-3 flex flex-col">
+            <TiltCard3D maxTilt={5} glareEffect={true} className="h-full">
             <div className="p-5 rounded-3xl bg-surface-container-low/90 backdrop-blur-md border border-outline-variant/30 shadow-sm flex flex-col justify-between h-full rizzeat-bento-card space-y-3">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-1.5">
@@ -2535,6 +2548,7 @@ export default function DashboardTab({
                 </button>
               </div>
             </div>
+            </TiltCard3D>
           </div>
 
         </div>
