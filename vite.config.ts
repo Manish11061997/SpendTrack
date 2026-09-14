@@ -30,7 +30,13 @@ export default defineConfig(() => {
     },
     server: {
       hmr: process.env.DISABLE_HMR !== 'true',
-      watch: process.env.DISABLE_HMR === 'true' ? null : {},
+      watch: process.env.DISABLE_HMR === 'true' ? null : {
+        ignored: ['**/android/**', '**/ios/**', '**/dist/**'],
+      },
+    },
+    optimizeDeps: {
+      entries: ['index.html', 'src/**/*.{ts,tsx}'],
+      exclude: ['@capacitor/core', '@capacitor/app'],
     },
     build: {
       target: ['chrome60', 'es2015'],
