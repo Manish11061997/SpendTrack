@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { X, FileText, Download, Sparkles, CheckCircle2, ShieldCheck, Printer, Table, FileSpreadsheet, Calendar, Filter } from 'lucide-react';
 import { Transaction, BudgetConfig, UserProfile, Subscription, SavingsGoal } from '../types';
 import { formatCurrency, getCurrencySymbol } from '../utils/currency';
+import { getLocalDateString } from '../utils/dateUtils';
 
 interface PdfExportModalProps {
   isOpen: boolean;
@@ -29,13 +30,13 @@ export const PdfExportModal: React.FC<PdfExportModalProps> = ({
   const [exportSuccess, setExportSuccess] = useState<string | null>(null);
 
   const today = useMemo(() => new Date(), []);
-  const todayStr = useMemo(() => today.toISOString().split('T')[0], [today]);
+  const todayStr = useMemo(() => getLocalDateString(today), [today]);
 
   const [timeframe, setTimeframe] = useState<TimeframeType>('current_month');
   const [startDate, setStartDate] = useState<string>(() => {
     const d = new Date();
     d.setDate(1);
-    return d.toISOString().split('T')[0];
+    return getLocalDateString(d);
   });
   const [endDate, setEndDate] = useState<string>(todayStr);
 
@@ -235,7 +236,7 @@ export const PdfExportModal: React.FC<PdfExportModalProps> = ({
       // Mobile-compatible download: Blob → object URL → anchor click
       const blob = new Blob([reportHtml], { type: 'text/html;charset=utf-8' });
       const blobUrl = URL.createObjectURL(blob);
-      const fileName = `SpendTrack_Audit_${profile?.name?.replace(/\s+/g, '_') || 'Report'}_${today.toISOString().slice(0, 10)}.html`;
+      const fileName = `SpendTrack_Audit_${profile?.name?.replace(/\s+/g, '_') || 'Report'}_${getLocalDateString(today)}.html`;
       const link = document.createElement('a');
       link.href = blobUrl;
       link.download = fileName;

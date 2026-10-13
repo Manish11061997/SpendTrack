@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { X, Camera, Upload, Sparkles, CheckCircle2, AlertCircle, RefreshCw, FileText, ArrowRight } from 'lucide-react';
 import { GoogleGenAI } from '@google/genai';
 import { Transaction } from '../types';
+import { getLocalDateString } from '../utils/dateUtils';
 
 interface ReceiptScannerModalProps {
   isOpen: boolean;
@@ -101,7 +102,7 @@ Return ONLY a valid JSON object matching this structure:
         title: parsed.title || 'Scanned Receipt',
         amount: Math.abs(parseFloat(parsed.amount) || 0),
         category: ['Food', 'Transport', 'Rent', 'Shopping', 'Other'].includes(parsed.category) ? parsed.category : 'Other',
-        date: parsed.date || new Date().toISOString().split('T')[0],
+        date: parsed.date || getLocalDateString(),
         notes: parsed.notes || 'Scanned via AI Receipt OCR'
       });
     } catch (err: any) {
@@ -111,7 +112,7 @@ Return ONLY a valid JSON object matching this structure:
         title: 'Supermarket Bill',
         amount: 350,
         category: 'Food',
-        date: new Date().toISOString().split('T')[0],
+        date: getLocalDateString(),
         notes: 'Grocery items scanned'
       });
     } finally {

@@ -19,7 +19,16 @@ export function parseVoiceTranscript(transcript: string): ParsedVoiceCommand {
   const text = transcript.trim().toLowerCase();
 
   // 1. Detect type: income vs expense
-  const isIncome = /\b(income|salary|received|got|credited|bonus|earned|deposit)\b/i.test(text);
+  const hasExpenseIntent = /\b(spent|paid|bought|buy|purchased|bill|ordered|cost|got)\b/i.test(text);
+  const hasIncomeIntent = /\b(salary|credited|bonus|earned|received)\b/i.test(text);
+  let isIncome = false;
+  if (hasIncomeIntent && !hasExpenseIntent) {
+    isIncome = true;
+  } else if (hasExpenseIntent) {
+    isIncome = false;
+  } else if (/\b(income|deposit)\b/i.test(text)) {
+    isIncome = true;
+  }
   const type: 'expense' | 'income' = isIncome ? 'income' : 'expense';
 
   // 2. Extract numeric amount
@@ -49,9 +58,12 @@ export function parseVoiceTranscript(transcript: string): ParsedVoiceCommand {
 
   // 4. Extract Title / Description
   let cleanTitle = text
-    .replace(/\b(spent|paid|received|credited|for|on|rupees|rs|inr|dollars|\$|at)\b/gi, '')
-    .replace(/\b(\d+(?:\.\d+)?)\s*k\b/gi, '')
-    .replace(/\b(?:\$|₹|rs\.?|inr)?\s*(\d+(?:,\d+)*(?:\.\d+)?)\b/gi, '')
+    .replace(/\b(spent|paid|received|credited|for|on|rupees|rs\.?|inr|dollars|at|got)\b/gi, ' ')
+    .replace(/\b(\d+(?:\.\d+)?)\s*k\b/gi, ' ')
+    .replace(/[$₹]\s*\d+(?:,\d+)*(?:\.\d+)?/gi, ' ')
+    .replace(/\b\d+(?:,\d+)*(?:\.\d+)?\b/gi, ' ')
+    .replace(/[$₹.,!?;:]+/g, ' ')
+    .replace(/\s+/g, ' ')
     .trim();
 
   // Capitalize first letter

@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { Transaction, UserProfile, BudgetConfig, Subscription } from '../types';
 import { formatCurrency } from '../utils/currency';
+import { getLocalDateString } from '../utils/dateUtils';
 
 interface ExportPDFButtonProps {
   transactions: Transaction[];
@@ -72,18 +73,18 @@ export default function ExportPDFButton({
       setStartDate(sorted[0] || '');
       setEndDate(sorted[sorted.length - 1] || '');
     } else if (preset === 'this-month') {
-      const firstDay = new Date(baseDate.getFullYear(), baseDate.getMonth(), 1).toISOString().split('T')[0];
-      const lastDay = new Date(baseDate.getFullYear(), baseDate.getMonth() + 1, 0).toISOString().split('T')[0];
+      const firstDay = getLocalDateString(new Date(baseDate.getFullYear(), baseDate.getMonth(), 1));
+      const lastDay = getLocalDateString(new Date(baseDate.getFullYear(), baseDate.getMonth() + 1, 0));
       setStartDate(firstDay);
       setEndDate(lastDay);
     } else if (preset === 'last-30') {
-      const past30 = new Date(baseDate.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-      const endDay = baseDate.toISOString().split('T')[0];
+      const past30 = getLocalDateString(new Date(baseDate.getTime() - 30 * 24 * 60 * 60 * 1000));
+      const endDay = getLocalDateString(baseDate);
       setStartDate(past30);
       setEndDate(endDay);
     } else if (preset === 'last-90') {
-      const past90 = new Date(baseDate.getTime() - 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-      const endDay = baseDate.toISOString().split('T')[0];
+      const past90 = getLocalDateString(new Date(baseDate.getTime() - 90 * 24 * 60 * 60 * 1000));
+      const endDay = getLocalDateString(baseDate);
       setStartDate(past90);
       setEndDate(endDay);
     }
@@ -98,18 +99,18 @@ export default function ExportPDFButton({
     const latestTxStr = sorted[sorted.length - 1];
     const baseDate = latestTxStr ? new Date(latestTxStr) : new Date();
     if (preset === 'this-month') {
-      const firstDay = new Date(baseDate.getFullYear(), baseDate.getMonth(), 1).toISOString().split('T')[0];
-      const lastDay = new Date(baseDate.getFullYear(), baseDate.getMonth() + 1, 0).toISOString().split('T')[0];
+      const firstDay = getLocalDateString(new Date(baseDate.getFullYear(), baseDate.getMonth(), 1));
+      const lastDay = getLocalDateString(new Date(baseDate.getFullYear(), baseDate.getMonth() + 1, 0));
       return startDate === firstDay && endDate === lastDay;
     }
     if (preset === 'last-30') {
-      const past30 = new Date(baseDate.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-      const endDay = baseDate.toISOString().split('T')[0];
+      const past30 = getLocalDateString(new Date(baseDate.getTime() - 30 * 24 * 60 * 60 * 1000));
+      const endDay = getLocalDateString(baseDate);
       return startDate === past30 && endDate === endDay;
     }
     if (preset === 'last-90') {
-      const past90 = new Date(baseDate.getTime() - 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-      const endDay = baseDate.toISOString().split('T')[0];
+      const past90 = getLocalDateString(new Date(baseDate.getTime() - 90 * 24 * 60 * 60 * 1000));
+      const endDay = getLocalDateString(baseDate);
       return startDate === past90 && endDate === endDay;
     }
     return false;

@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Sector, RadialBarChart, RadialBar, PolarAngleAxis, AreaChart, Area, XAxis } from 'recharts';
 import { Transaction, UserProfile, BudgetConfig, Subscription } from '../types';
 import { formatCurrency as formatCustomCurrency, getCurrencySymbol, getCurrencyLocale, isSubscriptionDoubleCounted, parseRawAmount } from '../utils/currency';
+import { getLocalDateString } from '../utils/dateUtils';
 import { COLOR_PRESETS } from '../theme';
 import { triggerHaptic } from '../utils/haptics';
 import { ThreeDDonutCanvas, ThreeDCardCanvas, TiltCard3D, FlipCard3D, Card3D, RollingNumber } from './animated';
@@ -130,12 +131,16 @@ export default function DashboardTab({
 }: DashboardTabProps) {
   const healthRadarRef = React.useRef<HTMLDivElement>(null);
   const noSpendRef = React.useRef<HTMLDivElement>(null);
+  const healthRadarMobileRef = React.useRef<HTMLDivElement>(null);
+  const noSpendMobileRef = React.useRef<HTMLDivElement>(null);
 
   const scrollToHealthRadar = () => {
-    healthRadarRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    const target = (window.innerWidth < 1024 ? healthRadarMobileRef.current : healthRadarRef.current) || healthRadarRef.current || healthRadarMobileRef.current;
+    target?.scrollIntoView({ behavior: 'smooth', block: 'center' });
   };
   const scrollToNoSpend = () => {
-    noSpendRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    const target = (window.innerWidth < 1024 ? noSpendMobileRef.current : noSpendRef.current) || noSpendRef.current || noSpendMobileRef.current;
+    target?.scrollIntoView({ behavior: 'smooth', block: 'center' });
   };
   // Dynamically look up active theme/preset hex colors to avoid d3-color oklch parsing errors
   const activeThemePresetId = themePresetId || localStorage.getItem('spendtrack_theme_preset') || 'navy';
@@ -549,7 +554,7 @@ export default function DashboardTab({
     .slice(0, 4);
 
   const handleQuickAdd = (title: string, amount: number, category: 'Food' | 'Transport' | 'Shopping' | 'Other') => {
-    const todayStr = new Date().toISOString().split('T')[0];
+    const todayStr = getLocalDateString();
     const nowTime = new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
     onAddTransaction({
       title,
@@ -2174,6 +2179,22 @@ export default function DashboardTab({
     )}
   </section>
 
+        {/* Mobile Financial Health Radar & No-Spend Heatmap */}
+        <div ref={healthRadarMobileRef} className="pt-1">
+          <FinancialHealthRadarCard
+            transactions={transactions}
+            budget={budget}
+            subscriptions={subscriptions}
+            currency={budget?.currency || 'INR'}
+            onNavigateToSettings={onNavigateToSettings}
+          />
+        </div>
+        <div ref={noSpendMobileRef} className="pt-1">
+          <NoSpendHeatmapCard
+            transactions={transactions}
+            budget={budget}
+          />
+        </div>
       </div>
 
       {/* ── DESKTOP EXECUTIVE FINTECH COCKPIT (Visible on lg+, Hidden on Mobile) ── */}
@@ -2677,7 +2698,7 @@ export default function DashboardTab({
                         <div className={`font-mono text-xs font-bold ${isExpense ? 'text-on-surface' : 'text-emerald-600 dark:text-emerald-400'}`}>
                           {isExpense ? '' : '+'}{formatCurrency(Math.abs(tx.amount))}
                         </div>
-                        <span className="inline-block px-1.5 py-0.2 mt-0.5 text-[8px] font-semibold bg-surface-container-highest text-on-surface-variant rounded">
+                        <span className="inline-block px-1.5 py-0.5 mt-0.5 text-[8px] font-semibold bg-surface-container-highest text-on-surface-variant rounded">
                           {tx.label}
                         </span>
                       </div>
@@ -2892,7 +2913,7 @@ export default function DashboardTab({
                       <p className="text-xs text-on-surface-variant py-8 text-center">No active savings targets set.</p>
                     ) : (
                       savingsGoals.map((g) => {
-                        const pct = Math.min(100, Math.round((g.currentAmount / (g.targetAmount || 1)) * 100));
+                        const pct = g.targetAmount > 0 ? Math.min(100, Math.round((g.currentAmount / g.targetAmount) * 100)) : 0;
                         return (
                           <div key={g.id} className="p-2 bg-surface-container/60 rounded-xl space-y-1">
                             <div className="flex justify-between items-center text-xs">

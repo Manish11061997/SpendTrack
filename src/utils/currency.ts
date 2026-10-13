@@ -10,12 +10,13 @@ export const getCurrencyLocale = (code: string = 'INR'): string => {
 };
 
 export const formatCurrency = (val: number, code: string = 'INR', maxFractionDigits: number = 0): string => {
+  const safeVal = (typeof val !== 'number' || isNaN(val) || !isFinite(val)) ? 0 : val;
   const locale = getCurrencyLocale(code);
   return new Intl.NumberFormat(locale, {
     style: 'currency',
-    currency: code.toUpperCase(),
+    currency: (code || 'INR').toUpperCase(),
     maximumFractionDigits: maxFractionDigits
-  }).format(val);
+  }).format(safeVal);
 };
 
 export const getCurrencySymbol = (code: string = 'INR'): string => {

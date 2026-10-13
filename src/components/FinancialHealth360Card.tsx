@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Transaction, BudgetConfig, Subscription } from '../types';
 import { formatCurrency, isSubscriptionDoubleCounted } from '../utils/currency';
+import { getLocalDateString } from '../utils/dateUtils';
 import { CardSpotlight } from './ui/CardSpotlight';
 import { BorderBeam } from './ui/BorderBeam';
 import { triggerHaptic } from '../utils/haptics';
@@ -165,7 +166,7 @@ export const FinancialHealth360Card: React.FC<FinancialHealth360CardProps> = ({
     const past7Days = Array.from({ length: 7 }, (_, i) => {
       const d = new Date(today);
       d.setDate(d.getDate() - i);
-      return d.toISOString().split('T')[0];
+      return getLocalDateString(d);
     });
     const loggedDays = past7Days.filter(dayStr => monthTxs.some(t => t.date === dayStr)).length;
     if (loggedDays >= 5) return 15;

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Transaction, BudgetConfig, Subscription } from '../types';
 import { formatCurrency, getCurrencySymbol, isSubscriptionDoubleCounted } from '../utils/currency';
+import { getLocalDateString } from '../utils/dateUtils';
 import { ShieldCheck, TrendingUp, Sparkles, ChevronDown, ChevronUp, AlertCircle, Award, Target, Activity } from 'lucide-react';
 
 interface FinancialHealthRadarCardProps {
@@ -98,7 +99,7 @@ export const FinancialHealthRadarCard: React.FC<FinancialHealthRadarCardProps> =
     const past7Days = Array.from({ length: 7 }, (_, i) => {
       const d = new Date(today);
       d.setDate(d.getDate() - i);
-      return d.toISOString().split('T')[0];
+      return getLocalDateString(d);
     });
     const loggedDays = past7Days.filter(dayStr => monthTxs.some(t => t.date === dayStr)).length;
     if (loggedDays >= 5) return 15;

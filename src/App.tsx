@@ -849,20 +849,6 @@ export default function App() {
     setAchievementBadges(evaluated);
   }, [transactions, budget]);
 
-  // Global Keyboard Shortcuts (Cmd+K / Ctrl+K or 'N' to open Add Expense form)
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      const target = e.target as HTMLElement;
-      const isInput = target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable);
-      
-      if ((e.key.toLowerCase() === 'k' && (e.metaKey || e.ctrlKey)) || (!isInput && e.key.toLowerCase() === 'n' && !e.metaKey && !e.ctrlKey)) {
-        e.preventDefault();
-        setIsAddFormVisible(prev => !prev);
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
 
   const handleUpdateProfile = async (updatedProfile: UserProfile) => {
     if (currentUser) {
@@ -1165,9 +1151,12 @@ export default function App() {
     };
   }, []);
 
-  // Desktop keyboard shortcuts (Cmd/Ctrl + 1..4, Cmd/Ctrl + N or K for quick add)
+  // Desktop & Global keyboard shortcuts (Cmd/Ctrl + 1..4, Cmd/Ctrl + K for Search, Cmd/Ctrl + N for Quick Add)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement;
+      const isInput = target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable);
+
       if ((e.metaKey || e.ctrlKey) && !e.shiftKey && !e.altKey) {
         if (e.key === '1') {
           e.preventDefault();
@@ -1181,10 +1170,16 @@ export default function App() {
         } else if (e.key === '4') {
           e.preventDefault();
           setActiveTab('settings');
-        } else if (e.key.toLowerCase() === 'k' || e.key.toLowerCase() === 'n') {
+        } else if (e.key.toLowerCase() === 'k') {
+          e.preventDefault();
+          setActiveTab('history');
+        } else if (e.key.toLowerCase() === 'n') {
           e.preventDefault();
           setIsAddFormVisible(prev => !prev);
         }
+      } else if (!isInput && !e.metaKey && !e.ctrlKey && !e.altKey && e.key.toLowerCase() === 'n') {
+        e.preventDefault();
+        setIsAddFormVisible(prev => !prev);
       }
     };
     window.addEventListener('keydown', handleKeyDown);

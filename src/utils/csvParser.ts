@@ -1,4 +1,5 @@
 import { Transaction } from '../types';
+import { getLocalDateString, parseLocalDate } from './dateUtils';
 
 export interface ParsedCsvRow {
   date: string;
@@ -8,6 +9,19 @@ export interface ParsedCsvRow {
   label: 'Personal' | 'Work' | 'Freelance' | 'Subscription' | 'General';
   notes?: string;
   isDuplicate?: boolean;
+}
+
+function parseAmountString(str: string): number {
+  if (!str) return 0;
+  let clean = str.replace(/[₹$,€£\s]/g, '').trim();
+  const isDr = /dr\.?$/i.test(clean) || (clean.startsWith('(') && clean.endsWith(')'));
+  const isCr = /cr\.?$/i.test(clean);
+  clean = clean.replace(/[()]/g, '').replace(/dr\.?$/i, '').replace(/cr\.?$/i, '').replace(/,/g, '');
+  let val = parseFloat(clean);
+  if (isNaN(val)) return 0;
+  if (isDr) val = -Math.abs(val);
+  else if (isCr) val = Math.abs(val);
+  return val;
 }
 
 /**
@@ -28,16 +42,23 @@ export function parseBankCsv(
   // Find column indices
   let dateIdx = headers.findIndex(h => h.includes('date') || h.includes('time') || h.includes('day'));
   let titleIdx = headers.findIndex(h => h.includes('desc') || h.includes('title') || h.includes('payee') || h.includes('merchant') || h.includes('particulars') || h.includes('name'));
-  let amountIdx = headers.findIndex(h => h === 'amount' || h.includes('value') || h.includes('sum'));
   let outflowIdx = headers.findIndex(h => h.includes('debit') || h.includes('expense') || h.includes('outflow') || h.includes('withdrawal'));
   let inflowIdx = headers.findIndex(h => h.includes('credit') || h.includes('income') || h.includes('inflow') || h.includes('deposit'));
-  let catIdx = headers.findIndex(h => h.includes('cat') || h.includes('type'));
+  let amountIdx = headers.findIndex(h => !h.includes('date') && !h.includes('time') && !h.includes('balance') && (h === 'amount' || h.includes('amount') || h.includes('value') || h.includes('sum')));
+  let typeIdx = headers.findIndex(h => h === 'type' || h.includes('type'));
+  let catIdx = headers.findIndex(h => h.includes('category') || (h.includes('cat') && !h.includes('type')));
   let notesIdx = headers.findIndex(h => h.includes('note') || h.includes('remark') || h.includes('memo'));
+
+  // If there are separate debit and credit columns, prefer them over a generic amount column
+  const hasDebitCredit = outflowIdx !== -1 || inflowIdx !== -1;
+  if (hasDebitCredit && amountIdx !== -1 && headers[amountIdx] !== 'amount') {
+    amountIdx = -1;
+  }
 
   // Fallbacks if indices not matched cleanly
   if (dateIdx === -1) dateIdx = 0;
   if (titleIdx === -1) titleIdx = 1;
-  if (amountIdx === -1 && outflowIdx === -1 && inflowIdx === -1) amountIdx = 2;
+  if (amountIdx === -1 && !hasDebitCredit) amountIdx = 2;
 
   const validRows: ParsedCsvRow[] = [];
   const errors: string[] = [];
@@ -47,20 +68,30 @@ export function parseBankCsv(
     if (row.length < 2) continue;
 
     try {
-      const rawDate = row[dateIdx] || new Date().toISOString().split('T')[0];
-      const parsedDate = normalizeDate(rawDate);
+      const rawDate = row[dateIdx] || getLocalDateString();
+      const parsedDate = parseLocalDate(rawDate);
       const rawTitle = row[titleIdx] || 'Imported Transaction';
 
       let amount = 0;
-      if (amountIdx !== -1 && row[amountIdx]) {
-        amount = parseFloat(row[amountIdx].replace(/,/g, ''));
-      } else {
-        const outflow = outflowIdx !== -1 && row[outflowIdx] ? parseFloat(row[outflowIdx].replace(/,/g, '')) : 0;
-        const inflow = inflowIdx !== -1 && row[inflowIdx] ? parseFloat(row[inflowIdx].replace(/,/g, '')) : 0;
-        if (inflow > 0) {
-          amount = inflow;
-        } else if (outflow > 0) {
-          amount = -Math.abs(outflow);
+      if (hasDebitCredit && (outflowIdx !== -1 || inflowIdx !== -1)) {
+        const rawOutflow = outflowIdx !== -1 && row[outflowIdx] ? parseAmountString(row[outflowIdx]) : 0;
+        const rawInflow = inflowIdx !== -1 && row[inflowIdx] ? parseAmountString(row[inflowIdx]) : 0;
+        if (rawInflow > 0) {
+          amount = rawInflow;
+        } else if (rawOutflow > 0) {
+          amount = -Math.abs(rawOutflow);
+        }
+      } else if (amountIdx !== -1 && row[amountIdx]) {
+        amount = parseAmountString(row[amountIdx]);
+      }
+
+      // Check type column (e.g. from app's own export: "Expense" or "Income")
+      if (typeIdx !== -1 && row[typeIdx]) {
+        const tVal = row[typeIdx].toLowerCase();
+        if (tVal.includes('expense') || tVal.includes('debit') || tVal.includes('outflow')) {
+          amount = -Math.abs(amount);
+        } else if (tVal.includes('income') || tVal.includes('credit') || tVal.includes('inflow')) {
+          amount = Math.abs(amount);
         }
       }
 
@@ -99,7 +130,12 @@ function parseCsvLine(text: string): string[] {
   for (let i = 0; i < text.length; i++) {
     const c = text[i];
     if (c === '"') {
-      inQuotes = !inQuotes;
+      if (inQuotes && i + 1 < text.length && text[i + 1] === '"') {
+        cur += '"';
+        i++;
+      } else {
+        inQuotes = !inQuotes;
+      }
     } else if (c === ',' && !inQuotes) {
       result.push(cur.trim());
       cur = '';
@@ -109,27 +145,6 @@ function parseCsvLine(text: string): string[] {
   }
   result.push(cur.trim());
   return result;
-}
-
-function normalizeDate(raw: string): string {
-  const clean = raw.replace(/["']/g, '').trim();
-  const d = new Date(clean);
-  if (!isNaN(d.getTime())) {
-    return d.toISOString().split('T')[0];
-  }
-  // Try DD/MM/YYYY or DD-MM-YYYY
-  const parts = clean.split(/[-/.]/);
-  if (parts.length === 3) {
-    let day = parseInt(parts[0], 10);
-    let month = parseInt(parts[1], 10);
-    let year = parseInt(parts[2], 10);
-    if (year < 100) year += 2000;
-    if (day > 12) {
-      // DD/MM/YYYY
-      return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-    }
-  }
-  return new Date().toISOString().split('T')[0];
 }
 
 function inferCategory(title: string, rawCat: string): 'Food' | 'Transport' | 'Rent' | 'Shopping' | 'Other' {
