@@ -125,7 +125,7 @@ export const analyzeUserFinances = (
 
   // Subscriptions
   const activeSubs = safeSubs.filter((s) => s.isActive !== false);
-  const subTotalMonthly = activeSubs.reduce((s, sub) => s + Number(sub.amount), 0);
+  const subTotalMonthly = activeSubs.reduce((s, sub) => s + (Number(sub.amount) || 0), 0);
   const subTotalAnnual = subTotalMonthly * 12;
 
   // Savings goals

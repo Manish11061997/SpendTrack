@@ -109,6 +109,7 @@ export const FinancialHealthRadarCard: React.FC<FinancialHealthRadarCardProps> =
   })();
 
   const totalScore = Math.min(100, savingsPillar + budgetPillar + subPillar + runwayPillar + loggingPillar);
+  const safeTotalScore = isNaN(totalScore) ? 50 : Math.max(0, Math.min(100, Math.round(totalScore)));
 
   // Status configuration
   const getScoreStatus = (score: number) => {
@@ -143,7 +144,7 @@ export const FinancialHealthRadarCard: React.FC<FinancialHealthRadarCardProps> =
     }
   };
 
-  const status = getScoreStatus(totalScore);
+  const status = getScoreStatus(safeTotalScore);
 
   return (
     <div className="p-5 bg-surface-container-lowest border border-outline-variant/30 rounded-3xl space-y-4 shadow-sm backdrop-blur-xs">
@@ -184,14 +185,14 @@ export const FinancialHealthRadarCard: React.FC<FinancialHealthRadarCardProps> =
               stroke={status.strokeColor}
               strokeWidth="6"
               strokeDasharray={2 * Math.PI * 32}
-              strokeDashoffset={2 * Math.PI * 32 * (1 - totalScore / 100)}
+              strokeDashoffset={2 * Math.PI * 32 * (1 - safeTotalScore / 100)}
               strokeLinecap="round"
               fill="transparent"
               className="transition-all duration-1000 ease-out"
             />
           </svg>
           <div className="absolute flex flex-col items-center justify-center text-center">
-            <span className="font-black text-lg font-mono text-on-surface leading-none">{totalScore}</span>
+            <span className="font-black text-lg font-mono text-on-surface leading-none">{safeTotalScore}</span>
             <span className="text-[8px] font-bold text-on-surface-variant uppercase tracking-wider">/ 100</span>
           </div>
         </div>

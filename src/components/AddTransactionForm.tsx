@@ -176,30 +176,7 @@ export default function AddTransactionForm({ onSave, onCancel, budget, transacti
     setReceiptPreview(null);
   };
 
-  const handleReceiptUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    try {
-      setIsScanningReceipt(true);
-      setError('');
-      const base64Str = await new Promise<string>((resolve) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result as string);
-        reader.readAsDataURL(file);
-      });
-      setReceiptPreview(base64Str);
-
-      const parsed = await parseReceiptWithAI(base64Str);
-      if (parsed.merchantName) setTitle(parsed.merchantName);
-      if (parsed.totalAmount) setAmount(parsed.totalAmount.toString());
-      if (parsed.category) setCategory(parsed.category as any);
-    } catch (err: any) {
-      console.error("Receipt upload scan error:", err);
-    } finally {
-      setIsScanningReceipt(false);
-    }
-  };
+  // Use unified handleFileChange with canvas 800px compression and error handling
 
   const handleAddTag = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' || e.key === ',') {
@@ -527,7 +504,7 @@ export default function AddTransactionForm({ onSave, onCancel, budget, transacti
                     accept="image/*"
                     capture="environment"
                     className="hidden"
-                    onChange={handleReceiptUpload}
+                    onChange={handleFileChange}
                   />
                 </label>
 

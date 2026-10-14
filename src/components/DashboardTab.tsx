@@ -674,16 +674,17 @@ export default function DashboardTab({
     // Category limits warning using computed categoryDataMap
     if (budget?.categoryLimits) {
       Object.entries(budget.categoryLimits).forEach(([cat, limit]) => {
-        if (!limit) return;
+        const numLimit = Number(limit);
+        if (!numLimit || numLimit <= 0) return;
         const spent = categoryDataMap[cat] || 0;
-        if (spent > limit) {
+        if (spent > numLimit) {
           nudges.push({
-            text: `Over budget in ${cat}: spent ${formatCurrency(spent)} vs limit ${formatCurrency(limit)}.`,
+            text: `Over budget in ${cat}: spent ${formatCurrency(spent)} vs limit ${formatCurrency(numLimit)}.`,
             type: 'warning'
           });
-        } else if (spent > limit * 0.85) {
+        } else if (spent > numLimit * 0.85) {
           nudges.push({
-            text: `${cat} limit warning: spent ${Math.round((spent / limit) * 100)}% of your budget.`,
+            text: `${cat} limit warning: spent ${Math.round((spent / numLimit) * 100)}% of your budget.`,
             type: 'info'
           });
         }
@@ -2330,7 +2331,7 @@ export default function DashboardTab({
                   Burn rate / day
                 </span>
                 <span className="font-mono">
-                  Target: <strong className="text-on-surface font-semibold">{formatCurrency(Math.round(activeLimit / daysInCurrentMonth))}</strong>
+                  Target: <strong className="text-on-surface font-semibold">{formatCurrency(Math.round(activeLimit / Math.max(1, daysInCurrentMonth)))}</strong>
                 </span>
               </div>
             </div>

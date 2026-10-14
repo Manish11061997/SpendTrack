@@ -65,7 +65,7 @@ export const AiCoachWidget: React.FC<AiCoachWidgetProps> = ({
 
   const getInitialPos = () => ({
     x: 16,
-    y: Math.max(88, window.innerHeight - 96 - 48),
+    y: typeof window !== 'undefined' ? Math.max(88, window.innerHeight - 96 - 48) : 500,
   });
   const currentPos = btnPos || getInitialPos();
 
@@ -101,6 +101,7 @@ export const AiCoachWidget: React.FC<AiCoachWidgetProps> = ({
   };
 
   const getDrawerStyle = (): React.CSSProperties => {
+    if (typeof window === 'undefined') return {};
     const sw = window.innerWidth;
     const sh = window.innerHeight;
     if (sw < 640) return {};
@@ -152,7 +153,10 @@ export const AiCoachWidget: React.FC<AiCoachWidgetProps> = ({
       const audit = analyzeUserFinances(transactions, budgetConfig, subscriptions, savingsGoals, currency);
       const systemInstruction = buildGeminiSystemPrompt(audit, transactions);
 
-      const conversationHistory = messages.slice(-10).map((m) => ({
+      const rawHistory = messages.slice(-10);
+      const firstUserIdx = rawHistory.findIndex((m) => m.sender === 'user');
+      const validHistory = firstUserIdx >= 0 ? rawHistory.slice(firstUserIdx) : [];
+      const conversationHistory = validHistory.map((m) => ({
         role: m.sender === 'user' ? 'user' : 'model',
         parts: [{ text: m.text }],
       }));

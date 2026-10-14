@@ -176,22 +176,23 @@ export const FinancialHealth360Card: React.FC<FinancialHealth360CardProps> = ({
   }, [safeTransactions]);
 
   const totalScore = Math.min(100, savingsPillar + budgetPillar + subPillar + runwayPillar + regularityPillar);
+  const safeTotalScore = isNaN(totalScore) ? 50 : Math.max(0, Math.min(100, Math.round(totalScore)));
 
   // Status label & styling
   const scoreStatus = useMemo(() => {
-    if (totalScore >= 80) {
+    if (safeTotalScore >= 80) {
       return {
         label: 'Optimal Health',
         colorClass: 'text-primary bg-primary/15 border-primary/30 dark:shadow-[0_0_12px_rgba(0,245,160,0.25)] shadow-none',
         tip: 'Superior financial discipline! Robust surplus buffer and budget pacing detected.'
       };
-    } else if (totalScore >= 60) {
+    } else if (safeTotalScore >= 60) {
       return {
         label: 'Healthy Stable',
         colorClass: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20',
         tip: 'Solid foundation. Keep spending under daily pace to reach optimal status.'
       };
-    } else if (totalScore >= 40) {
+    } else if (safeTotalScore >= 40) {
       return {
         label: 'Caution Pace',
         colorClass: 'text-amber-400 bg-amber-500/10 border-amber-500/20',
@@ -204,7 +205,7 @@ export const FinancialHealth360Card: React.FC<FinancialHealth360CardProps> = ({
         tip: 'Outflows are approaching ceiling. Review category budgets immediately.'
       };
     }
-  }, [totalScore]);
+  }, [safeTotalScore]);
 
   // Radar chart geometry for 5-axis pentagon (Credit, Spend, Net Worth, Debt, Savings)
   // Center at (120, 105), radius = 68
@@ -317,7 +318,7 @@ export const FinancialHealth360Card: React.FC<FinancialHealth360CardProps> = ({
                     <span className="text-on-surface-variant font-medium">Health Score</span>
                     <span className="font-mono font-bold">
                       <span className="text-primary font-black text-sm dark:drop-shadow-[0_0_8px_var(--primary)] drop-shadow-none">
-                        {totalScore || 78}
+                        {safeTotalScore}
                       </span>
                       <span className="text-on-surface-variant text-xs">/100</span>
                     </span>
@@ -451,10 +452,10 @@ export const FinancialHealth360Card: React.FC<FinancialHealth360CardProps> = ({
 
                   {/* 4 Rows */}
                   {[
-                    { label: 'Oct 1', rowDays: [1, 2, 3, 4, 5, 6, 7], pattern: [true, true, true, false, true, true, true] },
-                    { label: '4xt 7', rowDays: [8, 9, 10, 11, 12, 13, 14], pattern: [true, true, false, false, true, true, true] },
-                    { label: '4xt 7', rowDays: [15, 16, 17, 18, 19, 20, 21], pattern: [true, true, true, false, false, false, true] },
-                    { label: 'Oct 1', rowDays: [22, 23, 24, 25, 26, 27, 28], pattern: [true, true, false, false, false, true, true] }
+                    { label: 'Wk 1', rowDays: [1, 2, 3, 4, 5, 6, 7], pattern: [true, true, true, false, true, true, true] },
+                    { label: 'Wk 2', rowDays: [8, 9, 10, 11, 12, 13, 14], pattern: [true, true, false, false, true, true, true] },
+                    { label: 'Wk 3', rowDays: [15, 16, 17, 18, 19, 20, 21], pattern: [true, true, true, false, false, false, true] },
+                    { label: 'Wk 4', rowDays: [22, 23, 24, 25, 26, 27, 28], pattern: [true, true, false, false, false, true, true] }
                   ].map((row, rIdx) => (
                     <div key={rIdx} className="grid grid-cols-8 gap-1.5 items-center">
                       <span className="text-[9px] font-mono text-on-surface-variant">{row.label}</span>
@@ -520,7 +521,13 @@ export const FinancialHealth360Card: React.FC<FinancialHealth360CardProps> = ({
                   <div className="p-2.5 dark:bg-black/90 bg-surface-container-high border border-outline-variant/50 dark:border-primary/40 rounded-xl flex items-center justify-between text-xs animate-fade-in shadow-xl">
                     <div className="flex items-center gap-2 min-w-0">
                       <span className="font-bold text-on-surface shrink-0">
-                        {new Date(selectedDay.dateStr).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}:
+                        {(() => {
+                          const parts = selectedDay.dateStr.split('-').map(Number);
+                          const dObj = new Date(parts[0], parts[1] - 1, parts[2]);
+                          return !isNaN(dObj.getTime())
+                            ? dObj.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
+                            : selectedDay.dateStr;
+                        })()}:
                       </span>
                       {selectedDay.total === 0 ? (
                         <span className="text-primary font-bold truncate">🎉 No-Spend Day Achieved!</span>
@@ -549,7 +556,7 @@ export const FinancialHealth360Card: React.FC<FinancialHealth360CardProps> = ({
                 <span>{scoreStatus.tip}</span>
               </span>
               <span className="font-mono text-[10px] font-bold text-primary shrink-0 pl-2">
-                Score {totalScore}/100
+                Score {safeTotalScore}/100
               </span>
             </div>
           </div>

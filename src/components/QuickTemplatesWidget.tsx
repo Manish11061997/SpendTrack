@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Zap, Utensils, Car, ShoppingBag, Home as HomeIcon, Check } from 'lucide-react';
 import { QuickLogTemplate } from '../types';
 import { formatCurrency } from '../utils/currency';
@@ -16,6 +16,13 @@ export const QuickTemplatesWidget: React.FC<QuickTemplatesWidgetProps> = ({
 }) => {
   const activeTemplates = templates && Array.isArray(templates) ? templates : [];
   const [loggedId, setLoggedId] = useState<string | null>(null);
+  const loggedTimerRef = useRef<any>(null);
+
+  useEffect(() => {
+    return () => {
+      if (loggedTimerRef.current) clearTimeout(loggedTimerRef.current);
+    };
+  }, []);
 
   const getCategoryIcon = (category: string) => {
     switch (category) {
@@ -34,7 +41,8 @@ export const QuickTemplatesWidget: React.FC<QuickTemplatesWidgetProps> = ({
       category: tpl.category
     });
     setLoggedId(tpl.id);
-    setTimeout(() => setLoggedId(null), 1400);
+    if (loggedTimerRef.current) clearTimeout(loggedTimerRef.current);
+    loggedTimerRef.current = setTimeout(() => setLoggedId(null), 1400);
   };
 
   // Only render if the user has explicitly added 1 or more quick presets to their list
