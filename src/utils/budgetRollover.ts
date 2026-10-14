@@ -18,7 +18,12 @@ export function calculateBudgetRollover(
 ): RolloverSummary | null {
   if (!budget?.enableCategoryRollover) return null;
 
-  const [year, month] = targetMonthKey.split('-').map(Number);
+  const safeTargetKey = (targetMonthKey && typeof targetMonthKey === 'string' && targetMonthKey.includes('-'))
+    ? targetMonthKey
+    : getLocalDateString().slice(0, 7);
+  const [year, month] = safeTargetKey.split('-').map(Number);
+  if (isNaN(year) || isNaN(month)) return null;
+
   const prevMonthDate = new Date(year, month - 2, 1);
   const prevYearStr = prevMonthDate.getFullYear();
   const prevMonthStr = String(prevMonthDate.getMonth() + 1).padStart(2, '0');

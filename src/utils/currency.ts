@@ -31,8 +31,9 @@ export const getCurrencySymbol = (code: string = 'INR'): string => {
 };
 
 export const isSubscriptionDoubleCounted = (subName: string, txTitle: string): boolean => {
+  if (!subName || !txTitle || typeof subName !== 'string' || typeof txTitle !== 'string') return false;
   const clean = (str: string) => 
-    str.toLowerCase()
+    (str || '').toLowerCase()
        .replace(/[^a-z0-9\s]/g, '') // Keep spaces so we can do word-based matching
        .replace(/\b(payment|membership|subscription|premium|family|monthly|sub)\b/g, '')
        .trim()

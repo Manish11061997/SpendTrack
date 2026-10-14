@@ -16,7 +16,7 @@ import {
   Hash
 } from 'lucide-react';
 import { Transaction, UserProfile, BudgetConfig, Subscription } from '../types';
-import { formatCurrency } from '../utils/currency';
+import { formatCurrency, isSubscriptionDoubleCounted } from '../utils/currency';
 import { getLocalDateString } from '../utils/dateUtils';
 
 interface ExportPDFButtonProps {
@@ -140,8 +140,8 @@ export default function ExportPDFButton({
     .filter(s => s.isActive)
     .reduce((sum, s) => {
       const isAlreadyLogged = filteredTransactions.some(t => 
-        t.amount < 0 &&
-        (t.label === 'Subscription' || t.title.toLowerCase().includes(s.title.toLowerCase()) || s.title.toLowerCase().includes(t.title.toLowerCase()))
+        t && t.amount < 0 &&
+        (t.label === 'Subscription' || isSubscriptionDoubleCounted(s.title, t.title))
       );
       return sum + (isAlreadyLogged ? 0 : s.amount);
     }, 0);
@@ -175,8 +175,8 @@ export default function ExportPDFButton({
       .filter(s => s.isActive && s.category === cat)
       .reduce((sum, s) => {
         const isAlreadyLogged = filteredTransactions.some(t => 
-          t.amount < 0 &&
-          (t.label === 'Subscription' || t.title.toLowerCase().includes(s.title.toLowerCase()) || s.title.toLowerCase().includes(t.title.toLowerCase()))
+          t && t.amount < 0 &&
+          (t.label === 'Subscription' || isSubscriptionDoubleCounted(s.title, t.title))
         );
         return sum + (isAlreadyLogged ? 0 : s.amount);
       }, 0);
@@ -302,7 +302,8 @@ export default function ExportPDFButton({
 
       // Save PDF file
       setStatusMessage('Saving document...');
-      const fileName = `SpendTrack_Statement_${profile.name.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0,10)}.pdf`;
+      const cleanProfileName = (profile?.name || 'Statement').replace(/\s+/g, '_');
+      const fileName = `SpendTrack_Statement_${cleanProfileName}_${new Date().toISOString().slice(0,10)}.pdf`;
 
       if (Capacitor.isNativePlatform()) {
         const pdfBase64 = pdf.output('datauristring').split(',')[1];

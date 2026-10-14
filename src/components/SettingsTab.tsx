@@ -102,6 +102,12 @@ export default function SettingsTab({
     const file = e.target.files?.[0];
     if (!file) return;
 
+    setProfileError(null);
+    if (!file.type.startsWith('image/')) {
+      setProfileError('Please upload a valid image file (PNG, JPG, WebP).');
+      return;
+    }
+
     const reader = new FileReader();
     reader.onload = (event) => {
       const img = new Image();
@@ -133,7 +139,13 @@ export default function SettingsTab({
           setAvatarUrl(dataUrl);
         }
       };
+      img.onerror = () => {
+        setProfileError('Failed to load image file.');
+      };
       img.src = event.target?.result as string;
+    };
+    reader.onerror = () => {
+      setProfileError('Failed to read image file.');
     };
     reader.readAsDataURL(file);
   };
@@ -1033,7 +1045,8 @@ export default function SettingsTab({
                     setNewTplTitle('');
                     setNewTplAmount('');
                   }}
-                  className="px-4 py-2 bg-primary hover:bg-primary/90 text-on-primary font-bold text-xs rounded-xl shadow-xs transition-colors flex items-center justify-center gap-1 cursor-pointer shrink-0"
+                  disabled={!newTplTitle.trim() || !newTplAmount || parseFloat(parseRawAmount(newTplAmount)) <= 0}
+                  className="px-4 py-2 bg-primary hover:bg-primary/90 disabled:opacity-40 text-on-primary font-bold text-xs rounded-xl shadow-xs transition-colors flex items-center justify-center gap-1 cursor-pointer shrink-0"
                 >
                   <Plus className="w-4 h-4" /> Save Preset
                 </button>
