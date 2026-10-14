@@ -97,9 +97,9 @@ export default function HistoryTab({
   const recordsList: MonthlyHistorySummary[] = useMemo(() => {
     return Object.entries(groupedByMonth).map(([monthKey, txs]) => {
       const [year, month] = monthKey.split('-').map(Number);
-      const dateObj = new Date(year, month - 1, 1);
-      const label = dateObj.toLocaleString('en-IN', { month: 'long', year: 'numeric' });
-      const shortLabel = dateObj.toLocaleString('en-IN', { month: 'short' }).toUpperCase();
+      const dateObj = (!isNaN(year) && !isNaN(month)) ? new Date(year, month - 1, 1) : new Date();
+      const label = !isNaN(dateObj.getTime()) ? dateObj.toLocaleString('en-IN', { month: 'long', year: 'numeric' }) : monthKey;
+      const shortLabel = !isNaN(dateObj.getTime()) ? dateObj.toLocaleString('en-IN', { month: 'short' }).toUpperCase() : (monthKey.slice(0, 3).toUpperCase() || 'MTH');
       const totalOutflow = Math.abs(
         txs
           .filter(t => t.amount < 0)
@@ -179,6 +179,7 @@ export default function HistoryTab({
         const parts = dateStr.split('-');
         if (parts.length < 2) return dateStr;
         const d = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, 1);
+        if (isNaN(d.getTime())) return dateStr;
         return d.toLocaleString('en-IN', { month: 'short', year: 'numeric' });
       };
       
@@ -371,7 +372,7 @@ export default function HistoryTab({
 
               return (
                 <>
-                  <p className="text-xs text-on-surface-variant italic leading-relaxed bg-white/60 p-3 rounded-xl border border-outline-variant/10">
+                  <p className="text-xs text-on-surface-variant italic leading-relaxed bg-surface-container/70 dark:bg-black/25 p-3 rounded-xl border border-outline-variant/10">
                     "{spendingQuote}"
                   </p>
 
@@ -379,7 +380,7 @@ export default function HistoryTab({
                   <div className="flex items-end justify-between h-36 px-2 gap-3 pt-2">
                     {insightList.map((b, i) => (
                       <div key={i} className="flex flex-col items-center flex-1 gap-1.5">
-                        <div className="w-full bg-slate-100 rounded-t-lg h-24 flex items-end">
+                        <div className="w-full bg-slate-100 dark:bg-white/10 rounded-t-lg h-24 flex items-end">
                           <div 
                             style={{ height: `${b.pct}%` }}
                             className={`w-full rounded-t-lg transition-all duration-700 ${

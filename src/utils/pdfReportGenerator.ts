@@ -29,6 +29,14 @@ export const generateMonthlyPdfReport = ({
   const totalExpense = Math.abs(expenseTxs.reduce((sum, t) => sum + Number(t.amount), 0));
   const netSavings = totalIncome - totalExpense;
 
+  const escapeHtml = (str: string = '') =>
+    String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+
   const categories = ['Food', 'Transport', 'Rent', 'Shopping', 'Other'];
   const categoryBreakdown = categories.map(cat => {
     const amount = Math.abs(
@@ -108,7 +116,7 @@ export const generateMonthlyPdfReport = ({
           <tbody>
             ${categoryBreakdown.map(c => `
               <tr>
-                <td><strong>${c.category}</strong></td>
+                <td><strong>${escapeHtml(c.category)}</strong></td>
                 <td>${formatCurrency(c.amount, currency)}</td>
                 <td>${c.limit > 0 ? formatCurrency(c.limit, currency) : 'No Limit'}</td>
                 <td>
@@ -133,14 +141,18 @@ export const generateMonthlyPdfReport = ({
               </tr>
             </thead>
             <tbody>
-              ${savingsGoals.map(g => `
+              ${savingsGoals.map(g => {
+                const cur = Number(g.currentAmount) || 0;
+                const tgt = Math.max(1, Number(g.targetAmount) || 1);
+                return `
                 <tr>
-                  <td><strong>${g.title}</strong></td>
-                  <td>${formatCurrency(g.currentAmount, currency)}</td>
-                  <td>${formatCurrency(g.targetAmount, currency)}</td>
-                  <td><strong>${Math.round((g.currentAmount / Math.max(1, g.targetAmount)) * 100)}%</strong></td>
+                  <td><strong>${escapeHtml(g.title)}</strong></td>
+                  <td>${formatCurrency(cur, currency)}</td>
+                  <td>${formatCurrency(Number(g.targetAmount) || 0, currency)}</td>
+                  <td><strong>${Math.round((cur / tgt) * 100)}%</strong></td>
                 </tr>
-              `).join('')}
+              `;
+              }).join('')}
             </tbody>
           </table>
         ` : ''}
@@ -158,9 +170,9 @@ export const generateMonthlyPdfReport = ({
             <tbody>
               ${subscriptions.filter(s => s.isActive !== false).map(s => `
                 <tr>
-                  <td><strong>${s.title}</strong></td>
-                  <td>${formatCurrency(s.amount, currency)}</td>
-                  <td>${s.billingDate ? `Day ${s.billingDate} of month` : 'Monthly'}</td>
+                  <td><strong>${escapeHtml(s.title)}</strong></td>
+                  <td>${formatCurrency(Number(s.amount) || 0, currency)}</td>
+                  <td>${s.billingDate ? `Day ${Number(s.billingDate) || 1} of month` : 'Monthly'}</td>
                 </tr>
               `).join('')}
             </tbody>

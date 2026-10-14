@@ -726,8 +726,10 @@ export default function App() {
     const today = new Date();
     const currentMonthKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
     const todayDate = today.getDate();
+    const maxDaysInMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
+    const targetDay = Math.min(Math.max(1, Number(budget.recurringIncome.dayOfMonth) || 1), maxDaysInMonth);
 
-    if (todayDate >= (budget.recurringIncome.dayOfMonth || 1) && budget.recurringIncome.lastProcessedMonth !== currentMonthKey) {
+    if (todayDate >= targetDay && budget.recurringIncome.lastProcessedMonth !== currentMonthKey) {
       const isAlreadyLogged = transactions.some(t =>
         t &&
         typeof t.date === 'string' &&
@@ -739,9 +741,9 @@ export default function App() {
       if (!isAlreadyLogged) {
         handleSaveTransaction({
           title: budget.recurringIncome.title,
-          amount: Math.abs(budget.recurringIncome.amount),
+          amount: Math.abs(Number(budget.recurringIncome.amount)),
           category: 'Other',
-          date: `${currentMonthKey}-${String(budget.recurringIncome.dayOfMonth || 1).padStart(2, '0')}`,
+          date: `${currentMonthKey}-${String(targetDay).padStart(2, '0')}`,
           time: '12:00 PM',
           label: 'Personal'
         });

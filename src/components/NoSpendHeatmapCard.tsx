@@ -172,7 +172,13 @@ export const NoSpendHeatmapCard: React.FC<NoSpendHeatmapCardProps> = ({
         <div className="p-3 bg-surface-container border border-outline-variant/30 rounded-2xl flex items-center justify-between text-xs animate-fade-in">
           <div>
             <span className="font-bold text-on-surface">
-              {new Date(selectedDay.dateStr).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}:
+              {(() => {
+                const parts = selectedDay.dateStr.split('-').map(Number);
+                const dObj = new Date(parts[0], parts[1] - 1, parts[2]);
+                return !isNaN(dObj.getTime())
+                  ? dObj.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
+                  : selectedDay.dateStr;
+              })()}:
             </span>{' '}
             {selectedDay.total === 0 ? (
               <span className="text-emerald-600 dark:text-emerald-400 font-bold">🎉 No-Spend Day Achieved!</span>

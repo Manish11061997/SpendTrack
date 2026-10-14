@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { 
   AreaChart, 
@@ -83,6 +83,12 @@ export default function InsightsTab({
   const [customIncome, setCustomIncome] = useState<number>(() => {
     return activeMonthInflow > 0 ? activeMonthInflow : ((budget?.monthlyLimit ?? 3000) * 1.5 || 50000);
   });
+
+  useEffect(() => {
+    if (activeMonthInflow > 0) {
+      setCustomIncome(activeMonthInflow);
+    }
+  }, [activeMonth, activeMonthInflow]);
 
   // Simulator States
   const [simFood, setSimFood] = useState<number>(-1);
@@ -428,9 +434,15 @@ export default function InsightsTab({
           </div>
 
           <div className="p-2.5 rounded-2xl bg-surface-container-high/60 flex justify-between items-center text-xs">
-            <span className="text-[11px] text-on-surface-variant font-medium">End-of-Month Projection</span>
+            <span className="text-[11px] text-on-surface-variant font-medium">
+              {activeMonth === currentRealMonth ? 'End-of-Month Projection' : 'Full Month Outflow'}
+            </span>
             <span className="font-mono font-bold text-on-surface">
-              {formatCurrency(Math.round((totalSpent / Math.max(1, today.getDate())) * 30))} est.
+              {formatCurrency(
+                activeMonth === currentRealMonth
+                  ? Math.round((totalSpent / Math.max(1, today.getDate())) * new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate())
+                  : totalSpent
+              )} {activeMonth === currentRealMonth ? 'est.' : 'actual'}
             </span>
           </div>
         </div>
