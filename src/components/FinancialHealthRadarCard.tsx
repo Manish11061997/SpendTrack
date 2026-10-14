@@ -32,18 +32,18 @@ export const FinancialHealthRadarCard: React.FC<FinancialHealthRadarCardProps> =
   const currentMonthKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
   const monthTxs = safeTransactions.filter(t => t && t.date && typeof t.date === 'string' && t.date.startsWith(currentMonthKey));
 
-  const loggedMonthExpenses = Math.abs(monthTxs.filter(t => Number(t.amount) < 0).reduce((sum, t) => sum + (Number(t.amount) || 0), 0));
+  const loggedMonthExpenses = Math.abs(monthTxs.filter(t => t && Number(t.amount) < 0).reduce((sum, t) => sum + (Number(t.amount) || 0), 0));
   const activeSubsCommitment = safeSubscriptions
     .filter(s => s && s.isActive !== false)
     .reduce((sum, s) => {
       const isAlreadyLogged = monthTxs.some(t => 
-        Number(t.amount) < 0 && isSubscriptionDoubleCounted(s.title, t.title)
+        t && Number(t.amount) < 0 && isSubscriptionDoubleCounted(s.title, t.title)
       );
       return sum + (isAlreadyLogged ? 0 : (Number(s.amount) || 0));
     }, 0);
 
   const monthExpenses = loggedMonthExpenses + activeSubsCommitment;
-  const monthIncome = monthTxs.filter(t => Number(t.amount) > 0).reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
+  const monthIncome = monthTxs.filter(t => t && Number(t.amount) > 0).reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
 
   // 1. Savings & Surplus Pillar (30 pts max)
   const savingsPillar = (() => {

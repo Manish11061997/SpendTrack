@@ -26,6 +26,7 @@ export const VoiceInputModal: React.FC<VoiceInputModalProps> = ({
   const [isSupported, setIsSupported] = useState(true);
 
   const recognitionRef = useRef<any>(null);
+  const retryTimerRef = useRef<any>(null);
 
   useEffect(() => {
     // Check Speech Recognition support in browser/mobile
@@ -76,6 +77,7 @@ export const VoiceInputModal: React.FC<VoiceInputModalProps> = ({
     recognitionRef.current = recognition;
 
     return () => {
+      if (retryTimerRef.current) clearTimeout(retryTimerRef.current);
       if (recognitionRef.current) {
         try { recognitionRef.current.stop(); } catch (e) {}
       }
@@ -86,6 +88,7 @@ export const VoiceInputModal: React.FC<VoiceInputModalProps> = ({
     if (isOpen && isSupported) {
       startListening();
     } else if (!isOpen) {
+      if (retryTimerRef.current) clearTimeout(retryTimerRef.current);
       stopListening();
       setTranscript('');
       setParsed(null);
@@ -110,7 +113,13 @@ export const VoiceInputModal: React.FC<VoiceInputModalProps> = ({
       // If already started, try stopping then starting
       try {
         recognitionRef.current.stop();
-        setTimeout(() => recognitionRef.current?.start(), 150);
+        if (retryTimerRef.current) clearTimeout(retryTimerRef.current);
+        retryTimerRef.current = setTimeout(() => {
+          try {
+            recognitionRef.current?.start();
+            setIsListening(true);
+          } catch (err) {}
+        }, 150);
       } catch (err) {
         console.error(err);
       }

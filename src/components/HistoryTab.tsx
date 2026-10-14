@@ -40,7 +40,7 @@ interface HistoryTabProps {
   transactions: Transaction[];
   budget: BudgetConfig;
   profile: UserProfile;
-  subscriptions: Subscription[];
+  subscriptions?: Subscription[];
   onAddTransactionClick: () => void;
   onDeleteTransaction: (id: string) => void;
   onUpdateTransaction: (id: string, updatedTx: Partial<Transaction>) => void;
@@ -51,7 +51,7 @@ export default function HistoryTab({
   transactions, 
   budget, 
   profile,
-  subscriptions,
+  subscriptions = [],
   onAddTransactionClick,
   onDeleteTransaction,
   onUpdateTransaction,

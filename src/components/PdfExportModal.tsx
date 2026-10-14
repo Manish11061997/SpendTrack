@@ -49,8 +49,9 @@ export const PdfExportModal: React.FC<PdfExportModalProps> = ({
     const currentMonth = now.getMonth();
 
     return transactions.filter(t => {
-      if (!t || !t.date) return false;
+      if (!t || typeof t.date !== 'string') return false;
       const txDate = new Date(t.date);
+      if (isNaN(txDate.getTime())) return false;
 
       if (timeframe === 'current_month') {
         return txDate.getFullYear() === currentYear && txDate.getMonth() === currentMonth;

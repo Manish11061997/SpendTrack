@@ -624,10 +624,10 @@ export default function DashboardTab({
     });
 
     // Factor active recurring subscriptions into category analysis
-    subscriptions.forEach(s => {
-      if (s.isActive !== false) {
+    (subscriptions || []).forEach(s => {
+      if (s && s.isActive !== false) {
         const isAlreadyLogged = currentMonthTxs.some(t => 
-          Number(t.amount) < 0 &&
+          t && Number(t.amount) < 0 &&
           isSubscriptionDoubleCounted(s.title, t.title)
         );
         if (!isAlreadyLogged) {
@@ -3350,7 +3350,7 @@ export default function DashboardTab({
       {/* Custom Confirmation Dialog for Subscription Deletion */}
       <AnimatePresence>
         {subToDeleteId && (() => {
-          const subToDelete = subscriptions.find(s => s.id === subToDeleteId);
+          const subToDelete = (subscriptions || []).find(s => s && s.id === subToDeleteId);
           return (
             <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
               <motion.div

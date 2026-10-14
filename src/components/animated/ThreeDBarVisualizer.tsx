@@ -35,6 +35,11 @@ export const ThreeDBarVisualizer: React.FC<ThreeDBarVisualizerProps> = ({
   const [hoveredBar, setHoveredBar] = useState<CategoryBarData | null>(null);
   const hoveredBarRef = useRef<CategoryBarData | null>(null);
   const [autoRotate, setAutoRotate] = useState(true);
+  const autoRotateRef = useRef(autoRotate);
+
+  useEffect(() => {
+    autoRotateRef.current = autoRotate;
+  }, [autoRotate]);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -293,7 +298,7 @@ export const ThreeDBarVisualizer: React.FC<ThreeDBarVisualizerProps> = ({
         worldGroup.rotation.x += velocityRef.current.y;
         worldGroup.rotation.x = Math.max(-0.2, Math.min(0.6, worldGroup.rotation.x));
 
-        if (autoRotate && Math.abs(velocityRef.current.x) < 0.001) {
+        if (autoRotateRef.current && Math.abs(velocityRef.current.x) < 0.001) {
           worldGroup.rotation.y += 0.006;
         }
       }
@@ -344,7 +349,7 @@ export const ThreeDBarVisualizer: React.FC<ThreeDBarVisualizerProps> = ({
       ringMat.dispose();
       renderer.dispose();
     };
-  }, [categories, autoRotate]);
+  }, [categories]);
 
   return (
     <div className={`relative w-full flex flex-col items-center justify-center select-none ${className}`}>

@@ -366,7 +366,12 @@ export default function App() {
         } else {
           setSubscriptions([]);
         }
-        setSavingsGoals([]);
+        const storedGuestGoals = localStorage.getItem('spendtrack_guest_savings_goals');
+        if (storedGuestGoals) {
+          try { setSavingsGoals(JSON.parse(storedGuestGoals)); } catch (e) {}
+        } else {
+          setSavingsGoals([]);
+        }
       }
 
       setIsAuthLoading(false);
@@ -1084,26 +1089,35 @@ export default function App() {
 
 
   const handleUpdateSavingsGoals = async (updatedGoals: any[]) => {
-    if (!currentUser) return;
-    try {
-      const currentIds = savingsGoals.map(g => g.id);
-      const newIds = updatedGoals.map(g => g.id);
-      const deletedIds = currentIds.filter(id => !newIds.includes(id));
+    setSavingsGoals(updatedGoals);
+    if (currentUser) {
+      try {
+        const currentIds = savingsGoals.map(g => g.id);
+        const newIds = updatedGoals.map(g => g.id);
+        const deletedIds = currentIds.filter(id => !newIds.includes(id));
 
-      await Promise.all(deletedIds.map(id => 
-        deleteDoc(doc(db, 'users', currentUser, 'savingsGoals', id))
-      ));
+        await Promise.all(deletedIds.map(id => 
+          deleteDoc(doc(db, 'users', currentUser, 'savingsGoals', id))
+        ));
 
-      await Promise.all(updatedGoals.map(goal => {
-        const { id, ...fields } = goal;
-        return setDoc(doc(db, 'users', currentUser, 'savingsGoals', id), fields);
-      }));
-    } catch (err) { console.error('Firestore savings goals update error:', err); }
+        await Promise.all(updatedGoals.map(goal => {
+          const { id, ...fields } = goal;
+          return setDoc(doc(db, 'users', currentUser, 'savingsGoals', id), fields);
+        }));
+      } catch (err) { console.error('Firestore savings goals update error:', err); }
+    } else {
+      try {
+        localStorage.setItem('spendtrack_guest_savings_goals', JSON.stringify(updatedGoals));
+      } catch (e) {}
+    }
     showToast('Savings goals synced.', 'success');
   };
 
 
   const handleClearData = async () => {
+    setTransactions([]);
+    setSubscriptions([]);
+    setSavingsGoals([]);
     if (currentUser) {
       const uid = currentUser;
       const deleteSubcollection = async (colName: string) => {
@@ -1129,6 +1143,13 @@ export default function App() {
       } catch (err) {
         console.error("Firestore purge error:", err);
       }
+    } else {
+      try {
+        localStorage.removeItem('spendtrack_guest_transactions');
+        localStorage.removeItem('spendtrack_guest_subscriptions');
+        localStorage.removeItem('spendtrack_guest_savings_goals');
+        localStorage.removeItem('spendtrack_guest_budget');
+      } catch (e) {}
     }
     
     setActiveTab('dashboard');

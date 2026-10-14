@@ -54,7 +54,7 @@ export const NoSpendHeatmapCard: React.FC<NoSpendHeatmapCardProps> = ({
   let currentStreak = 0;
   for (let d = currentDayNum; d >= 1; d--) {
     const dayData = dailySpendMap[d];
-    if (dayData.total === 0 || dayData.total <= dailyThreshold) {
+    if (dayData && (dayData.total === 0 || dayData.total <= dailyThreshold)) {
       currentStreak++;
     } else {
       break;
@@ -64,7 +64,7 @@ export const NoSpendHeatmapCard: React.FC<NoSpendHeatmapCardProps> = ({
   // Count total no-spend days in month so far
   let noSpendDaysCount = 0;
   for (let d = 1; d <= currentDayNum; d++) {
-    if (dailySpendMap[d].total === 0) {
+    if (dailySpendMap[d] && dailySpendMap[d].total === 0) {
       noSpendDaysCount++;
     }
   }

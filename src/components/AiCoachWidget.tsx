@@ -40,6 +40,13 @@ export const AiCoachWidget: React.FC<AiCoachWidgetProps> = ({
   ]);
   const [loading, setLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const offlineReplyTimerRef = useRef<any>(null);
+
+  useEffect(() => {
+    return () => {
+      if (offlineReplyTimerRef.current) clearTimeout(offlineReplyTimerRef.current);
+    };
+  }, []);
 
   // Draggable Floating Button State
   const [btnPos, setBtnPos] = useState<{ x: number; y: number } | null>(null);
@@ -115,7 +122,8 @@ export const AiCoachWidget: React.FC<AiCoachWidgetProps> = ({
       (typeof process !== 'undefined' ? process.env?.GEMINI_API_KEY : undefined);
 
     if (!apiKey) {
-      setTimeout(() => {
+      if (offlineReplyTimerRef.current) clearTimeout(offlineReplyTimerRef.current);
+      offlineReplyTimerRef.current = setTimeout(() => {
         const offlineReply = generateOfflineResponse(
           userText,
           transactions,

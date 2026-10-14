@@ -23,14 +23,14 @@ interface ExportPDFButtonProps {
   transactions: Transaction[];
   profile: UserProfile;
   budget: BudgetConfig;
-  subscriptions: Subscription[];
+  subscriptions?: Subscription[];
 }
 
 export default function ExportPDFButton({ 
-  transactions, 
+  transactions = [], 
   profile, 
   budget, 
-  subscriptions 
+  subscriptions = []
 }: ExportPDFButtonProps) {
   const [isGenerating, setIsGenerating] = useState(false);
   const [statusMessage, setStatusMessage] = useState('');
@@ -44,26 +44,29 @@ export default function ExportPDFButton({
   const lastTxCountRef = useRef(transactions.length);
 
   React.useEffect(() => {
-    if (transactions.length > 0) {
-      if (!startDate || !endDate || lastTxCountRef.current !== transactions.length) {
-        const sorted = [...transactions].map(t => t.date).sort();
+    const validTxs = (transactions || []).filter(t => t && typeof t.date === 'string');
+    if (validTxs.length > 0) {
+      if (!startDate || !endDate || lastTxCountRef.current !== validTxs.length) {
+        const sorted = validTxs.map(t => t.date).sort();
         setStartDate(sorted[0]);
         setEndDate(sorted[sorted.length - 1]);
-        lastTxCountRef.current = transactions.length;
+        lastTxCountRef.current = validTxs.length;
       }
     }
   }, [transactions]);
 
   // Derived filtered transactions based on custom date range picker selection
-  const filteredTransactions = transactions.filter(t => {
+  const filteredTransactions = (transactions || []).filter(t => {
+    if (!t || typeof t.date !== 'string') return false;
     if (startDate && t.date < startDate) return false;
     if (endDate && t.date > endDate) return false;
     return true;
   });
 
   const handlePreset = (preset: 'all' | 'this-month' | 'last-30' | 'last-90') => {
-    if (transactions.length === 0) return;
-    const sorted = [...transactions].map(t => t.date).sort();
+    const validTxs = (transactions || []).filter(t => t && typeof t.date === 'string');
+    if (validTxs.length === 0) return;
+    const sorted = validTxs.map(t => t.date).sort();
     
     // Base date is either the latest transaction date or today
     const latestTxStr = sorted[sorted.length - 1];
@@ -91,8 +94,9 @@ export default function ExportPDFButton({
   };
 
   const isPresetActive = (preset: 'all' | 'this-month' | 'last-30' | 'last-90') => {
-    if (transactions.length === 0) return false;
-    const sorted = [...transactions].map(t => t.date).sort();
+    const validTxs = (transactions || []).filter(t => t && typeof t.date === 'string');
+    if (validTxs.length === 0) return false;
+    const sorted = validTxs.map(t => t.date).sort();
     if (preset === 'all') {
       return startDate === (sorted[0] || '') && endDate === (sorted[sorted.length - 1] || '');
     }

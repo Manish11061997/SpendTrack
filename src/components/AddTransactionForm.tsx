@@ -2,7 +2,7 @@ import React, { useState, useRef } from 'react';
 import { motion } from 'motion/react';
 import { Transaction, BudgetConfig } from '../types';
 import { formatCurrency, getCurrencySymbol, formatInputAmount, parseRawAmount } from '../utils/currency';
-import { getLocalDateString } from '../utils/dateUtils';
+import { parseLocalDate, getLocalDateString } from '../utils/dateUtils';
 import { parseReceiptWithAI } from '../utils/aiReceiptParser';
 import { parseVoiceTranscript } from '../utils/voiceParser';
 import { SUPPORTED_CURRENCIES, convertCurrency } from '../utils/currencyConverter';
@@ -122,7 +122,7 @@ export default function AddTransactionForm({ onSave, onCancel, budget, transacti
             const parsed = await parseReceiptWithAI(compressedBase64);
             if (parsed.merchantName) setTitle(parsed.merchantName);
             if (parsed.totalAmount) setAmount(parsed.totalAmount.toString());
-            if (parsed.date) setDate(parsed.date);
+            if (parsed.date) setDate(parseLocalDate(parsed.date));
             if (parsed.category) setCategory(parsed.category);
             if (parsed.suggestedNotes) setNotes(parsed.suggestedNotes);
           } catch (err) {

@@ -16,6 +16,7 @@ export const ThreeDCoinCanvas: React.FC<ThreeDCoinCanvasProps> = ({
   const previousPointerRef = useRef({ x: 0, y: 0 });
   const velocityRef = useRef({ x: 0, y: 0 });
   const isFlippingRef = useRef(false);
+  const flipTimeoutRef = useRef<any>(null);
   const [flipCount, setFlipCount] = useState(0);
 
   useEffect(() => {
@@ -282,13 +283,19 @@ export const ThreeDCoinCanvas: React.FC<ThreeDCoinCanvasProps> = ({
       frontTexture.dispose();
       backTexture.dispose();
       renderer.dispose();
+      if (flipTimeoutRef.current) {
+        clearTimeout(flipTimeoutRef.current);
+      }
     };
   }, [currencySymbol]);
 
   const handleFlipCoin = () => {
     isFlippingRef.current = true;
     setFlipCount((prev) => prev + 1);
-    setTimeout(() => {
+    if (flipTimeoutRef.current) {
+      clearTimeout(flipTimeoutRef.current);
+    }
+    flipTimeoutRef.current = setTimeout(() => {
       isFlippingRef.current = false;
     }, 1200);
   };

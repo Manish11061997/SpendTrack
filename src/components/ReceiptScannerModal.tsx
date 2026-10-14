@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { X, Camera, Upload, Sparkles, CheckCircle2, AlertCircle, RefreshCw, FileText, ArrowRight } from 'lucide-react';
 import { GoogleGenAI } from '@google/genai';
 import { Transaction } from '../types';
-import { getLocalDateString } from '../utils/dateUtils';
+import { parseLocalDate, getLocalDateString } from '../utils/dateUtils';
 
 interface ReceiptScannerModalProps {
   isOpen: boolean;
@@ -44,11 +44,46 @@ export const ReceiptScannerModal: React.FC<ReceiptScannerModalProps> = ({
 
     const reader = new FileReader();
     reader.onload = () => {
-      const base64Str = reader.result as string;
-      setImagePreview(base64Str);
-      setExtractedResult(null);
-      setScanError(null);
-      scanReceiptWithGemini(base64Str);
+      const rawBase64 = reader.result as string;
+      const img = new Image();
+      img.src = rawBase64;
+      img.onload = () => {
+        const MAX_DIM = 1280;
+        let w = img.width;
+        let h = img.height;
+        if (w > MAX_DIM || h > MAX_DIM) {
+          if (w > h) {
+            h = Math.round((h * MAX_DIM) / w);
+            w = MAX_DIM;
+          } else {
+            w = Math.round((w * MAX_DIM) / h);
+            h = MAX_DIM;
+          }
+          const canvas = document.createElement('canvas');
+          canvas.width = w;
+          canvas.height = h;
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            ctx.drawImage(img, 0, 0, w, h);
+            const optimizedBase64 = canvas.toDataURL('image/jpeg', 0.82);
+            setImagePreview(optimizedBase64);
+            setExtractedResult(null);
+            setScanError(null);
+            scanReceiptWithGemini(optimizedBase64);
+            return;
+          }
+        }
+        setImagePreview(rawBase64);
+        setExtractedResult(null);
+        setScanError(null);
+        scanReceiptWithGemini(rawBase64);
+      };
+      img.onerror = () => {
+        setImagePreview(rawBase64);
+        setExtractedResult(null);
+        setScanError(null);
+        scanReceiptWithGemini(rawBase64);
+      };
     };
     reader.readAsDataURL(file);
   };
@@ -105,7 +140,7 @@ Return ONLY a valid JSON object matching this structure:
         title: parsed.title || 'Scanned Receipt',
         amount: Math.abs(parseFloat(parsed.amount) || 0),
         category: ['Food', 'Transport', 'Rent', 'Shopping', 'Other'].includes(parsed.category) ? parsed.category : 'Other',
-        date: parsed.date || getLocalDateString(),
+        date: parsed.date ? parseLocalDate(parsed.date) : getLocalDateString(),
         notes: parsed.notes || 'Scanned via AI Receipt OCR'
       });
     } catch (err: any) {

@@ -68,15 +68,15 @@ export default function InsightsTab({
   const today = new Date();
   const currentRealMonth = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
   
-  const availableMonths = Array.from(new Set(transactions.map(t => (t.date || '').substring(0, 7)))).filter(Boolean).sort((a, b) => b.localeCompare(a));
+  const availableMonths = Array.from(new Set((transactions || []).map(t => (t && t.date ? String(t.date).substring(0, 7) : '')))).filter(Boolean).sort((a, b) => b.localeCompare(a));
   const [selectedMonthState, setSelectedMonthState] = useState<string | null>(null);
   const activeMonth = selectedMonthState || availableMonths[0] || currentRealMonth;
 
   // Filter transactions for active month
-  const activeTxs = transactions.filter(t => t && typeof t.date === 'string' && t.date.startsWith(activeMonth));
+  const activeTxs = (transactions || []).filter(t => t && typeof t.date === 'string' && t.date.startsWith(activeMonth));
   
   // Dynamic monthly income initial setup
-  const activeMonthInflow = transactions
+  const activeMonthInflow = (transactions || [])
     .filter(t => t && typeof t.date === 'string' && t.date.startsWith(activeMonth) && Number(t.amount) > 0)
     .reduce((sum, t) => sum + Number(t.amount), 0);
 
@@ -92,11 +92,11 @@ export default function InsightsTab({
   const [simOther, setSimOther] = useState<number>(-1);
   
   // Active subscriptions total recurring monthly expense (guarded against double-counting)
-  const activeSubsTotal = subscriptions
-    .filter(s => s.isActive !== false)
+  const activeSubsTotal = (subscriptions || [])
+    .filter(s => s && s.isActive !== false)
     .reduce((sum, s) => {
       const isAlreadyLogged = activeTxs.some(t => 
-        t.amount < 0 &&
+        t && Number(t.amount) < 0 &&
         isSubscriptionDoubleCounted(s.title, t.title)
       );
       return sum + (isAlreadyLogged ? 0 : (Number(s.amount) || 0));
@@ -109,11 +109,11 @@ export default function InsightsTab({
         .filter(t => t.category === catName && Number(t.amount) < 0)
         .reduce((sum, t) => sum + (Number(t.amount) || 0), 0)
     );
-    const subSpend = subscriptions
-      .filter(s => s.isActive !== false && s.category === catName)
+    const subSpend = (subscriptions || [])
+      .filter(s => s && s.isActive !== false && s.category === catName)
       .reduce((sum, s) => {
         const isAlreadyLogged = activeTxs.some(t => 
-          Number(t.amount) < 0 &&
+          t && Number(t.amount) < 0 &&
           isSubscriptionDoubleCounted(s.title, t.title)
         );
         return sum + (isAlreadyLogged ? 0 : (Number(s.amount) || 0));
@@ -234,7 +234,7 @@ export default function InsightsTab({
   const savingsDiff = currentTotal - simTotal;
 
   // Let's calculate the runway
-  const savingsBalance = savingsGoals.reduce((sum, g) => sum + g.currentAmount, 0) || 15000;
+  const savingsBalance = (savingsGoals || []).filter(Boolean).reduce((sum, g) => sum + (Number(g.currentAmount) || 0), 0) || 15000;
   
   // Current runway = savings / Math.max(1, currentTotal) (in months)
   // Simulated runway = savings / Math.max(1, simTotal)
@@ -243,10 +243,10 @@ export default function InsightsTab({
   const runwayExtension = Math.max(0, simRunway - currentRunway);
 
   // Goal impact
-  const primaryGoal = savingsGoals[0];
+  const primaryGoal = (savingsGoals || []).find(Boolean);
   let goalImpactText = '';
   if (primaryGoal) {
-    const remainingTarget = primaryGoal.targetAmount - primaryGoal.currentAmount;
+    const remainingTarget = (Number(primaryGoal.targetAmount) || 0) - (Number(primaryGoal.currentAmount) || 0);
     if (remainingTarget > 0) {
       const currentRate = Math.max(10, customIncome - currentTotal);
       const simRate = Math.max(10, customIncome - simTotal);
@@ -264,13 +264,13 @@ export default function InsightsTab({
     let streak = 0;
     const sortedMonths = [...availableMonths].sort((a, b) => b.localeCompare(a));
     for (const m of sortedMonths) {
-      const monthTxs = transactions.filter(t => t && typeof t.date === 'string' && t.date.startsWith(m) && Number(t.amount) < 0);
+      const monthTxs = (transactions || []).filter(t => t && typeof t.date === 'string' && t.date.startsWith(m) && Number(t.amount) < 0);
       const txTotal = Math.abs(monthTxs.reduce((sum, t) => sum + Number(t.amount), 0));
-      const monthSubsTotal = subscriptions
-        .filter(s => s.isActive !== false)
+      const monthSubsTotal = (subscriptions || [])
+        .filter(s => s && s.isActive !== false)
         .reduce((sum, s) => {
           const isAlreadyLogged = monthTxs.some(t => 
-            isSubscriptionDoubleCounted(s.title, t.title)
+            t && isSubscriptionDoubleCounted(s.title, t.title)
           );
           return sum + (isAlreadyLogged ? 0 : (Number(s.amount) || 0));
         }, 0);

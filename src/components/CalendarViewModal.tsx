@@ -106,7 +106,7 @@ export const CalendarViewModal: React.FC<CalendarViewModalProps> = ({
               const dayNum = i + 1;
               const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(dayNum).padStart(2, '0')}`;
               const spendInfo = dailySpendMap[dateStr];
-              const daySubs = subscriptions.filter((s) => s.isActive && s.billingDate === dayNum);
+              const daySubs = (subscriptions || []).filter((s) => s && s.isActive && s.billingDate === dayNum);
               const isSelected = selectedDayDate === dateStr;
 
               return (

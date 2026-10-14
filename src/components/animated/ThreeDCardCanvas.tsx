@@ -364,10 +364,11 @@ export const ThreeDCardCanvas: React.FC<ThreeDCardCanvasProps> = ({
         cardMesh.rotation.y += velocityRef.current.x;
         cardMesh.rotation.x += velocityRef.current.y;
 
-        // Active floating & gentle 3D sway
-        cardMesh.rotation.y = Math.sin(elapsedTime * 0.8) * 0.14;
-        cardMesh.rotation.x = Math.cos(elapsedTime * 0.6) * 0.08;
-        cardMesh.position.y = Math.sin(elapsedTime * 1.2) * 0.08;
+        // Continuous gentle luxury orbit and floating bob when not actively dragged
+        if (Math.abs(velocityRef.current.x) < 0.001 && Math.abs(velocityRef.current.y) < 0.001) {
+          cardMesh.rotation.y += 0.006;
+          cardMesh.position.y = Math.sin(elapsedTime * 1.2) * 0.08;
+        }
       }
 
       renderer.render(scene, camera);

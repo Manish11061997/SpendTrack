@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Lock, Delete, Sparkles, KeyRound } from 'lucide-react';
 
 interface PinLockModalProps {
@@ -13,6 +13,13 @@ export const PinLockModal: React.FC<PinLockModalProps> = ({ isOpen, correctPin, 
   const [error, setError] = useState(false);
   const [failedAttempts, setFailedAttempts] = useState(0);
   const [lockoutTimer, setLockoutTimer] = useState(0);
+  const clearTimerRef = useRef<any>(null);
+
+  useEffect(() => {
+    return () => {
+      if (clearTimerRef.current) clearTimeout(clearTimerRef.current);
+    };
+  }, []);
 
   useEffect(() => {
     if (lockoutTimer > 0) {
@@ -42,7 +49,8 @@ export const PinLockModal: React.FC<PinLockModalProps> = ({ isOpen, correctPin, 
           if (newAttempts >= 5) {
             setLockoutTimer(30);
           }
-          setTimeout(() => setEnteredPin(''), 600);
+          if (clearTimerRef.current) clearTimeout(clearTimerRef.current);
+          clearTimerRef.current = setTimeout(() => setEnteredPin(''), 600);
         }
       }
     }
