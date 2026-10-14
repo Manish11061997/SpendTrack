@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { Transaction, BudgetConfig } from '../types';
 import { formatCurrency, getCurrencySymbol, formatInputAmount, parseRawAmount } from '../utils/currency';
@@ -65,6 +65,14 @@ export default function AddTransactionForm({ onSave, onCancel, budget, transacti
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onCancel();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onCancel]);
 
   const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const rawVal = e.target.value.replace(/,/g, '');

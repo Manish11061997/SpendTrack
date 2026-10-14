@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Transaction, BudgetConfig, UserProfile, Subscription } from '../types';
 import { formatCurrency as formatCustomCurrency, parseRawAmount, getCurrencySymbol } from '../utils/currency';
@@ -142,8 +142,21 @@ export default function HistoryTab({
     const parts = dateStr.split('-');
     if (parts.length < 3) return dateStr;
     const dateObj = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+    if (isNaN(dateObj.getTime())) return dateStr;
     return dateObj.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
   };
+
+  useEffect(() => {
+    if (!selectedTx && !txToDelete) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (txToDelete) setTxToDelete(null);
+        else if (selectedTx) setSelectedTx(null);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectedTx, txToDelete]);
 
   // Render Archive (List View)
   if (!selectedMonthKey) {

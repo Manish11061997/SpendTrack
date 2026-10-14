@@ -97,7 +97,8 @@ export const ThreeDDonutCanvas: React.FC<ThreeDDonutCanvasProps> = ({
 
     // Build 3D Pie Arcs
     const slices: { mesh: THREE.Mesh; data: CategoryRingData; basePos: THREE.Vector3; dir: THREE.Vector3 }[] = [];
-    const totalVal = categories.reduce((sum, c) => sum + Math.max(1, c.value), 0);
+    const safeCategories = (categories && categories.length > 0) ? categories : DEFAULT_CATEGORIES;
+    const totalVal = Math.max(1, safeCategories.reduce((sum, c) => sum + Math.max(0, c.value), 0));
 
     const innerRadius = 1.15;
     const outerRadius = 1.85;
@@ -106,7 +107,7 @@ export const ThreeDDonutCanvas: React.FC<ThreeDDonutCanvasProps> = ({
     let startAngle = 0;
     const gap = 0.04; // small angular separation
 
-    categories.forEach((cat) => {
+    safeCategories.forEach((cat) => {
       const sliceAngle = (Math.max(1, cat.value) / totalVal) * Math.PI * 2;
       const effectiveAngle = Math.max(0.1, sliceAngle - gap);
 

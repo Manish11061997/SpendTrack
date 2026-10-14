@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Calendar, ChevronLeft, ChevronRight, X, Clock, Tag } from 'lucide-react';
 import { Transaction, Subscription } from '../types';
 import { formatCurrency } from '../utils/currency';
@@ -20,6 +20,15 @@ export const CalendarViewModal: React.FC<CalendarViewModalProps> = ({
 }) => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDayDate, setSelectedDayDate] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 
@@ -60,7 +69,8 @@ export const CalendarViewModal: React.FC<CalendarViewModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-in fade-in">
-      <div className="bg-[#1e1e2d] border border-white/10 text-white w-full max-w-3xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+      <div className="absolute inset-0 cursor-pointer" onClick={onClose} />
+      <div className="relative z-10 bg-[#1e1e2d] border border-white/10 text-white w-full max-w-3xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
         {/* Header */}
         <div className="p-5 border-b border-white/10 flex items-center justify-between bg-gradient-to-r from-blue-900/30 to-indigo-900/30">
           <div className="flex items-center gap-3">

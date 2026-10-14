@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { X, Camera, Upload, Sparkles, CheckCircle2, AlertCircle, RefreshCw, FileText, ArrowRight } from 'lucide-react';
 import { GoogleGenAI } from '@google/genai';
@@ -30,6 +30,15 @@ export const ReceiptScannerModal: React.FC<ReceiptScannerModalProps> = ({
   } | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 
@@ -84,6 +93,10 @@ export const ReceiptScannerModal: React.FC<ReceiptScannerModalProps> = ({
         setScanError(null);
         scanReceiptWithGemini(rawBase64);
       };
+    };
+    reader.onerror = () => {
+      setScanError('Failed to read image file.');
+      setIsScanning(false);
     };
     reader.readAsDataURL(file);
   };

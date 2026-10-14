@@ -34,16 +34,18 @@ const CACHE_TTL_MS = 12 * 60 * 60 * 1000; // 12 hours
  */
 export async function fetchLiveExchangeRates(): Promise<ExchangeRates> {
   // Check local storage cache
-  try {
-    const cached = localStorage.getItem(CACHE_KEY);
-    if (cached) {
-      const { rates, timestamp } = JSON.parse(cached);
-      if (Date.now() - timestamp < CACHE_TTL_MS && rates) {
-        return rates;
+  if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
+    try {
+      const cached = localStorage.getItem(CACHE_KEY);
+      if (cached) {
+        const { rates, timestamp } = JSON.parse(cached);
+        if (Date.now() - timestamp < CACHE_TTL_MS && rates) {
+          return rates;
+        }
       }
+    } catch (e) {
+      // Ignore cache parse failure
     }
-  } catch (e) {
-    // Ignore cache parse failure
   }
 
   // Fetch live rates from free Open ER API
@@ -53,10 +55,14 @@ export async function fetchLiveExchangeRates(): Promise<ExchangeRates> {
       const data = await res.json();
       if (data && data.rates) {
         const rates: ExchangeRates = data.rates;
-        localStorage.setItem(
-          CACHE_KEY,
-          JSON.stringify({ rates, timestamp: Date.now() })
-        );
+        if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
+          try {
+            localStorage.setItem(
+              CACHE_KEY,
+              JSON.stringify({ rates, timestamp: Date.now() })
+            );
+          } catch (e) {}
+        }
         return rates;
       }
     }

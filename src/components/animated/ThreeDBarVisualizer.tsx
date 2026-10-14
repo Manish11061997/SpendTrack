@@ -115,7 +115,8 @@ export const ThreeDBarVisualizer: React.FC<ThreeDBarVisualizerProps> = ({
     worldGroup.add(ringMesh);
 
     // 5. 3D Monolith Columns
-    const maxVal = Math.max(1, ...categories.map((c) => Math.max(c.spent, c.limit)));
+    const safeCategories = (categories && categories.length > 0) ? categories : DEFAULT_CATEGORIES;
+    const maxVal = Math.max(1, ...safeCategories.map((c) => Math.max(c.spent, c.limit)));
     const maxHeight = 2.8;
 
     const barMeshes: {
@@ -126,11 +127,11 @@ export const ThreeDBarVisualizer: React.FC<ThreeDBarVisualizerProps> = ({
       baseHeight: number;
     }[] = [];
 
-    const numBars = categories.length;
+    const numBars = safeCategories.length;
     const spacing = 1.4;
     const startX = -((numBars - 1) * spacing) / 2;
 
-    categories.forEach((cat, index) => {
+    safeCategories.forEach((cat, index) => {
       const heightVal = Math.max(0.2, (cat.spent / maxVal) * maxHeight);
       const limitHeightVal = Math.max(0.2, (cat.limit / maxVal) * maxHeight);
       const hexColor = parseInt(cat.color.replace('#', ''), 16) || 0x10b981;

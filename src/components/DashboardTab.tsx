@@ -455,7 +455,7 @@ export default function DashboardTab({
     if (summaryMode === 'monthly') {
       if (!prevMonth) {
         if (hasBudget) {
-          const pct = Math.round((totalExpenses / budget.monthlyLimit) * 100);
+          const pct = (budget.monthlyLimit && budget.monthlyLimit > 0) ? Math.round((totalExpenses / budget.monthlyLimit) * 100) : 0;
           return {
             label: `${pct}% of monthly budget`,
             isLess: totalExpenses <= budget.monthlyLimit,
@@ -738,8 +738,11 @@ export default function DashboardTab({
   const donutSlices = useMemo(buildDonutSlices, [chartData, totalSpendingForMonth]);
 
   const formatMonthName = (monthKey: string) => {
+    if (!monthKey || typeof monthKey !== 'string') return '';
     const [y, m] = monthKey.split('-');
+    if (!y || !m) return monthKey;
     const date = new Date(parseInt(y), parseInt(m) - 1, 1);
+    if (isNaN(date.getTime())) return monthKey;
     return date.toLocaleString('en-IN', { month: 'long', year: 'numeric' });
   };
 
@@ -1567,7 +1570,7 @@ export default function DashboardTab({
                             <div className="w-full h-1 bg-surface-container rounded-full overflow-hidden">
                               <div
                                 className={`h-full rounded-full transition-all duration-500 ${isOver ? 'bg-error animate-pulse' : 'bg-primary'}`}
-                                style={{ width: `${Math.min(100, (item.value / limitVal) * 100)}%` }}
+                                style={{ width: `${limitVal > 0 ? Math.min(100, (item.value / limitVal) * 100) : 0}%` }}
                               />
                             </div>
                           </div>

@@ -85,6 +85,15 @@ export const VoiceInputModal: React.FC<VoiceInputModalProps> = ({
   }, []);
 
   useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
+  useEffect(() => {
     if (isOpen && isSupported) {
       startListening();
     } else if (!isOpen) {

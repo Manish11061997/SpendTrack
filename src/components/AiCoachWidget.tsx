@@ -48,6 +48,15 @@ export const AiCoachWidget: React.FC<AiCoachWidgetProps> = ({
     };
   }, []);
 
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setIsOpen(false);
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen]);
+
   // Draggable Floating Button State
   const [btnPos, setBtnPos] = useState<{ x: number; y: number } | null>(null);
   const isDraggingRef = useRef(false);

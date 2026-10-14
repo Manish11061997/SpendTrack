@@ -21,9 +21,13 @@ export const DEFAULT_ALERT_RULES: AlertRule[] = [
 ];
 
 export function getStoredAlertRules(): AlertRule[] {
+  if (typeof window === 'undefined' || typeof localStorage === 'undefined') return DEFAULT_ALERT_RULES;
   try {
     const saved = localStorage.getItem('spendtrack_alert_rules');
-    if (saved) return JSON.parse(saved);
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (Array.isArray(parsed)) return parsed;
+    }
   } catch (e) {}
   return DEFAULT_ALERT_RULES;
 }

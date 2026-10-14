@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { X, FileText, Download, Sparkles, CheckCircle2, ShieldCheck, Printer, Table, FileSpreadsheet, Calendar, Filter } from 'lucide-react';
 import { Transaction, BudgetConfig, UserProfile, Subscription, SavingsGoal } from '../types';
@@ -107,6 +107,15 @@ export const PdfExportModal: React.FC<PdfExportModalProps> = ({
     if (timeframe === 'custom') return `${startDate} to ${endDate}`;
     return 'Selected Range';
   }, [timeframe, startDate, endDate, today]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
 
   // Early return ONLY AFTER all hooks have executed unconditionally
   if (!isOpen) return null;
