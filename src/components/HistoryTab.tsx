@@ -82,7 +82,8 @@ export default function HistoryTab({
 
   // Dynamically group all transactions by month with memoization
   const groupedByMonth = useMemo(() => {
-    return transactions.reduce((acc, t) => {
+    return (transactions || []).reduce((acc, t) => {
+      if (!t || typeof t.date !== 'string' || t.date.length < 7) return acc;
       const monthKey = t.date.substring(0, 7); // yyyy-mm
       if (!acc[monthKey]) {
         acc[monthKey] = [];
@@ -390,7 +391,7 @@ export default function HistoryTab({
   // Group Detail View (Daily Transactions list - Screenshot 3)
   const monthLabel = recordsList.find(r => r.monthKey === selectedMonthKey)?.label || selectedMonthKey;
   const monthTransactions = getSelectedMonthTransactions(selectedMonthKey);
-  const activeMonthExpenses = monthTransactions.filter(t => t.amount < 0).reduce((sum, t) => sum + t.amount, 0);
+  const activeMonthExpenses = monthTransactions.filter(t => t && Number(t.amount) < 0).reduce((sum, t) => sum + Number(t.amount), 0);
   const monthTotalSpent = Math.abs(activeMonthExpenses);
 
   // Calculate dynamic budget details

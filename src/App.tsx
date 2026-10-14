@@ -360,7 +360,12 @@ export default function App() {
         } else {
           setBudget(DEFAULT_BUDGET);
         }
-        setSubscriptions([]);
+        const storedGuestSubs = localStorage.getItem('spendtrack_guest_subscriptions');
+        if (storedGuestSubs) {
+          try { setSubscriptions(JSON.parse(storedGuestSubs)); } catch (e) {}
+        } else {
+          setSubscriptions([]);
+        }
         setSavingsGoals([]);
       }
 
@@ -376,17 +381,25 @@ export default function App() {
 
   const handleSaveSubscription = async (newSubData: Omit<Subscription, 'id'>) => {
     const subId = Math.random().toString(36).substring(2, 11);
+    const newSub: Subscription = { id: subId, ...newSubData };
+    setSubscriptions(prev => [...prev, newSub]);
     if (currentUser) {
       try {
         await setDoc(doc(db, 'users', currentUser, 'subscriptions', subId), newSubData);
       } catch (err: any) {
         console.error('Firestore subscription save error:', err);
       }
+    } else {
+      try {
+        const guestSubs = JSON.parse(localStorage.getItem('spendtrack_guest_subscriptions') || '[]');
+        localStorage.setItem('spendtrack_guest_subscriptions', JSON.stringify([...guestSubs, newSub]));
+      } catch (e) {}
     }
   };
 
 
   const handleUpdateSubscription = async (id: string, updatedSub: Partial<Subscription>) => {
+    setSubscriptions(prev => prev.map(s => s.id === id ? { ...s, ...updatedSub } : s));
     if (currentUser) {
       try {
         const { id: _, ...fieldsToUpdate } = updatedSub;
@@ -397,17 +410,28 @@ export default function App() {
       } catch (err: any) {
         console.error('Firestore subscription update error:', err);
       }
+    } else {
+      try {
+        const guestSubs = JSON.parse(localStorage.getItem('spendtrack_guest_subscriptions') || '[]');
+        localStorage.setItem('spendtrack_guest_subscriptions', JSON.stringify(guestSubs.map((s: any) => s.id === id ? { ...s, ...updatedSub } : s)));
+      } catch (e) {}
     }
   };
 
 
   const handleDeleteSubscription = async (id: string) => {
+    setSubscriptions(prev => prev.filter(s => s.id !== id));
     if (currentUser) {
       try {
         await deleteDoc(doc(db, 'users', currentUser, 'subscriptions', id));
       } catch (err) {
         console.error("Firestore subscription delete error:", err);
       }
+    } else {
+      try {
+        const guestSubs = JSON.parse(localStorage.getItem('spendtrack_guest_subscriptions') || '[]');
+        localStorage.setItem('spendtrack_guest_subscriptions', JSON.stringify(guestSubs.filter((s: any) => s.id !== id)));
+      } catch (e) {}
     }
   };
 
@@ -961,10 +985,16 @@ export default function App() {
 
   const handleDeleteTransaction = async (id: string) => {
     const deletedTx = transactions.find(t => t.id === id);
+    setTransactions(prev => prev.filter(t => t.id !== id));
     if (currentUser) {
       try {
         await deleteDoc(doc(db, 'users', currentUser, 'transactions', id));
       } catch (err) { console.error('Firestore transaction delete error:', err); }
+    } else {
+      try {
+        const guestTxs = JSON.parse(localStorage.getItem('spendtrack_guest_transactions') || '[]');
+        localStorage.setItem('spendtrack_guest_transactions', JSON.stringify(guestTxs.filter((t: any) => t && t.id !== id)));
+      } catch (e) {}
     }
     showToast(`Transaction "${deletedTx?.title || 'Item'}" deleted.`, 'info');
   };
@@ -1009,13 +1039,47 @@ export default function App() {
 
   // Callback to update transaction
   const handleUpdateTransaction = async (id: string, updatedTx: Partial<Transaction>) => {
+    setTransactions(prev => prev.map(t => t.id === id ? { ...t, ...updatedTx } : t));
     if (currentUser) {
       try {
         const { id: _, ...fieldsToUpdate } = updatedTx;
         await updateDoc(doc(db, 'users', currentUser, 'transactions', id), fieldsToUpdate);
       } catch (err) { console.error('Firestore transaction update error:', err); }
+    } else {
+      try {
+        const guestTxs = JSON.parse(localStorage.getItem('spendtrack_guest_transactions') || '[]');
+        localStorage.setItem('spendtrack_guest_transactions', JSON.stringify(guestTxs.map((t: any) => t && t.id === id ? { ...t, ...updatedTx } : t)));
+      } catch (e) {}
     }
     showToast('Transaction updated successfully.', 'success');
+  };
+
+  const handleBulkImportTransactions = async (importedTxs: Omit<Transaction, 'id'>[]) => {
+    if (!importedTxs || importedTxs.length === 0) return;
+    const newTxs: Transaction[] = importedTxs.map(tx => ({
+      id: Math.random().toString(36).substring(2, 11),
+      ...tx
+    }));
+
+    setTransactions(prev => [...newTxs, ...prev]);
+
+    if (currentUser) {
+      try {
+        await Promise.all(newTxs.map(tx => {
+          const { id, ...data } = tx;
+          return setDoc(doc(db, 'users', currentUser, 'transactions', id), data);
+        }));
+      } catch (err) {
+        console.error('Bulk import firestore write error:', err);
+      }
+    } else {
+      try {
+        const guestTxs = JSON.parse(localStorage.getItem('spendtrack_guest_transactions') || '[]');
+        localStorage.setItem('spendtrack_guest_transactions', JSON.stringify([...newTxs, ...guestTxs]));
+      } catch (e) {}
+    }
+
+    showToast(`Successfully imported ${newTxs.length} transactions!`, 'success');
   };
 
 
@@ -1197,7 +1261,11 @@ export default function App() {
 
   const getActiveMonth = (): string => {
     if (transactions.length === 0) return currentRealMonthLabel();
-    const available = Array.from(new Set(transactions.map(t => t.date.substring(0, 7)))) as string[];
+    const available = Array.from(new Set(
+      transactions
+        .filter(t => t && typeof t.date === 'string' && t.date.length >= 7)
+        .map(t => t.date.substring(0, 7))
+    )) as string[];
     available.sort((a, b) => b.localeCompare(a));
     return available[0] || currentRealMonthLabel();
   };
@@ -2436,8 +2504,7 @@ export default function App() {
           isOpen={isCsvImportOpen}
           onClose={() => setIsCsvImportOpen(false)}
           onImport={(importedTxs) => {
-            importedTxs.forEach(tx => handleSaveTransaction(tx));
-            showToast(`Successfully imported ${importedTxs.length} transactions!`, 'success');
+            handleBulkImportTransactions(importedTxs);
           }}
           existingTransactions={transactions}
           currency={budget?.currency || 'INR'}

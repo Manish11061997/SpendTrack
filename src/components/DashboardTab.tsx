@@ -299,7 +299,7 @@ export default function DashboardTab({
     .filter(s => s.isActive !== false)
     .reduce((sum, s) => {
       const isAlreadyLogged = currentMonthTxs.some(t => 
-        t.amount < 0 &&
+        t && Number(t.amount) < 0 &&
         isSubscriptionDoubleCounted(s.title, t.title)
       );
       return sum + (isAlreadyLogged ? 0 : (Number(s.amount) || 0));
@@ -316,15 +316,16 @@ export default function DashboardTab({
 
   // Helper to get weekly transactions from current month's transactions
   const getWeeklyTransactions = (txs: Transaction[]) => {
-    if (txs.length === 0) return [];
-    const dates = txs.map(t => new Date(t.date).getTime());
+    const validTxs = (txs || []).filter(t => t && t.date && !isNaN(new Date(t.date).getTime()));
+    if (validTxs.length === 0) return [];
+    const dates = validTxs.map(t => new Date(t.date).getTime());
     const maxTime = Math.max(...dates);
     const maxDate = new Date(maxTime);
     
     const minDate = new Date(maxDate);
     minDate.setDate(maxDate.getDate() - 6);
     
-    return txs.filter(t => {
+    return validTxs.filter(t => {
       const d = new Date(t.date);
       const dZero = new Date(d);
       dZero.setHours(0,0,0,0);
@@ -415,8 +416,10 @@ export default function DashboardTab({
     : 0;
 
   // Find the latest transaction's date in this set
-  const dates = currentMonthTxs.map(t => new Date(t.date).getTime());
-  const maxTime = dates.length > 0 ? Math.max(...dates) : new Date().getTime();
+  const validTimestamps = currentMonthTxs
+    .map(t => (t && t.date ? new Date(t.date).getTime() : NaN))
+    .filter(time => !isNaN(time));
+  const maxTime = validTimestamps.length > 0 ? Math.max(...validTimestamps) : new Date().getTime();
   const maxDate = new Date(maxTime);
   
   // Current week window: [maxDate - 6, maxDate]

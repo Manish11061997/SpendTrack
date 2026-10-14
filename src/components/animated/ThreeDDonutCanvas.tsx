@@ -39,6 +39,11 @@ export const ThreeDDonutCanvas: React.FC<ThreeDDonutCanvasProps> = ({
   const [hoveredSlice, setHoveredSlice] = useState<CategoryRingData | null>(null);
   const hoveredSliceRef = useRef<CategoryRingData | null>(null);
   const [autoRotate, setAutoRotate] = useState(true);
+  const autoRotateRef = useRef(autoRotate);
+
+  useEffect(() => {
+    autoRotateRef.current = autoRotate;
+  }, [autoRotate]);
 
   const overallPct = totalBudget > 0 ? Math.min(100, Math.round((totalSpent / totalBudget) * 100)) : 68;
 
@@ -319,7 +324,7 @@ export const ThreeDDonutCanvas: React.FC<ThreeDDonutCanvasProps> = ({
         donutGroup.rotation.x = Math.max(-0.8, Math.min(1.2, donutGroup.rotation.x));
 
         // Continuous 3D orbit and floating bob
-        if (autoRotate && Math.abs(velocityRef.current.x) < 0.001) {
+        if (autoRotateRef.current && Math.abs(velocityRef.current.x) < 0.001) {
           donutGroup.rotation.y += 0.006;
           donutGroup.position.y = Math.sin(clock.getElapsedTime() * 1.2) * 0.06;
         }
@@ -371,7 +376,7 @@ export const ThreeDDonutCanvas: React.FC<ThreeDDonutCanvasProps> = ({
       rimMat.dispose();
       renderer.dispose();
     };
-  }, [categories, autoRotate]);
+  }, [categories]);
 
   return (
     <div className={`relative w-full h-full flex flex-col items-center justify-center select-none ${className}`}>

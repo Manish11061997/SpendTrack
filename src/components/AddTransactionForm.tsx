@@ -226,7 +226,7 @@ export default function AddTransactionForm({ onSave, onCancel, budget, transacti
 
     const baseCurrency = budget?.currency || 'INR';
     const rawNum = parseFloat(cleanAmtStr);
-    const convertedAmount = convertCurrency(rawNum, selectedCurrency, baseCurrency);
+    const convertedAmount = convertCurrency(rawNum, selectedCurrency, baseCurrency) || rawNum;
 
     const now = new Date();
     let hours = now.getHours();

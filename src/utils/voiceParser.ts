@@ -16,7 +16,8 @@ export interface ParsedVoiceCommand {
  * - "Shopping 3000 zara" -> Expense, 3000, Shopping, "Zara"
  */
 export function parseVoiceTranscript(transcript: string): ParsedVoiceCommand {
-  const text = transcript.trim().toLowerCase();
+  const safeTranscript = typeof transcript === 'string' ? transcript : '';
+  const text = safeTranscript.trim().toLowerCase();
 
   // 1. Detect type: income vs expense
   const hasExpenseIntent = /\b(spent|paid|bought|buy|purchased|bill|ordered|cost|got)\b/i.test(text);

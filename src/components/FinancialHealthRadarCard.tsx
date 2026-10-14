@@ -101,7 +101,7 @@ export const FinancialHealthRadarCard: React.FC<FinancialHealthRadarCardProps> =
       d.setDate(d.getDate() - i);
       return getLocalDateString(d);
     });
-    const loggedDays = past7Days.filter(dayStr => monthTxs.some(t => t.date === dayStr)).length;
+    const loggedDays = past7Days.filter(dayStr => safeTransactions.some(t => t && t.date === dayStr)).length;
     if (loggedDays >= 5) return 15;
     if (loggedDays >= 3) return 11;
     if (loggedDays >= 1) return 7;

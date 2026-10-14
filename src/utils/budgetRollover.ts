@@ -24,12 +24,12 @@ export function calculateBudgetRollover(
   const prevMonthStr = String(prevMonthDate.getMonth() + 1).padStart(2, '0');
   const prevMonthKey = `${prevYearStr}-${prevMonthStr}`;
 
-  const prevMonthTxs = transactions.filter(t => t.date && t.date.startsWith(prevMonthKey));
+  const prevMonthTxs = (transactions || []).filter(t => t && typeof t.date === 'string' && t.date.startsWith(prevMonthKey));
   const prevExpenses = Math.abs(
-    prevMonthTxs.filter(t => t.amount < 0).reduce((sum, t) => sum + Number(t.amount), 0)
+    prevMonthTxs.filter(t => Number(t.amount) < 0).reduce((sum, t) => sum + Number(t.amount), 0)
   );
 
-  const monthlyLimit = budget.monthlyLimit || 0;
+  const monthlyLimit = Number(budget?.monthlyLimit) || 0;
   const unspent = Math.max(0, monthlyLimit - prevExpenses);
 
   if (unspent <= 0) return null;
@@ -101,7 +101,8 @@ export function evaluateBadges(
   currentBadges: AchievementBadge[] = INITIAL_ACHIEVEMENT_BADGES
 ): AchievementBadge[] {
   const updated = [...currentBadges];
-  const totalTxs = transactions.length;
+  const safeTxs = (transactions || []).filter(Boolean);
+  const totalTxs = safeTxs.length;
 
   // 1. First Log
   const firstLogIdx = updated.findIndex(b => b.id === 'first_log');
@@ -115,7 +116,7 @@ export function evaluateBadges(
   }
 
   // 2. Logging Streaks
-  const uniqueDates = Array.from(new Set(transactions.map(t => t.date && String(t.date)).filter(Boolean))).sort();
+  const uniqueDates = Array.from(new Set(safeTxs.map(t => t.date && String(t.date)).filter(Boolean))).sort();
   let maxStreak = 0;
   let currentStreak = 0;
 
@@ -160,14 +161,14 @@ export function evaluateBadges(
   // 3. Budget Master
   const currentMonthKey = getLocalDateString().slice(0, 7);
   const thisMonthExpenses = Math.abs(
-    transactions
+    safeTxs
       .filter(t => t.date && String(t.date).startsWith(currentMonthKey) && Number(t.amount) < 0)
       .reduce((sum, t) => sum + Math.abs(Number(t.amount) || 0), 0)
   );
 
   const bmIdx = updated.findIndex(b => b.id === 'under_budget');
   if (bmIdx !== -1) {
-    const limit = Number(budget.monthlyLimit) || 0;
+    const limit = Number(budget?.monthlyLimit) || 0;
     if (limit > 0) {
       const remaining = limit - thisMonthExpenses;
       const pctLeft = Math.max(0, Math.min(100, Math.round((remaining / limit) * 100)));
@@ -184,7 +185,7 @@ export function evaluateBadges(
   // 4. Savings Guardian
   const sgIdx = updated.findIndex(b => b.id === 'savings_hero');
   if (sgIdx !== -1) {
-    const limit = Number(budget.monthlyLimit) || 0;
+    const limit = Number(budget?.monthlyLimit) || 0;
     const isSafe = limit > 0 && thisMonthExpenses < limit;
     updated[sgIdx] = {
       ...updated[sgIdx],

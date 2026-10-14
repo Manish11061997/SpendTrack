@@ -31,6 +31,9 @@ export function parseBankCsv(
   csvText: string,
   existingTxs: Transaction[] = []
 ): { valid: ParsedCsvRow[]; errors: string[] } {
+  if (!csvText || typeof csvText !== 'string') {
+    return { valid: [], errors: ['CSV file is empty or has no data rows.'] };
+  }
   const lines = csvText.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
   if (lines.length < 2) {
     return { valid: [], errors: ['CSV file is empty or has no data rows.'] };
@@ -102,8 +105,8 @@ export function parseBankCsv(
       const notes = notesIdx !== -1 ? row[notesIdx] : 'Imported via CSV';
 
       // Duplicate check: matching date and amount
-      const isDuplicate = existingTxs.some(
-        tx => tx.date === parsedDate && Math.abs(tx.amount - amount) < 0.01
+      const isDuplicate = (existingTxs || []).some(
+        tx => tx && tx.date === parsedDate && Math.abs((Number(tx.amount) || 0) - amount) < 0.01
       );
 
       validRows.push({
