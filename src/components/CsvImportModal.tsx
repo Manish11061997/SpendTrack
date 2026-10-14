@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { X, Upload, FileText, CheckCircle2, AlertTriangle, ArrowRight, ShieldCheck } from 'lucide-react';
 import { parseBankCsv, ParsedCsvRow } from '../utils/csvParser';
@@ -26,6 +26,15 @@ export const CsvImportModal: React.FC<CsvImportModalProps> = ({
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [ignoreDuplicates, setIgnoreDuplicates] = useState<boolean>(true);
 
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -44,6 +53,10 @@ export const CsvImportModal: React.FC<CsvImportModalProps> = ({
         setParsedRows(valid);
         setErrors(errs);
       }
+      setIsProcessing(false);
+    };
+    reader.onerror = () => {
+      setErrors(['Failed to read file. Please ensure it is a valid CSV.']);
       setIsProcessing(false);
     };
     reader.readAsText(file);
@@ -94,6 +107,14 @@ export const CsvImportModal: React.FC<CsvImportModalProps> = ({
             <X className="w-5 h-5" />
           </button>
         </div>
+
+        {/* Error Banner */}
+        {errors.length > 0 && parsedRows.length === 0 && (
+          <div className="p-3 bg-error/10 border border-error/20 rounded-2xl flex items-center gap-2 text-error text-xs font-semibold">
+            <AlertTriangle className="w-4 h-4 shrink-0" />
+            <span>{errors[0]}</span>
+          </div>
+        )}
 
         {/* Upload Zone */}
         {parsedRows.length === 0 ? (

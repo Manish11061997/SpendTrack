@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { X, Sparkles, Shield, Cpu, CreditCard } from 'lucide-react';
 import { ThreeDCardCanvas } from './animated/ThreeDCardCanvas';
@@ -19,6 +19,15 @@ export const ThreeDCardModal: React.FC<ThreeDCardModalProps> = ({
   currencySymbol,
   cardHolder = 'Alexander Chen',
 }) => {
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
   return (
     <AnimatePresence>
       {isOpen && (

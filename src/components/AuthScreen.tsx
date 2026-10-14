@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { 
   Mail, 
@@ -47,6 +47,14 @@ export default function AuthScreen({ onLoginSuccess }: AuthScreenProps) {
   const [isSigningIn, setIsSigningIn] = useState(false);
   const [legalModalTab, setLegalModalTab] = useState<'privacy' | 'terms' | null>(null);
 
+  const redirectTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (redirectTimerRef.current) clearTimeout(redirectTimerRef.current);
+    };
+  }, []);
+
   // Local helper to fetch all registered users
   const getRegisteredUsers = (): UserAccount[] => {
     const stored = localStorage.getItem('spendtrack_users');
@@ -67,6 +75,7 @@ export default function AuthScreen({ onLoginSuccess }: AuthScreenProps) {
 
   const handleAuthSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSigningIn) return;
     setError('');
     setSuccess('');
 
@@ -88,6 +97,7 @@ export default function AuthScreen({ onLoginSuccess }: AuthScreenProps) {
       return;
     }
 
+    setIsSigningIn(true);
     try {
       if (isLogin) {
         // --- REAL FIREBASE LOGIN ---
@@ -95,7 +105,8 @@ export default function AuthScreen({ onLoginSuccess }: AuthScreenProps) {
         const userCredential = await signInWithEmailAndPassword(auth, email.trim(), password);
         const user = userCredential.user;
         setSuccess(`Welcome back, ${user.displayName || user.email}!`);
-        setTimeout(() => {
+        redirectTimerRef.current = setTimeout(() => {
+          setIsSigningIn(false);
           onLoginSuccess(user.email!, user.displayName || user.email!);
         }, 800);
 
@@ -103,10 +114,12 @@ export default function AuthScreen({ onLoginSuccess }: AuthScreenProps) {
         // --- REAL FIREBASE SIGNUP ---
         if (!name.trim()) {
           setError('Please enter your full name.');
+          setIsSigningIn(false);
           return;
         }
         if (password !== confirmPassword) {
           setError('Passwords do not match.');
+          setIsSigningIn(false);
           return;
         }
 
@@ -132,11 +145,13 @@ export default function AuthScreen({ onLoginSuccess }: AuthScreenProps) {
         }
 
         setSuccess('Account created! Verification link sent to your email.');
-        setTimeout(() => {
+        redirectTimerRef.current = setTimeout(() => {
+          setIsSigningIn(false);
           onLoginSuccess(user.email!, name.trim());
         }, 1200);
       }
     } catch (err: any) {
+      setIsSigningIn(false);
       console.error('Firebase Auth error:', err);
       // Translate Firebase error codes into user-friendly messages
       const code = err?.code || '';
@@ -184,6 +199,7 @@ export default function AuthScreen({ onLoginSuccess }: AuthScreenProps) {
   };
 
   const handleGoogleSignIn = async () => {
+    if (isSigningIn) return;
     setError('');
     setSuccess('Connecting to Google...');
     setIsSigningIn(true);
@@ -449,10 +465,19 @@ export default function AuthScreen({ onLoginSuccess }: AuthScreenProps) {
             <button
               id="auth-submit-btn"
               type="submit"
-              className="w-full py-3 bg-primary text-on-primary rounded-xl text-xs font-bold hover:bg-primary/95 transition-all shadow-md active:scale-98 flex items-center justify-center gap-1.5 cursor-pointer mt-2"
+              disabled={isSigningIn}
+              className={`w-full py-3 bg-primary text-on-primary rounded-xl text-xs font-bold hover:bg-primary/95 transition-all shadow-md active:scale-98 flex items-center justify-center gap-1.5 cursor-pointer mt-2 ${
+                isSigningIn ? 'opacity-70 cursor-not-allowed' : ''
+              }`}
             >
-              {isLogin ? 'Sign In' : 'Create Account'}
-              <ArrowRight className="w-4 h-4" />
+              {isSigningIn ? (
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin shrink-0" />
+              ) : (
+                <>
+                  {isLogin ? 'Sign In' : 'Create Account'}
+                  <ArrowRight className="w-4 h-4" />
+                </>
+              )}
             </button>
           </form>
 

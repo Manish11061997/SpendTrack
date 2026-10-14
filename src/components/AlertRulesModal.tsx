@@ -49,10 +49,19 @@ export const AlertRulesModal: React.FC<AlertRulesModalProps> = ({
     localStorage.setItem('spendtrack_alert_rules', JSON.stringify(rules));
   }, [rules]);
 
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
 
   const handleAddRule = () => {
-    if (!newRuleName.trim()) return;
+    if (!newRuleName.trim() || newRuleThreshold <= 0) return;
 
     const newRule: AlertRule = {
       id: Math.random().toString(36).substring(2, 9),
@@ -201,7 +210,7 @@ export const AlertRulesModal: React.FC<AlertRulesModalProps> = ({
 
           <button
             onClick={handleAddRule}
-            disabled={!newRuleName.trim()}
+            disabled={!newRuleName.trim() || newRuleThreshold <= 0}
             className="w-full py-2 bg-primary text-on-primary font-bold text-xs rounded-xl shadow-xs hover:bg-primary/95 transition-all flex items-center justify-center gap-1 cursor-pointer disabled:opacity-50"
           >
             <Plus className="w-4 h-4" />

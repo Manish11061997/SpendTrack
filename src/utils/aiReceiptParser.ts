@@ -1,5 +1,5 @@
 import { GoogleGenAI } from '@google/genai';
-import { getLocalDateString } from './dateUtils';
+import { parseLocalDate, getLocalDateString } from './dateUtils';
 
 export interface ParsedReceipt {
   merchantName: string;
@@ -55,7 +55,7 @@ export async function parseReceiptWithAI(base64Image: string): Promise<ParsedRec
         return {
           merchantName: parsed.merchantName || 'Receipt Expense',
           totalAmount: Math.abs(Number(parsed.totalAmount) || 0),
-          date: parsed.date || getLocalDateString(),
+          date: parsed.date ? parseLocalDate(parsed.date) : getLocalDateString(),
           category: ['Food', 'Transport', 'Rent', 'Shopping', 'Other'].includes(parsed.category)
             ? parsed.category
             : 'Other',

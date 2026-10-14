@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   X, Award, Sparkles, Flame, Zap,
@@ -104,15 +104,25 @@ export const AchievementBadgesModal: React.FC<AchievementBadgesModalProps> = ({
 }) => {
   const [filter, setFilter] = useState<'all' | 'unlocked' | 'locked'>('all');
 
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
 
-  const unlockedCount = badges.filter(b => b.unlocked).length;
-  const totalCount    = badges.length;
+  const safeBadges   = (badges || []).filter(Boolean);
+  const unlockedCount = safeBadges.filter(b => b.unlocked).length;
+  const totalCount    = safeBadges.length;
   const pct           = totalCount > 0 ? Math.round((unlockedCount / totalCount) * 100) : 0;
   const rank          = getRankInfo(unlockedCount, totalCount);
   const RankIcon      = rank.icon;
 
-  const filtered = badges.filter(b => {
+  const filtered = safeBadges.filter(b => {
     if (filter === 'unlocked') return b.unlocked;
     if (filter === 'locked')   return !b.unlocked;
     return true;

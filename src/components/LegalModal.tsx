@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { ShieldCheck, FileText, X, ExternalLink, Lock, CheckCircle2, AlertCircle } from 'lucide-react';
 
@@ -10,8 +10,17 @@ interface LegalModalProps {
 export const LegalModal: React.FC<LegalModalProps> = ({ initialTab = 'privacy', onClose }) => {
   const [activeTab, setActiveTab] = useState<'privacy' | 'terms'>(initialTab);
 
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
+
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-50 flex items-center justify-center p-3 sm:p-5 animate-fade-in">
+      <div className="absolute inset-0 cursor-pointer" onClick={onClose} />
       <motion.div 
         initial={{ opacity: 0, scale: 0.95, y: 15 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}

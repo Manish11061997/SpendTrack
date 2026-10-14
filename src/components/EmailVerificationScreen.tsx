@@ -15,18 +15,25 @@ export default function EmailVerificationScreen({ onVerified, onLogout }: EmailV
   const [message, setMessage] = useState<{ text: string; type: 'info' | 'success' | 'error' } | null>(null);
   const user = auth.currentUser;
 
+  const redirectTimerRef = React.useRef<any>(null);
+
   // Poll for verification status every 5 seconds as a convenience
   useEffect(() => {
     const interval = setInterval(async () => {
       if (auth.currentUser) {
-        await auth.currentUser.reload();
-        if (auth.currentUser.emailVerified) {
-          clearInterval(interval);
-          onVerified();
-        }
+        try {
+          await auth.currentUser.reload();
+          if (auth.currentUser.emailVerified) {
+            clearInterval(interval);
+            onVerified();
+          }
+        } catch (e) {}
       }
     }, 5000);
-    return () => clearInterval(interval);
+    return () => {
+      clearInterval(interval);
+      if (redirectTimerRef.current) clearTimeout(redirectTimerRef.current);
+    };
   }, [onVerified]);
 
   const handleCheckVerification = async () => {
@@ -37,7 +44,8 @@ export default function EmailVerificationScreen({ onVerified, onLogout }: EmailV
       await user.reload();
       if (user.emailVerified) {
         setMessage({ text: 'Email successfully verified! Redirecting...', type: 'success' });
-        setTimeout(() => {
+        if (redirectTimerRef.current) clearTimeout(redirectTimerRef.current);
+        redirectTimerRef.current = setTimeout(() => {
           onVerified();
         }, 1200);
       } else {
