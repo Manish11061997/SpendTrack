@@ -73,11 +73,19 @@ export function convertCurrency(
   toCurrency: string,
   customRates?: ExchangeRates
 ): number {
-  if (!amount || fromCurrency === toCurrency) return amount;
+  if (!amount || typeof amount !== 'number' || isNaN(amount) || !isFinite(amount)) return 0;
+  if (!fromCurrency || !toCurrency || fromCurrency.toUpperCase() === toCurrency.toUpperCase()) return amount;
 
   const rates = customRates || FALLBACK_RATES;
-  const fromRate = rates[fromCurrency.toUpperCase()] || FALLBACK_RATES[fromCurrency.toUpperCase()] || 1;
-  const toRate = rates[toCurrency.toUpperCase()] || FALLBACK_RATES[toCurrency.toUpperCase()] || 1;
+  const fromCode = fromCurrency.toUpperCase();
+  const toCode = toCurrency.toUpperCase();
+  const rawFromRate = rates[fromCode] !== undefined ? rates[fromCode] : (FALLBACK_RATES[fromCode] ?? 1);
+  const rawToRate = rates[toCode] !== undefined ? rates[toCode] : (FALLBACK_RATES[toCode] ?? 1);
+
+  const fromRate = typeof rawFromRate === 'number' ? rawFromRate : 1;
+  const toRate = typeof rawToRate === 'number' ? rawToRate : 1;
+
+  if (fromRate <= 0 || toRate <= 0) return amount;
 
   // Convert to USD base first, then to target currency
   const inUSD = amount / fromRate;

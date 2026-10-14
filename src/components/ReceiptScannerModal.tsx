@@ -95,8 +95,11 @@ Return ONLY a valid JSON object matching this structure:
       });
 
       const text = response.text || '';
-      const cleanJson = text.replace(/```json|```/g, '').trim();
-      const parsed = JSON.parse(cleanJson);
+      const jsonMatch = text.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) {
+        throw new Error('Could not parse receipt JSON structure');
+      }
+      const parsed = JSON.parse(jsonMatch[0]);
 
       setExtractedResult({
         title: parsed.title || 'Scanned Receipt',

@@ -116,7 +116,7 @@ export default function HistoryTab({
 
   // Group transactions for a specific month
   const getSelectedMonthTransactions = (key: string): Transaction[] => {
-    return transactions.filter(t => t.date.startsWith(key));
+    return transactions.filter(t => t && typeof t.date === 'string' && t.date.startsWith(key));
   };
 
   // Helper to category config
@@ -136,7 +136,8 @@ export default function HistoryTab({
   };
 
   // Format month name label
-  const formatFullDate = (dateStr: string) => {
+  const formatFullDate = (dateStr?: string) => {
+    if (!dateStr || typeof dateStr !== 'string') return '';
     const parts = dateStr.split('-');
     if (parts.length < 3) return dateStr;
     const dateObj = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
@@ -148,18 +149,19 @@ export default function HistoryTab({
     // Total Year Outflow is computed from user's actual transaction history
     const totalYearOutflow = Math.abs(
       transactions
-        .filter(t => t.amount < 0)
-        .reduce((sum, t) => sum + t.amount, 0)
+        .filter(t => t && Number(t.amount) < 0)
+        .reduce((sum, t) => sum + Number(t.amount), 0)
     );
 
     // Get date range label dynamically
     const getTransactionDateRangeLabel = () => {
-      if (transactions.length === 0) return 'No active records';
-      const dates = transactions.map(t => t.date).sort();
+      const dates = transactions.map(t => t?.date).filter((d): d is string => typeof d === 'string' && Boolean(d)).sort();
+      if (dates.length === 0) return 'No active records';
       const minDateStr = dates[0];
       const maxDateStr = dates[dates.length - 1];
       
-      const parseMonthYear = (dateStr: string) => {
+      const parseMonthYear = (dateStr?: string) => {
+        if (!dateStr || typeof dateStr !== 'string') return '';
         const parts = dateStr.split('-');
         if (parts.length < 2) return dateStr;
         const d = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, 1);
@@ -303,11 +305,11 @@ export default function HistoryTab({
                   const mLabel = d.toLocaleString('en-IN', { month: 'short' });
                   const mKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
                   
-                  const monthTxs = transactions.filter(t => t.date.startsWith(mKey));
+                  const monthTxs = transactions.filter(t => t && typeof t.date === 'string' && t.date.startsWith(mKey));
                   const monthExpenses = Math.abs(
                     monthTxs
-                      .filter(t => t.amount < 0)
-                      .reduce((sum, t) => sum + t.amount, 0)
+                      .filter(t => Number(t.amount) < 0)
+                      .reduce((sum, t) => sum + Number(t.amount), 0)
                   );
                   
                   list.push({
@@ -398,10 +400,12 @@ export default function HistoryTab({
 
   // Apply real-time search and category filter
   const filteredMonthTransactions = monthTransactions.filter(t => {
-    const matchesSearch = t.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                          (t.notes && t.notes.toLowerCase().includes(searchQuery.toLowerCase())) ||
-                          t.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                          t.label.toLowerCase().includes(searchQuery.toLowerCase());
+    const q = searchQuery.toLowerCase().trim();
+    const title = (t.title || '').toLowerCase();
+    const notes = (t.notes || '').toLowerCase();
+    const category = (t.category || '').toLowerCase();
+    const label = (t.label || '').toLowerCase();
+    const matchesSearch = !q || title.includes(q) || notes.includes(q) || category.includes(q) || label.includes(q);
     const matchesCategory = !selectedCategoryFilter || t.category === selectedCategoryFilter;
     return matchesSearch && matchesCategory;
   });
@@ -409,20 +413,24 @@ export default function HistoryTab({
   // Group transactions by date
   const groupedTransactions: { [date: string]: Transaction[] } = {};
   filteredMonthTransactions
-    .sort((a, b) => b.date.localeCompare(a.date))
+    .sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')))
     .forEach(tx => {
-      if (!groupedTransactions[tx.date]) {
-        groupedTransactions[tx.date] = [];
+      const dKey = tx.date || 'Unknown';
+      if (!groupedTransactions[dKey]) {
+        groupedTransactions[dKey] = [];
       }
-      groupedTransactions[tx.date].push(tx);
+      groupedTransactions[dKey].push(tx);
     });
 
   // Helper to format heading date
-  const formatGroupHeaderDate = (dateStr: string) => {
-    // format: YYYY-MM-DD to "October 15, 2023"
-    const [y, m, d] = dateStr.split('-');
+  const formatGroupHeaderDate = (dateStr?: string) => {
+    if (!dateStr || typeof dateStr !== 'string') return '';
+    const parts = dateStr.split('-');
+    if (parts.length < 3) return dateStr;
+    const [y, m, d] = parts;
     const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-    return `${months[parseInt(m) - 1]} ${d}, ${y}`;
+    const mIdx = parseInt(m, 10) - 1;
+    return `${months[mIdx] || m} ${parseInt(d, 10)}, ${y}`;
   };
 
   return (

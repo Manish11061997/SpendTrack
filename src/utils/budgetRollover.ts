@@ -1,4 +1,5 @@
 import { Transaction, BudgetConfig, AchievementBadge } from '../types';
+import { getLocalDateString } from './dateUtils';
 
 export interface RolloverSummary {
   previousMonthKey: string;
@@ -157,7 +158,7 @@ export function evaluateBadges(
   }
 
   // 3. Budget Master
-  const currentMonthKey = new Date().toISOString().slice(0, 7);
+  const currentMonthKey = getLocalDateString().slice(0, 7);
   const thisMonthExpenses = Math.abs(
     transactions
       .filter(t => t.date && String(t.date).startsWith(currentMonthKey) && Number(t.amount) < 0)

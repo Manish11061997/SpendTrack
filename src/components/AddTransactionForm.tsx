@@ -2,6 +2,7 @@ import React, { useState, useRef } from 'react';
 import { motion } from 'motion/react';
 import { Transaction, BudgetConfig } from '../types';
 import { formatCurrency, getCurrencySymbol, formatInputAmount, parseRawAmount } from '../utils/currency';
+import { getLocalDateString } from '../utils/dateUtils';
 import { parseReceiptWithAI } from '../utils/aiReceiptParser';
 import { parseVoiceTranscript } from '../utils/voiceParser';
 import { SUPPORTED_CURRENCIES, convertCurrency } from '../utils/currencyConverter';
@@ -41,13 +42,7 @@ export default function AddTransactionForm({ onSave, onCancel, budget, transacti
   const [selectedCurrency, setSelectedCurrency] = useState<string>(budget?.currency || 'INR');
   const [title, setTitle] = useState<string>('');
   const [category, setCategory] = useState<'Food' | 'Transport' | 'Rent' | 'Shopping' | 'Other'>('Food');
-  const [date, setDate] = useState<string>(() => {
-    const today = new Date();
-    const yyyy = today.getFullYear();
-    const mm = String(today.getMonth() + 1).padStart(2, '0');
-    const dd = String(today.getDate()).padStart(2, '0');
-    return `${yyyy}-${mm}-${dd}`;
-  });
+  const [date, setDate] = useState<string>(() => getLocalDateString());
   const [label, setLabel] = useState<'Personal' | 'Work' | 'Freelance' | 'Subscription' | 'General'>('Personal');
   const [notes, setNotes] = useState<string>('');
   const [receiptFile, setReceiptFile] = useState<File | null>(null);

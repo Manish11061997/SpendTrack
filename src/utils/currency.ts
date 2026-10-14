@@ -44,17 +44,15 @@ export const isSubscriptionDoubleCounted = (subName: string, txTitle: string): b
   // Exact match after cleaning
   if (cleanSub === cleanTx) return true;
   
-  // Check if one contains the other as a whole word
-  const subWords = cleanSub.split(' ');
-  const txWords = cleanTx.split(' ');
-  
-  // If the subscription is a single word, it must match one of the transaction words exactly
-  if (subWords.length === 1) {
-    return txWords.includes(subWords[0]);
-  }
-  
-  // Otherwise, check if cleanTx contains cleanSub as a substring (e.g. "youtube premium" contains "youtube")
-  return cleanTx.includes(cleanSub) || cleanSub.includes(cleanTx);
+  // Substring match
+  if (cleanTx.includes(cleanSub) || cleanSub.includes(cleanTx)) return true;
+
+  // Keyword overlap matching (matches distinctive brand terms e.g. Spotify, Netflix, Adobe)
+  const STOP_WORDS = new Set(['the', 'and', 'for', 'via', 'app', 'pay', 'bill', 'order', 'card', 'auto', 'debit', 'plan', 'charge', 'service']);
+  const subWords = cleanSub.split(' ').filter(w => w.length >= 3 && !STOP_WORDS.has(w));
+  const txWords = cleanTx.split(' ').filter(w => w.length >= 3 && !STOP_WORDS.has(w));
+
+  return subWords.some(w => txWords.includes(w));
 };
 
 /**

@@ -154,7 +154,6 @@ export default function DashboardTab({
   const [showCalcTooltip, setShowCalcTooltip] = useState<boolean>(false);
   const [activeCategoryFilter, setActiveCategoryFilter] = useState<string | null>(null);
   const [hoveredCategory, setHoveredCategory] = useState<string | null>(null);
-  const [isBankSmsOpen, setIsBankSmsOpen] = useState(false);
   const [isSubsExpanded, setIsSubsExpanded] = useState<boolean>(false);
   const [isGoalsExpanded, setIsGoalsExpanded] = useState<boolean>(false);
   const [isHeroFlipped, setIsHeroFlipped] = useState<boolean>(false);
@@ -1014,7 +1013,7 @@ export default function DashboardTab({
       {/* 1-Tap Cockpit Quick Shortcuts */}
       <QuickShortcutsWidget
         onOpenExportAudit={onOpenExportAudit || (() => {})}
-        onOpenSms={() => setIsBankSmsOpen(true)}
+        onOpenVoice={onOpenVoice}
         onOpenCalendar={onOpenCalendar || (() => {})}
         onOpenAddTx={onAddTransactionClick}
         onOpenInsights={onNavigateToInsights}
@@ -3125,7 +3124,7 @@ export default function DashboardTab({
               </span>
               <QuickShortcutsWidget
                 onOpenExportAudit={onOpenExportAudit || (() => {})}
-                onOpenSms={() => setIsBankSmsOpen(true)}
+                onOpenVoice={onOpenVoice}
                 onOpenCalendar={onOpenCalendar || (() => {})}
                 onOpenAddTx={onAddTransactionClick}
                 onOpenInsights={onNavigateToInsights}

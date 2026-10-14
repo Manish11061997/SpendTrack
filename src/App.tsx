@@ -700,8 +700,10 @@ export default function App() {
 
     if (todayDate >= (budget.recurringIncome.dayOfMonth || 1) && budget.recurringIncome.lastProcessedMonth !== currentMonthKey) {
       const isAlreadyLogged = transactions.some(t =>
+        t &&
+        typeof t.date === 'string' &&
         t.date.startsWith(currentMonthKey) &&
-        t.amount > 0 &&
+        Number(t.amount) > 0 &&
         t.title === budget.recurringIncome!.title
       );
 

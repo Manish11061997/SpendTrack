@@ -1,8 +1,9 @@
 import { Transaction, BudgetConfig, Subscription, SavingsGoal } from '../types';
 import { formatCurrency } from './currency';
+import { getLocalDateString } from './dateUtils';
 
 export const generateMonthlyPdfReport = ({
-  transactions,
+  transactions = [],
   budget,
   subscriptions = [],
   savingsGoals = [],
@@ -15,11 +16,12 @@ export const generateMonthlyPdfReport = ({
   monthKey: string;
 }) => {
   const currency = budget?.currency || 'INR';
-  const [yearStr, monthStr] = monthKey.split('-');
-  const monthDate = new Date(Number(yearStr), Number(monthStr) - 1, 1);
+  const safeMonthKey = monthKey || getLocalDateString().slice(0, 7);
+  const [yearStr, monthStr] = safeMonthKey.split('-');
+  const monthDate = new Date(Number(yearStr) || new Date().getFullYear(), (Number(monthStr) || 1) - 1, 1);
   const monthName = monthDate.toLocaleString('default', { month: 'long', year: 'numeric' });
 
-  const monthTxs = transactions.filter(t => t.date && t.date.startsWith(monthKey));
+  const monthTxs = (transactions || []).filter(t => t && typeof t.date === 'string' && t.date.startsWith(safeMonthKey));
   const incomeTxs = monthTxs.filter(t => Number(t.amount) > 0);
   const expenseTxs = monthTxs.filter(t => Number(t.amount) < 0);
 
@@ -181,6 +183,10 @@ export const generateMonthlyPdfReport = ({
   `;
 
   // Mobile-compatible download: Blob → object URL → anchor click
+  if (typeof document === 'undefined' || typeof window === 'undefined') {
+    return reportHtml;
+  }
+
   const blob = new Blob([reportHtml], { type: 'text/html;charset=utf-8' });
   const blobUrl = URL.createObjectURL(blob);
   const fileName = `SpendTrack_Report_${monthName.replace(/\s+/g, '_')}.html`;

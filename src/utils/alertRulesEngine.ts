@@ -1,5 +1,6 @@
 import { Transaction, BudgetConfig, AlertRule } from '../types';
 import { formatCurrency } from './currency';
+import { getLocalDateString } from './dateUtils';
 
 export const DEFAULT_ALERT_RULES: AlertRule[] = [
   {
@@ -50,10 +51,11 @@ export function checkAlertRulesOnSave(
       }
     } else if (rule.type === 'category_cap' && savedTx.amount < 0 && rule.targetCategory) {
       if (savedTx.category === rule.targetCategory) {
-        const currentMonthKey = (savedTx.date || new Date().toISOString()).slice(0, 7);
+        const currentMonthKey = (savedTx.date || getLocalDateString()).slice(0, 7);
+        const savedId = (savedTx as any).id;
         const catSpent = Math.abs(
           allTxs
-            .filter(t => t.date && t.date.startsWith(currentMonthKey) && t.category === rule.targetCategory && t.amount < 0)
+            .filter(t => t && t.id !== savedId && typeof t.date === 'string' && t.date.startsWith(currentMonthKey) && t.category === rule.targetCategory && Number(t.amount) < 0)
             .reduce((sum, t) => sum + Number(t.amount), 0)
         ) + absAmount;
 

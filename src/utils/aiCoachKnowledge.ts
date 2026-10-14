@@ -72,8 +72,8 @@ export const analyzeUserFinances = (
   const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
   const remainingDays = Math.max(1, daysInMonth - now.getDate() + 1);
 
-  const currentMonthTxs = safeTxs.filter((t) => t.date?.startsWith(currentMonthKey));
-  const lastMonthTxs = safeTxs.filter((t) => t.date?.startsWith(lastMonthKey));
+  const currentMonthTxs = safeTxs.filter((t) => t && typeof t.date === 'string' && t.date.startsWith(currentMonthKey));
+  const lastMonthTxs = safeTxs.filter((t) => t && typeof t.date === 'string' && t.date.startsWith(lastMonthKey));
 
   const currentSpent = currentMonthTxs.filter((t) => Number(t.amount) < 0).reduce((s, t) => s + Math.abs(Number(t.amount)), 0);
   const currentIncome = currentMonthTxs.filter((t) => Number(t.amount) > 0).reduce((s, t) => s + Number(t.amount), 0);
@@ -202,8 +202,9 @@ export const buildGeminiSystemPrompt = (
     .join('\n') || '  No active savings goals';
 
   const txListStr = safeTxs
+    .filter(Boolean)
     .slice(0, 50)
-    .map((t) => `  [${t.date}] ${t.title} (${t.category}${t.label ? ', ' + t.label : ''}): ${Number(t.amount) < 0 ? '-' : '+'}${curr} ${Math.abs(Number(t.amount))}`)
+    .map((t) => `  [${t.date || ''}] ${t.title || 'Untitled'} (${t.category || 'Other'}${t.label ? ', ' + t.label : ''}): ${Number(t.amount) < 0 ? '-' : '+'}${curr} ${Math.abs(Number(t.amount) || 0)}`)
     .join('\n') || '  No transactions logged';
 
   return `You are "Tracky", the official AI Personal Finance Advisor & Wealth Coach embedded in SpendTrack. You have been trained across 100+ unique financial intents and possess complete real-time access to the user's financial ledger.

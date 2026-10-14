@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Lock, Delete, Sparkles, KeyRound } from 'lucide-react';
 
 interface PinLockModalProps {
@@ -11,10 +11,20 @@ interface PinLockModalProps {
 export const PinLockModal: React.FC<PinLockModalProps> = ({ isOpen, correctPin, onUnlock, onResetPin }) => {
   const [enteredPin, setEnteredPin] = useState('');
   const [error, setError] = useState(false);
+  const [failedAttempts, setFailedAttempts] = useState(0);
+  const [lockoutTimer, setLockoutTimer] = useState(0);
 
-  if (!isOpen) return null;
+  useEffect(() => {
+    if (lockoutTimer > 0) {
+      const interval = setInterval(() => {
+        setLockoutTimer(prev => prev - 1);
+      }, 1000);
+      return () => clearInterval(interval);
+    }
+  }, [lockoutTimer]);
 
   const handleKeyPress = (num: string) => {
+    if (lockoutTimer > 0) return;
     if (enteredPin.length < 4) {
       const next = enteredPin + num;
       setEnteredPin(next);
@@ -24,8 +34,14 @@ export const PinLockModal: React.FC<PinLockModalProps> = ({ isOpen, correctPin, 
         if (next === correctPin) {
           onUnlock();
           setEnteredPin('');
+          setFailedAttempts(0);
         } else {
           setError(true);
+          const newAttempts = failedAttempts + 1;
+          setFailedAttempts(newAttempts);
+          if (newAttempts >= 5) {
+            setLockoutTimer(30);
+          }
           setTimeout(() => setEnteredPin(''), 600);
         }
       }
@@ -33,9 +49,25 @@ export const PinLockModal: React.FC<PinLockModalProps> = ({ isOpen, correctPin, 
   };
 
   const handleDelete = () => {
+    if (lockoutTimer > 0) return;
     setEnteredPin(enteredPin.slice(0, -1));
     setError(false);
   };
+
+  useEffect(() => {
+    if (!isOpen || lockoutTimer > 0) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key >= '0' && e.key <= '9') {
+        handleKeyPress(e.key);
+      } else if (e.key === 'Backspace') {
+        handleDelete();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, enteredPin, correctPin, lockoutTimer]);
+
+  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-[#0d0d15] text-white p-4 animate-in fade-in">
@@ -65,7 +97,11 @@ export const PinLockModal: React.FC<PinLockModalProps> = ({ isOpen, correctPin, 
           ))}
         </div>
 
-        {error && <p className="text-xs text-rose-400 font-semibold animate-shake">Incorrect PIN. Try again.</p>}
+        {lockoutTimer > 0 ? (
+          <p className="text-xs text-amber-400 font-bold">Too many attempts. Locked for {lockoutTimer}s.</p>
+        ) : error ? (
+          <p className="text-xs text-rose-400 font-semibold animate-shake">Incorrect PIN. Try again.</p>
+        ) : null}
 
         {/* Keypad Grid */}
         <div className="grid grid-cols-3 gap-4 w-full max-w-xs pt-2">

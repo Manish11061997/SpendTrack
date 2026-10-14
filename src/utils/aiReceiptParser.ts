@@ -10,12 +10,16 @@ export interface ParsedReceipt {
 }
 
 export async function parseReceiptWithAI(base64Image: string): Promise<ParsedReceipt> {
-  const apiKey = import.meta.env.VITE_GEMINI_API_KEY || process.env.GEMINI_API_KEY;
+  const apiKey =
+    import.meta.env.VITE_GEMINI_API_KEY ||
+    (typeof process !== 'undefined' ? process.env?.GEMINI_API_KEY : undefined);
 
   if (apiKey) {
     try {
       const ai = new GoogleGenAI({ apiKey });
       const cleanBase64 = base64Image.replace(/^data:image\/\w+;base64,/, '');
+      const mimeMatch = base64Image.match(/^data:(image\/[a-zA-Z0-9+.-]+);base64,/);
+      const mimeType = mimeMatch ? mimeMatch[1] : 'image/jpeg';
 
       const prompt = `Analyze this receipt image and return ONLY a valid JSON object matching this exact TypeScript structure:
 {
@@ -35,7 +39,7 @@ export async function parseReceiptWithAI(base64Image: string): Promise<ParsedRec
               { text: prompt },
               {
                 inlineData: {
-                  mimeType: 'image/jpeg',
+                  mimeType,
                   data: cleanBase64,
                 },
               },

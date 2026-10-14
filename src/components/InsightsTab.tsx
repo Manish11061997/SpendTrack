@@ -73,12 +73,12 @@ export default function InsightsTab({
   const activeMonth = selectedMonthState || availableMonths[0] || currentRealMonth;
 
   // Filter transactions for active month
-  const activeTxs = transactions.filter(t => t.date.startsWith(activeMonth));
+  const activeTxs = transactions.filter(t => t && typeof t.date === 'string' && t.date.startsWith(activeMonth));
   
   // Dynamic monthly income initial setup
   const activeMonthInflow = transactions
-    .filter(t => t.date.startsWith(activeMonth) && t.amount > 0)
-    .reduce((sum, t) => sum + t.amount, 0);
+    .filter(t => t && typeof t.date === 'string' && t.date.startsWith(activeMonth) && Number(t.amount) > 0)
+    .reduce((sum, t) => sum + Number(t.amount), 0);
 
   const [customIncome, setCustomIncome] = useState<number>(() => {
     return activeMonthInflow > 0 ? activeMonthInflow : ((budget?.monthlyLimit ?? 3000) * 1.5 || 50000);
@@ -147,11 +147,11 @@ export default function InsightsTab({
   };
 
   // Use user-defined category limits if set; otherwise proportional limits if budget is set, or 0 if no budget
-  const foodLimit      = budget.categoryLimits?.Food      ?? (hasBudget ? Math.round(Number(budget.monthlyLimit) * 0.20) : 0);
-  const transportLimit = budget.categoryLimits?.Transport  ?? (hasBudget ? Math.round(Number(budget.monthlyLimit) * 0.12) : 0);
-  const rentLimit      = budget.categoryLimits?.Rent       ?? (hasBudget ? Math.round(Number(budget.monthlyLimit) * 0.40) : 0);
-  const shoppingLimit  = budget.categoryLimits?.Shopping   ?? (hasBudget ? Math.round(Number(budget.monthlyLimit) * 0.18) : 0);
-  const otherLimit     = budget.categoryLimits?.Other      ?? (hasBudget ? Math.round(Number(budget.monthlyLimit) * 0.10) : 0);
+  const foodLimit      = budget?.categoryLimits?.Food      ?? (hasBudget ? Math.round(Number(budget.monthlyLimit) * 0.20) : 0);
+  const transportLimit = budget?.categoryLimits?.Transport ?? (hasBudget ? Math.round(Number(budget.monthlyLimit) * 0.12) : 0);
+  const rentLimit      = budget?.categoryLimits?.Rent      ?? (hasBudget ? Math.round(Number(budget.monthlyLimit) * 0.40) : 0);
+  const shoppingLimit  = budget?.categoryLimits?.Shopping  ?? (hasBudget ? Math.round(Number(budget.monthlyLimit) * 0.18) : 0);
+  const otherLimit     = budget?.categoryLimits?.Other     ?? (hasBudget ? Math.round(Number(budget.monthlyLimit) * 0.10) : 0);
 
   // Categories definitions matching screens
   const categoriesAnalysis = [
@@ -210,9 +210,9 @@ export default function InsightsTab({
   }));
 
   // Dynamic values for spending velocity and buffer
-  const budgetLimit = budget.monthlyLimit;
-  const remainingBudget = budgetLimit - totalSpent;
-  const velocityStatus = totalSpent > (budgetLimit * 0.8) ? 'High' : totalSpent > (budgetLimit * 0.5) ? 'Moderate' : 'Low';
+  const budgetLimit = Number(budget?.monthlyLimit) || 0;
+  const remainingBudget = budgetLimit > 0 ? budgetLimit - totalSpent : 0;
+  const velocityStatus = budgetLimit > 0 && totalSpent > (budgetLimit * 0.8) ? 'High' : (budgetLimit > 0 && totalSpent > (budgetLimit * 0.5)) ? 'Moderate' : 'Low';
   const velocityDesc = velocityStatus === 'High' ? 'Nearing budget limit quickly.' : velocityStatus === 'Moderate' ? 'Healthy spending rate.' : 'Excellent budget buffer.';
 
   const pastMonths = availableMonths.filter(m => m !== activeMonth);
@@ -264,8 +264,8 @@ export default function InsightsTab({
     let streak = 0;
     const sortedMonths = [...availableMonths].sort((a, b) => b.localeCompare(a));
     for (const m of sortedMonths) {
-      const monthTxs = transactions.filter(t => t.date.startsWith(m) && t.amount < 0);
-      const txTotal = Math.abs(monthTxs.reduce((sum, t) => sum + t.amount, 0));
+      const monthTxs = transactions.filter(t => t && typeof t.date === 'string' && t.date.startsWith(m) && Number(t.amount) < 0);
+      const txTotal = Math.abs(monthTxs.reduce((sum, t) => sum + Number(t.amount), 0));
       const monthSubsTotal = subscriptions
         .filter(s => s.isActive !== false)
         .reduce((sum, s) => {
@@ -275,7 +275,7 @@ export default function InsightsTab({
           return sum + (isAlreadyLogged ? 0 : (Number(s.amount) || 0));
         }, 0);
       const total = txTotal + monthSubsTotal;
-      const limit = budget.monthlyLimit || 3000;
+      const limit = Number(budget?.monthlyLimit) || 3000;
       if (total <= limit && total > 0) {
         streak++;
       } else if (total > limit) {

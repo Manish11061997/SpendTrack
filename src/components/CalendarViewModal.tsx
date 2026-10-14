@@ -39,9 +39,9 @@ export const CalendarViewModal: React.FC<CalendarViewModalProps> = ({
 
   // Map expenses to dates YYYY-MM-DD
   const dailySpendMap: { [dateStr: string]: { total: number; count: number } } = {};
-  transactions.forEach((tx) => {
-    if (tx.amount < 0) {
-      const absAmt = Math.abs(tx.amount);
+  (transactions || []).forEach((tx) => {
+    if (tx && tx.date && typeof tx.date === 'string' && Number(tx.amount) < 0) {
+      const absAmt = Math.abs(Number(tx.amount));
       if (!dailySpendMap[tx.date]) {
         dailySpendMap[tx.date] = { total: 0, count: 0 };
       }
@@ -51,11 +51,11 @@ export const CalendarViewModal: React.FC<CalendarViewModalProps> = ({
   });
 
   const selectedDayTransactions = selectedDayDate
-    ? transactions.filter((t) => t.date === selectedDayDate)
+    ? (transactions || []).filter((t) => t && t.date === selectedDayDate)
     : [];
 
   const selectedDaySubscriptions = selectedDayDate
-    ? subscriptions.filter((s) => s.isActive && s.billingDate === parseInt(selectedDayDate.split('-')[2], 10))
+    ? (subscriptions || []).filter((s) => s && s.isActive && s.billingDate === parseInt(selectedDayDate.split('-')[2], 10))
     : [];
 
   return (
@@ -176,8 +176,8 @@ export const CalendarViewModal: React.FC<CalendarViewModalProps> = ({
                         <span className="font-semibold text-white">{tx.title}</span>
                         <span className="text-gray-400 ml-2">({tx.category})</span>
                       </div>
-                      <span className={`font-bold ${tx.amount > 0 ? 'text-emerald-400' : 'text-white'}`}>
-                        {formatCurrency(tx.amount, currency)}
+                      <span className={`font-bold ${Number(tx.amount) > 0 ? 'text-emerald-400' : 'text-white'}`}>
+                        {Number(tx.amount) > 0 ? '+' : '-'}{formatCurrency(Math.abs(Number(tx.amount)), currency)}
                       </span>
                     </div>
                   ))

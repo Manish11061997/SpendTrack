@@ -268,6 +268,7 @@ export default function SettingsTab({
       categoryLimits,
       enableCategoryRollover: enableRollover,
       recurringIncome: {
+        ...budget?.recurringIncome,
         title: recurringSalaryTitle.trim() || 'Monthly Salary',
         amount: parseFloat(parseRawAmount(recurringSalaryAmt)) || 0,
         dayOfMonth: parseInt(recurringSalaryDay) || 1,

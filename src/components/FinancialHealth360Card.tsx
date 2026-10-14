@@ -164,16 +164,16 @@ export const FinancialHealth360Card: React.FC<FinancialHealth360CardProps> = ({
   // 5. Tracking Regularity Pillar (15 pts max)
   const regularityPillar = useMemo(() => {
     const past7Days = Array.from({ length: 7 }, (_, i) => {
-      const d = new Date(today);
+      const d = new Date();
       d.setDate(d.getDate() - i);
       return getLocalDateString(d);
     });
-    const loggedDays = past7Days.filter(dayStr => monthTxs.some(t => t.date === dayStr)).length;
+    const loggedDays = past7Days.filter(dayStr => safeTransactions.some(t => t && t.date === dayStr)).length;
     if (loggedDays >= 5) return 15;
     if (loggedDays >= 3) return 12;
     if (loggedDays >= 1) return 8;
     return 4;
-  }, [today, monthTxs]);
+  }, [safeTransactions]);
 
   const totalScore = Math.min(100, savingsPillar + budgetPillar + subPillar + runwayPillar + regularityPillar);
 
