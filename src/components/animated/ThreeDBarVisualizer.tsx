@@ -368,16 +368,16 @@ export const ThreeDBarVisualizer: React.FC<ThreeDBarVisualizerProps> = ({
             <div className="text-xs font-bold text-on-surface">{hoveredBar.name}</div>
             <div className="flex items-center gap-1.5 text-[11px] font-mono">
               <span className="font-black text-primary">
-                {currencySymbol}{hoveredBar.spent.toLocaleString()}
+                {currencySymbol}{(hoveredBar.spent || 0).toLocaleString()}
               </span>
               <span className="text-on-surface-variant">/</span>
               <span className="text-on-surface-variant">
-                {currencySymbol}{hoveredBar.limit.toLocaleString()}
+                {currencySymbol}{(hoveredBar.limit || 0).toLocaleString()}
               </span>
             </div>
           </div>
           <div className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded-md bg-primary/10 text-primary border border-primary/20">
-            {hoveredBar.limit > 0 ? Math.round((hoveredBar.spent / hoveredBar.limit) * 100) : 100}%
+            {(hoveredBar.limit && hoveredBar.limit > 0) ? Math.round(((hoveredBar.spent || 0) / hoveredBar.limit) * 100) : 100}%
           </div>
         </div>
       )}

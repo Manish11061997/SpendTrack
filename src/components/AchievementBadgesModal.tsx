@@ -252,7 +252,8 @@ export const AchievementBadgesModal: React.FC<AchievementBadgesModalProps> = ({
                 {filtered.map((badge, idx) => {
                   const style = BADGE_STYLES[badge.icon] ?? DEFAULT_STYLE;
                   const isUnlocked = badge.unlocked;
-                  const progressPct = Math.max(0, Math.min(100, badge.progress ?? 0));
+                  const rawProgress = Number(badge.progress);
+                  const progressPct = isNaN(rawProgress) ? 0 : Math.max(0, Math.min(100, Math.round(rawProgress)));
 
                   return (
                     <motion.div

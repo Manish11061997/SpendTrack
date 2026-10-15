@@ -337,12 +337,13 @@ export default function HistoryTab({
                 const maxSpend = Math.max(...list.map(l => l.spend), 1);
                 
                 return list.map(l => {
-                  const pct = maxSpend > 0 ? Math.max(10, Math.round((l.spend / maxSpend) * 100)) : 10;
+                  const safeSpend = (typeof l.spend === 'number' && !isNaN(l.spend)) ? l.spend : 0;
+                  const pct = maxSpend > 0 ? Math.max(10, Math.min(100, Math.round((safeSpend / maxSpend) * 100))) : 10;
                   return {
                     label: l.label,
                     pct,
                     active: l.monthKey === endMonth,
-                    spend: l.spend
+                    spend: safeSpend
                   };
                 });
               };
@@ -663,7 +664,7 @@ export default function HistoryTab({
                               
                               {/* Amount Input */}
                               <div className="w-full sm:w-32 flex flex-col gap-1">
-                                <label className="text-[10px] font-bold text-primary uppercase tracking-wider">Amount (₹)</label>
+                                <label className="text-[10px] font-bold text-primary uppercase tracking-wider">Amount ({getCurrencySymbol(budget?.currency || 'INR')})</label>
                                 <div className="relative flex items-center">
                                   <span className="absolute left-3 text-xs font-bold text-on-surface-variant">
                                     {editType === 'expense' ? '' : '+'}

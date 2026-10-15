@@ -16,6 +16,13 @@ export const PinLockModal: React.FC<PinLockModalProps> = ({ isOpen, correctPin, 
   const clearTimerRef = useRef<any>(null);
 
   useEffect(() => {
+    if (isOpen) {
+      setEnteredPin('');
+      setError(false);
+    }
+  }, [isOpen]);
+
+  useEffect(() => {
     return () => {
       if (clearTimerRef.current) clearTimeout(clearTimerRef.current);
     };
@@ -38,7 +45,8 @@ export const PinLockModal: React.FC<PinLockModalProps> = ({ isOpen, correctPin, 
       setError(false);
 
       if (next.length === 4) {
-        if (next === correctPin) {
+        const expected = String(correctPin || '').trim();
+        if (next === expected) {
           onUnlock();
           setEnteredPin('');
           setFailedAttempts(0);
@@ -50,7 +58,10 @@ export const PinLockModal: React.FC<PinLockModalProps> = ({ isOpen, correctPin, 
             setLockoutTimer(30);
           }
           if (clearTimerRef.current) clearTimeout(clearTimerRef.current);
-          clearTimerRef.current = setTimeout(() => setEnteredPin(''), 600);
+          clearTimerRef.current = setTimeout(() => {
+            setEnteredPin('');
+            setError(false);
+          }, 600);
         }
       }
     }

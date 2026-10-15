@@ -81,7 +81,7 @@ export const ThreeDCardModal: React.FC<ThreeDCardModalProps> = ({
             {/* 3D Canvas Viewport */}
             <div className="w-full bg-surface-container-lowest/60 dark:bg-black/50 border border-outline-variant/20 rounded-2xl p-4 flex flex-col items-center justify-center">
               <ThreeDCardCanvas
-                balance={balance.toLocaleString()}
+                balance={(typeof balance === 'number' && !isNaN(balance) ? balance : 0).toLocaleString()}
                 currencySymbol={currencySymbol}
                 cardHolder={cardHolder}
               />

@@ -165,6 +165,7 @@ export default function AddTransactionForm({ onSave, onCancel, budget, transacti
     if (e.target.files && e.target.files[0]) {
       processFile(e.target.files[0]);
     }
+    e.target.value = '';
   };
 
   const triggerFileSelect = () => {
@@ -562,9 +563,10 @@ export default function AddTransactionForm({ onSave, onCancel, budget, transacti
                 .reduce((sum, t) => sum + Math.abs(t.amount), 0);
 
               const enteredVal = txType === 'expense' 
-                ? convertCurrency(parseFloat(parseRawAmount(amount)) || 0, selectedCurrency, budget?.currency || 'INR') 
+                ? (convertCurrency(parseFloat(parseRawAmount(amount)) || 0, selectedCurrency, budget?.currency || 'INR') || 0)
                 : 0;
-              const totalProjected = currentMonthCategorySpent + enteredVal;
+              const safeEnteredVal = (typeof enteredVal === 'number' && !isNaN(enteredVal)) ? enteredVal : 0;
+              const totalProjected = currentMonthCategorySpent + safeEnteredVal;
               const limit = budget?.categoryLimits?.[category] || Math.round((budget?.monthlyLimit || 10000) / 5);
               const remaining = limit - totalProjected;
               const pct = limit > 0 ? Math.round((totalProjected / limit) * 100) : 0;

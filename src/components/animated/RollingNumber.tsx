@@ -74,8 +74,9 @@ export const RollingNumber: React.FC<RollingNumberProps> = ({
   }, []);
 
   // Format the absolute value with thousands/lakhs separators
-  const absVal = Math.abs(Math.round(value));
-  const isNegative = value < 0;
+  const safeVal = (typeof value === 'number' && !isNaN(value)) ? value : 0;
+  const absVal = Math.abs(Math.round(safeVal));
+  const isNegative = safeVal < 0;
   const formattedString = new Intl.NumberFormat(locale, {
     maximumFractionDigits: 0,
   }).format(absVal);

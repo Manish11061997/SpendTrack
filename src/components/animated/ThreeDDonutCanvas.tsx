@@ -45,7 +45,9 @@ export const ThreeDDonutCanvas: React.FC<ThreeDDonutCanvasProps> = ({
     autoRotateRef.current = autoRotate;
   }, [autoRotate]);
 
-  const overallPct = totalBudget > 0 ? Math.min(100, Math.round((totalSpent / totalBudget) * 100)) : 68;
+  const safeSpent = (typeof totalSpent === 'number' && !isNaN(totalSpent)) ? totalSpent : 0;
+  const safeBudget = (typeof totalBudget === 'number' && !isNaN(totalBudget)) ? totalBudget : 0;
+  const overallPct = safeBudget > 0 ? Math.max(0, Math.min(100, Math.round((safeSpent / safeBudget) * 100))) : 0;
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -406,7 +408,7 @@ export const ThreeDDonutCanvas: React.FC<ThreeDDonutCanvasProps> = ({
           <div className="w-2 h-2 rounded-full" style={{ backgroundColor: hoveredSlice.color }} />
           <span className="text-xs font-bold text-on-surface">{hoveredSlice.name}</span>
           <span className="text-xs font-mono font-black text-primary">
-            {currencySymbol}{hoveredSlice.value.toLocaleString()}
+            {currencySymbol}{(hoveredSlice.value || 0).toLocaleString()}
           </span>
           <span className="text-[10px] font-mono text-on-surface-variant">({hoveredSlice.percent}%)</span>
         </div>

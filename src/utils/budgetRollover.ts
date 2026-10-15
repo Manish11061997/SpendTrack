@@ -202,7 +202,7 @@ export function evaluateBadges(
   // 5. Category Specialist
   const csIdx = updated.findIndex(b => b.id === 'smart_categorizer');
   if (csIdx !== -1) {
-    const categoriesUsed = new Set(transactions.map(t => t.category).filter(Boolean));
+    const categoriesUsed = new Set(safeTxs.map(t => t.category).filter(Boolean));
     const count = categoriesUsed.size;
     updated[csIdx] = {
       ...updated[csIdx],

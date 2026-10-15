@@ -37,12 +37,13 @@ export default function EmailVerificationScreen({ onVerified, onLogout }: EmailV
   }, [onVerified]);
 
   const handleCheckVerification = async () => {
-    if (!user) return;
+    const currentUser = auth.currentUser || user;
+    if (!currentUser) return;
     setIsChecking(true);
     setMessage(null);
     try {
-      await user.reload();
-      if (user.emailVerified) {
+      await currentUser.reload();
+      if (currentUser.emailVerified) {
         setMessage({ text: 'Email successfully verified! Redirecting...', type: 'success' });
         if (redirectTimerRef.current) clearTimeout(redirectTimerRef.current);
         redirectTimerRef.current = setTimeout(() => {
@@ -59,11 +60,12 @@ export default function EmailVerificationScreen({ onVerified, onLogout }: EmailV
   };
 
   const handleResendEmail = async () => {
-    if (!user) return;
+    const currentUser = auth.currentUser || user;
+    if (!currentUser) return;
     setIsResending(true);
     setMessage(null);
     try {
-      await sendEmailVerification(user);
+      await sendEmailVerification(currentUser);
       setMessage({ text: 'Verification link resent successfully! Please check your email.', type: 'success' });
     } catch (err: any) {
       if (err.code === 'auth/too-many-requests') {

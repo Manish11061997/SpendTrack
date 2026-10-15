@@ -148,6 +148,7 @@ export default function SettingsTab({
       setProfileError('Failed to read image file.');
     };
     reader.readAsDataURL(file);
+    e.target.value = '';
   };
   const [budgetLimit, setBudgetLimit] = useState<string>((budget?.monthlyLimit ?? '').toString());
   const [foodLimit, setFoodLimit] = useState<string>((budget?.categoryLimits?.['Food'] ?? '').toString());
