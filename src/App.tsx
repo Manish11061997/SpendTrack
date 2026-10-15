@@ -350,25 +350,45 @@ export default function App() {
         setEmailVerified(true);
         const storedGuestTxs = localStorage.getItem('spendtrack_guest_transactions');
         if (storedGuestTxs) {
-          try { setTransactions(JSON.parse(storedGuestTxs)); } catch (e) {}
+          try {
+            const parsed = JSON.parse(storedGuestTxs);
+            setTransactions(Array.isArray(parsed) ? parsed : []);
+          } catch (e) {
+            setTransactions([]);
+          }
         } else {
           setTransactions([]);
         }
         const storedGuestBudget = localStorage.getItem('spendtrack_guest_budget');
         if (storedGuestBudget) {
-          try { setBudget(JSON.parse(storedGuestBudget)); } catch (e) {}
+          try {
+            const parsed = JSON.parse(storedGuestBudget);
+            setBudget(parsed && typeof parsed === 'object' ? parsed : DEFAULT_BUDGET);
+          } catch (e) {
+            setBudget(DEFAULT_BUDGET);
+          }
         } else {
           setBudget(DEFAULT_BUDGET);
         }
         const storedGuestSubs = localStorage.getItem('spendtrack_guest_subscriptions');
         if (storedGuestSubs) {
-          try { setSubscriptions(JSON.parse(storedGuestSubs)); } catch (e) {}
+          try {
+            const parsed = JSON.parse(storedGuestSubs);
+            setSubscriptions(Array.isArray(parsed) ? parsed : []);
+          } catch (e) {
+            setSubscriptions([]);
+          }
         } else {
           setSubscriptions([]);
         }
         const storedGuestGoals = localStorage.getItem('spendtrack_guest_savings_goals');
         if (storedGuestGoals) {
-          try { setSavingsGoals(JSON.parse(storedGuestGoals)); } catch (e) {}
+          try {
+            const parsed = JSON.parse(storedGuestGoals);
+            setSavingsGoals(Array.isArray(parsed) ? parsed : []);
+          } catch (e) {
+            setSavingsGoals([]);
+          }
         } else {
           setSavingsGoals([]);
         }

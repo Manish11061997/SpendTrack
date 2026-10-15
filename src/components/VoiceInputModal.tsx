@@ -145,7 +145,7 @@ export const VoiceInputModal: React.FC<VoiceInputModalProps> = ({
   };
 
   const handleConfirm = () => {
-    if (!parsed || parsed.amount <= 0) return;
+    if (!parsed || isNaN(parsed.amount) || parsed.amount <= 0) return;
 
     onAddTransaction({
       title: parsed.title,
@@ -245,7 +245,7 @@ export const VoiceInputModal: React.FC<VoiceInputModalProps> = ({
         )}
 
         {/* Parsed Fields Preview */}
-        {parsed && parsed.amount > 0 && (
+        {parsed && !isNaN(parsed.amount) && parsed.amount > 0 && (
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
@@ -287,7 +287,7 @@ export const VoiceInputModal: React.FC<VoiceInputModalProps> = ({
           
           <button
             onClick={handleConfirm}
-            disabled={!parsed || parsed.amount <= 0}
+            disabled={!parsed || isNaN(parsed.amount) || parsed.amount <= 0}
             className="flex-1 py-2.5 bg-primary text-on-primary font-bold text-xs rounded-xl shadow-md hover:bg-primary/95 transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
           >
             <Check className="w-4 h-4" />

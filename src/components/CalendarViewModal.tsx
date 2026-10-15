@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Calendar, ChevronLeft, ChevronRight, X, Clock, Tag } from 'lucide-react';
 import { Transaction, Subscription } from '../types';
 import { formatCurrency } from '../utils/currency';
+import { formatLocalDate } from '../utils/dateUtils';
 
 interface CalendarViewModalProps {
   isOpen: boolean;
@@ -20,6 +21,12 @@ export const CalendarViewModal: React.FC<CalendarViewModalProps> = ({
 }) => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDayDate, setSelectedDayDate] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (isOpen) {
+      setSelectedDayDate(null);
+    }
+  }, [isOpen]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -64,7 +71,7 @@ export const CalendarViewModal: React.FC<CalendarViewModalProps> = ({
     : [];
 
   const selectedDaySubscriptions = selectedDayDate
-    ? (subscriptions || []).filter((s) => s && s.isActive && Number(s.billingDate) === parseInt(selectedDayDate.split('-')[2], 10))
+    ? (subscriptions || []).filter((s) => s && s.isActive && Number(s.billingDate) === parseInt(selectedDayDate.split('-')[2] || '0', 10))
     : [];
 
   return (
@@ -161,7 +168,7 @@ export const CalendarViewModal: React.FC<CalendarViewModalProps> = ({
           {selectedDayDate && (
             <div className="p-4 bg-blue-950/30 border border-blue-500/30 rounded-xl space-y-3 animate-in slide-in-from-bottom-2">
               <h4 className="text-sm font-bold text-blue-300 flex items-center gap-2">
-                <Clock className="w-4 h-4" /> Transactions for {selectedDayDate}
+                <Clock className="w-4 h-4" /> Transactions for {formatLocalDate(selectedDayDate)}
               </h4>
 
               {selectedDaySubscriptions.length > 0 && (
@@ -187,7 +194,7 @@ export const CalendarViewModal: React.FC<CalendarViewModalProps> = ({
                         <span className="text-gray-400 ml-2">({tx.category})</span>
                       </div>
                       <span className={`font-bold ${Number(tx.amount) > 0 ? 'text-emerald-400' : 'text-white'}`}>
-                        {Number(tx.amount) > 0 ? '+' : '-'}{formatCurrency(Math.abs(Number(tx.amount)), currency)}
+                        {Number(tx.amount) > 0 ? '+' : '-'}{formatCurrency(Math.abs(Number(tx.amount) || 0), currency)}
                       </span>
                     </div>
                   ))

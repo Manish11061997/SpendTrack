@@ -36,7 +36,10 @@ export const AlertRulesModal: React.FC<AlertRulesModalProps> = ({
     if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
       const saved = localStorage.getItem('spendtrack_alert_rules');
       if (saved) {
-        try { return JSON.parse(saved); } catch (e) {}
+        try {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed)) return parsed;
+        } catch (e) {}
       }
     }
     return DEFAULT_ALERT_RULES;
@@ -65,7 +68,7 @@ export const AlertRulesModal: React.FC<AlertRulesModalProps> = ({
   if (!isOpen) return null;
 
   const handleAddRule = () => {
-    if (!newRuleName.trim() || newRuleThreshold <= 0) return;
+    if (!newRuleName.trim() || isNaN(newRuleThreshold) || newRuleThreshold <= 0) return;
 
     const newRule: AlertRule = {
       id: Math.random().toString(36).substring(2, 9),
@@ -214,7 +217,7 @@ export const AlertRulesModal: React.FC<AlertRulesModalProps> = ({
 
           <button
             onClick={handleAddRule}
-            disabled={!newRuleName.trim() || newRuleThreshold <= 0}
+            disabled={!newRuleName.trim() || isNaN(newRuleThreshold) || newRuleThreshold <= 0}
             className="w-full py-2 bg-primary text-on-primary font-bold text-xs rounded-xl shadow-xs hover:bg-primary/95 transition-all flex items-center justify-center gap-1 cursor-pointer disabled:opacity-50"
           >
             <Plus className="w-4 h-4" />

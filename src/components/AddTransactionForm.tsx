@@ -129,7 +129,7 @@ export default function AddTransactionForm({ onSave, onCancel, budget, transacti
           try {
             const parsed = await parseReceiptWithAI(compressedBase64);
             if (parsed.merchantName) setTitle(parsed.merchantName);
-            if (parsed.totalAmount) setAmount(parsed.totalAmount.toString());
+            if (parsed.totalAmount && !isNaN(parsed.totalAmount) && parsed.totalAmount > 0) setAmount(parsed.totalAmount.toString());
             if (parsed.date) setDate(parseLocalDate(parsed.date));
             if (parsed.category) setCategory(parsed.category);
             if (parsed.suggestedNotes) setNotes(parsed.suggestedNotes);
@@ -212,7 +212,8 @@ export default function AddTransactionForm({ onSave, onCancel, budget, transacti
 
     const baseCurrency = budget?.currency || 'INR';
     const rawNum = parseFloat(cleanAmtStr);
-    const convertedAmount = convertCurrency(rawNum, selectedCurrency, baseCurrency) || rawNum;
+    const converted = convertCurrency(rawNum, selectedCurrency, baseCurrency);
+    const convertedAmount = (typeof converted === 'number' && !isNaN(converted) && converted > 0) ? converted : rawNum;
 
     const now = new Date();
     let hours = now.getHours();
@@ -446,7 +447,7 @@ export default function AddTransactionForm({ onSave, onCancel, budget, transacti
                         setIsScanningReceipt(true);
                         const parsed = await parseVoiceTranscript(input);
                         if (parsed.title) setTitle(parsed.title);
-                        if (parsed.amount) setAmount(parsed.amount.toString());
+                        if (parsed.amount && !isNaN(parsed.amount) && parsed.amount > 0) setAmount(parsed.amount.toString());
                         if (parsed.category) setCategory(parsed.category);
                         if (parsed.type) setTxType(parsed.type);
                         if (parsed.notes) setNotes(parsed.notes);
@@ -469,7 +470,7 @@ export default function AddTransactionForm({ onSave, onCancel, budget, transacti
                         console.log("Voice transcript:", transcript);
                         const parsed = await parseVoiceTranscript(transcript);
                         if (parsed.title) setTitle(parsed.title);
-                        if (parsed.amount) setAmount(parsed.amount.toString());
+                        if (parsed.amount && !isNaN(parsed.amount) && parsed.amount > 0) setAmount(parsed.amount.toString());
                         if (parsed.category) setCategory(parsed.category);
                         if (parsed.type) setTxType(parsed.type);
                         if (parsed.notes) setNotes(parsed.notes);

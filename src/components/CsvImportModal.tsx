@@ -27,6 +27,15 @@ export const CsvImportModal: React.FC<CsvImportModalProps> = ({
   const [ignoreDuplicates, setIgnoreDuplicates] = useState<boolean>(true);
 
   useEffect(() => {
+    if (isOpen) {
+      setParsedRows([]);
+      setErrors([]);
+      setFileName('');
+      setIsProcessing(false);
+    }
+  }, [isOpen]);
+
+  useEffect(() => {
     if (!isOpen) return;
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();

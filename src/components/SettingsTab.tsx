@@ -283,8 +283,8 @@ export default function SettingsTab({
       recurringIncome: {
         ...budget?.recurringIncome,
         title: recurringSalaryTitle.trim() || 'Monthly Salary',
-        amount: parseFloat(parseRawAmount(recurringSalaryAmt)) || 0,
-        dayOfMonth: parseInt(recurringSalaryDay) || 1,
+        amount: Math.max(0, parseFloat(parseRawAmount(recurringSalaryAmt)) || 0),
+        dayOfMonth: Math.max(1, Math.min(31, parseInt(recurringSalaryDay) || 1)),
         category: 'Other',
         isActive: recurringSalaryActive
       },
@@ -1046,7 +1046,7 @@ export default function SettingsTab({
                     setNewTplTitle('');
                     setNewTplAmount('');
                   }}
-                  disabled={!newTplTitle.trim() || !newTplAmount || parseFloat(parseRawAmount(newTplAmount)) <= 0}
+                  disabled={!newTplTitle.trim() || !newTplAmount || isNaN(parseFloat(parseRawAmount(newTplAmount))) || parseFloat(parseRawAmount(newTplAmount)) <= 0}
                   className="px-4 py-2 bg-primary hover:bg-primary/90 disabled:opacity-40 text-on-primary font-bold text-xs rounded-xl shadow-xs transition-colors flex items-center justify-center gap-1 cursor-pointer shrink-0"
                 >
                   <Plus className="w-4 h-4" /> Save Preset

@@ -32,6 +32,15 @@ export const ReceiptScannerModal: React.FC<ReceiptScannerModalProps> = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
+    if (isOpen) {
+      setImagePreview(null);
+      setExtractedResult(null);
+      setScanError(null);
+      setIsScanning(false);
+    }
+  }, [isOpen]);
+
+  useEffect(() => {
     if (!isOpen) return;
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
@@ -175,11 +184,11 @@ Return ONLY a valid JSON object matching this structure:
   };
 
   const handleSaveScannedTransaction = () => {
-    if (!extractedResult) return;
+    if (!extractedResult || isNaN(extractedResult.amount) || extractedResult.amount <= 0 || !extractedResult.title.trim()) return;
 
     const now = new Date();
     onAddTransaction({
-      title: extractedResult.title,
+      title: extractedResult.title.trim(),
       amount: -Math.abs(extractedResult.amount),
       category: extractedResult.category,
       date: extractedResult.date,
@@ -299,7 +308,8 @@ Return ONLY a valid JSON object matching this structure:
 
                 <button
                   onClick={handleSaveScannedTransaction}
-                  className="w-full mt-2 py-3 bg-primary text-white hover:bg-primary/90 rounded-2xl font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer shadow-md active:scale-98"
+                  disabled={!extractedResult || isNaN(extractedResult.amount) || extractedResult.amount <= 0 || !extractedResult.title.trim()}
+                  className="w-full mt-2 py-3 bg-primary text-white hover:bg-primary/90 disabled:opacity-40 disabled:cursor-not-allowed rounded-2xl font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer shadow-md active:scale-98"
                 >
                   <span>Save Scanned Transaction</span>
                   <ArrowRight className="w-4 h-4" />
