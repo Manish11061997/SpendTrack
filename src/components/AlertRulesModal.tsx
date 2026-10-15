@@ -33,9 +33,11 @@ export const AlertRulesModal: React.FC<AlertRulesModalProps> = ({
   currency = 'INR'
 }) => {
   const [rules, setRules] = useState<AlertRule[]>(() => {
-    const saved = localStorage.getItem('spendtrack_alert_rules');
-    if (saved) {
-      try { return JSON.parse(saved); } catch (e) {}
+    if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
+      const saved = localStorage.getItem('spendtrack_alert_rules');
+      if (saved) {
+        try { return JSON.parse(saved); } catch (e) {}
+      }
     }
     return DEFAULT_ALERT_RULES;
   });
@@ -46,7 +48,9 @@ export const AlertRulesModal: React.FC<AlertRulesModalProps> = ({
   const [newTargetCat, setNewTargetCat] = useState<'Food' | 'Transport' | 'Rent' | 'Shopping' | 'Other'>('Food');
 
   useEffect(() => {
-    localStorage.setItem('spendtrack_alert_rules', JSON.stringify(rules));
+    if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
+      localStorage.setItem('spendtrack_alert_rules', JSON.stringify(rules));
+    }
   }, [rules]);
 
   useEffect(() => {

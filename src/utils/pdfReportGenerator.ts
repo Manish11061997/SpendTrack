@@ -2,6 +2,14 @@ import { Transaction, BudgetConfig, Subscription, SavingsGoal } from '../types';
 import { formatCurrency } from './currency';
 import { getLocalDateString } from './dateUtils';
 
+export const escapeHtml = (str: string = '') =>
+  String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+
 export const generateMonthlyPdfReport = ({
   transactions = [],
   budget,
@@ -28,14 +36,6 @@ export const generateMonthlyPdfReport = ({
   const totalIncome = incomeTxs.reduce((sum, t) => sum + Number(t.amount), 0);
   const totalExpense = Math.abs(expenseTxs.reduce((sum, t) => sum + Number(t.amount), 0));
   const netSavings = totalIncome - totalExpense;
-
-  const escapeHtml = (str: string = '') =>
-    String(str)
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#039;');
 
   const categories = ['Food', 'Transport', 'Rent', 'Shopping', 'Other'];
   const categoryBreakdown = categories.map(cat => {

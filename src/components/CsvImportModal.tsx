@@ -41,6 +41,12 @@ export const CsvImportModal: React.FC<CsvImportModalProps> = ({
     const file = e.target.files?.[0];
     if (!file) return;
 
+    if (!file.name.toLowerCase().endsWith('.csv') && file.type !== 'text/csv' && file.type !== 'application/vnd.ms-excel') {
+      setErrors(['Please upload a valid .csv bank statement file.']);
+      e.target.value = '';
+      return;
+    }
+
     setFileName(file.name);
     setIsProcessing(true);
     setErrors([]);
@@ -60,17 +66,28 @@ export const CsvImportModal: React.FC<CsvImportModalProps> = ({
       setIsProcessing(false);
     };
     reader.readAsText(file);
+    e.target.value = '';
   };
 
   const rowsToImport = ignoreDuplicates ? parsedRows.filter(r => !r.isDuplicate) : parsedRows;
 
   const handleConfirmImport = () => {
+    if (rowsToImport.length === 0) return;
+
+    const now = new Date();
+    let hours = now.getHours();
+    const minutes = String(now.getMinutes()).padStart(2, '0');
+    const ampm = hours >= 12 ? 'PM' : 'AM';
+    hours = hours % 12;
+    hours = hours ? hours : 12;
+    const timeString = `${hours}:${minutes} ${ampm}`;
+
     const finalTxs: Omit<Transaction, 'id'>[] = rowsToImport.map(r => ({
       title: r.title,
       amount: r.amount,
       category: r.category,
       date: r.date,
-      time: new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }),
+      time: timeString,
       label: r.label,
       notes: r.notes || 'Imported via CSV',
     }));

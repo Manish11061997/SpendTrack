@@ -68,9 +68,15 @@ export default function ExportPDFButton({
     if (validTxs.length === 0) return;
     const sorted = validTxs.map(t => t.date).sort();
     
-    // Base date is either the latest transaction date or today
+    // Base date is either the latest transaction date or today (parsed locally)
     const latestTxStr = sorted[sorted.length - 1];
-    const baseDate = latestTxStr ? new Date(latestTxStr) : new Date();
+    let baseDate = new Date();
+    if (latestTxStr) {
+      const parts = latestTxStr.split('-').map(Number);
+      if (parts.length >= 3 && !isNaN(parts[0]) && !isNaN(parts[1]) && !isNaN(parts[2])) {
+        baseDate = new Date(parts[0], parts[1] - 1, parts[2]);
+      }
+    }
 
     if (preset === 'all') {
       setStartDate(sorted[0] || '');
@@ -101,7 +107,13 @@ export default function ExportPDFButton({
       return startDate === (sorted[0] || '') && endDate === (sorted[sorted.length - 1] || '');
     }
     const latestTxStr = sorted[sorted.length - 1];
-    const baseDate = latestTxStr ? new Date(latestTxStr) : new Date();
+    let baseDate = new Date();
+    if (latestTxStr) {
+      const parts = latestTxStr.split('-').map(Number);
+      if (parts.length >= 3 && !isNaN(parts[0]) && !isNaN(parts[1]) && !isNaN(parts[2])) {
+        baseDate = new Date(parts[0], parts[1] - 1, parts[2]);
+      }
+    }
     if (preset === 'this-month') {
       const firstDay = getLocalDateString(new Date(baseDate.getFullYear(), baseDate.getMonth(), 1));
       const lastDay = getLocalDateString(new Date(baseDate.getFullYear(), baseDate.getMonth() + 1, 0));
@@ -194,30 +206,35 @@ export default function ExportPDFButton({
     percentage: Math.round((ct.total / grandExpenseCategoriesTotal) * 100)
   })).sort((a, b) => b.total - a.total);
 
-  // Get date range of transactions
-  const getDateRangeLabel = () => {
-    const formatDate = (dateStr: string) => {
-      if (!dateStr) return '';
-      return new Date(dateStr).toLocaleDateString('en-IN', {
+  // Helper to format date strings locally avoiding UTC backward day shifts
+  const formatDisplayDate = (dateStr: string) => {
+    if (!dateStr) return '';
+    const parts = dateStr.split('-').map(Number);
+    if (parts.length >= 3 && !isNaN(parts[0]) && !isNaN(parts[1]) && !isNaN(parts[2])) {
+      return new Date(parts[0], parts[1] - 1, parts[2]).toLocaleDateString('en-IN', {
         day: '2-digit',
         month: 'short',
         year: 'numeric'
       });
-    };
+    }
+    return dateStr;
+  };
 
+  // Get date range of transactions
+  const getDateRangeLabel = () => {
     if (startDate && endDate) {
-      return `${formatDate(startDate)} — ${formatDate(endDate)}`;
+      return `${formatDisplayDate(startDate)} — ${formatDisplayDate(endDate)}`;
     } else if (startDate) {
-      return `From ${formatDate(startDate)}`;
+      return `From ${formatDisplayDate(startDate)}`;
     } else if (endDate) {
-      return `Until ${formatDate(endDate)}`;
+      return `Until ${formatDisplayDate(endDate)}`;
     }
     
     if (filteredTransactions.length === 0) {
       return new Date().toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
     }
     const sortedDates = [...filteredTransactions].map(t => t.date).sort();
-    return `${formatDate(sortedDates[0])} — ${formatDate(sortedDates[sortedDates.length - 1])}`;
+    return `${formatDisplayDate(sortedDates[0])} — ${formatDisplayDate(sortedDates[sortedDates.length - 1])}`;
   };
 
   // Divide transactions into pages of ledger table
@@ -796,11 +813,7 @@ export default function ExportPDFButton({
                             return (
                               <tr key={tx.id} className="hover:bg-slate-50/40 transition-colors">
                                 <td className="py-2.5 px-4 font-mono text-[10px] text-slate-400">
-                                  {new Date(tx.date).toLocaleDateString('en-IN', {
-                                    day: '2-digit',
-                                    month: 'short',
-                                    year: 'numeric'
-                                  })}
+                                  {formatDisplayDate(tx.date)}
                                   <span className="block text-[8px] text-slate-400/80">{tx.time}</span>
                                 </td>
                                 <td className="py-2.5 px-4 font-bold text-slate-800">

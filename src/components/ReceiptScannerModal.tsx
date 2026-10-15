@@ -99,6 +99,7 @@ export const ReceiptScannerModal: React.FC<ReceiptScannerModalProps> = ({
       setIsScanning(false);
     };
     reader.readAsDataURL(file);
+    e.target.value = '';
   };
 
   const scanReceiptWithGemini = async (base64Data: string) => {
@@ -106,7 +107,9 @@ export const ReceiptScannerModal: React.FC<ReceiptScannerModalProps> = ({
     setScanError(null);
 
     try {
-      const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+      const apiKey =
+        import.meta.env.VITE_GEMINI_API_KEY ||
+        (typeof process !== 'undefined' ? process.env?.GEMINI_API_KEY : undefined);
       if (!apiKey) {
         throw new Error("Gemini API key is not configured.");
       }

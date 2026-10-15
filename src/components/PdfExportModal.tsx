@@ -4,6 +4,7 @@ import { X, FileText, Download, Sparkles, CheckCircle2, ShieldCheck, Printer, Ta
 import { Transaction, BudgetConfig, UserProfile, Subscription, SavingsGoal } from '../types';
 import { formatCurrency, getCurrencySymbol } from '../utils/currency';
 import { getLocalDateString } from '../utils/dateUtils';
+import { escapeHtml } from '../utils/pdfReportGenerator';
 
 interface PdfExportModalProps {
   isOpen: boolean;
@@ -47,30 +48,36 @@ export const PdfExportModal: React.FC<PdfExportModalProps> = ({
     const now = new Date();
     const currentYear = now.getFullYear();
     const currentMonth = now.getMonth();
+    const endOfToday = new Date(currentYear, currentMonth, now.getDate(), 23, 59, 59, 999);
 
     return transactions.filter(t => {
       if (!t || typeof t.date !== 'string') return false;
-      const txDate = new Date(t.date);
+      const parts = t.date.split('-').map(Number);
+      if (parts.length < 3 || isNaN(parts[0]) || isNaN(parts[1]) || isNaN(parts[2])) return false;
+      const txYear = parts[0];
+      const txMonth = parts[1] - 1;
+      const txDay = parts[2];
+      const txDate = new Date(txYear, txMonth, txDay);
       if (isNaN(txDate.getTime())) return false;
 
       if (timeframe === 'current_month') {
-        return txDate.getFullYear() === currentYear && txDate.getMonth() === currentMonth;
+        return txYear === currentYear && txMonth === currentMonth;
       }
       if (timeframe === 'last_month') {
         const lastMonthDate = new Date(currentYear, currentMonth - 1, 1);
-        return txDate.getFullYear() === lastMonthDate.getFullYear() && txDate.getMonth() === lastMonthDate.getMonth();
+        return txYear === lastMonthDate.getFullYear() && txMonth === lastMonthDate.getMonth();
       }
       if (timeframe === 'last_3_months') {
         const threeMonthsAgo = new Date(currentYear, currentMonth - 2, 1);
-        return txDate >= threeMonthsAgo && txDate <= now;
+        return txDate >= threeMonthsAgo && txDate <= endOfToday;
       }
       if (timeframe === 'last_6_months') {
         const sixMonthsAgo = new Date(currentYear, currentMonth - 5, 1);
-        return txDate >= sixMonthsAgo && txDate <= now;
+        return txDate >= sixMonthsAgo && txDate <= endOfToday;
       }
       if (timeframe === 'ytd') {
         const startOfYear = new Date(currentYear, 0, 1);
-        return txDate >= startOfYear && txDate <= now;
+        return txDate >= startOfYear && txDate <= endOfToday;
       }
       if (timeframe === 'all_time') {
         return true;
@@ -161,7 +168,7 @@ export const PdfExportModal: React.FC<PdfExportModalProps> = ({
         <!DOCTYPE html>
         <html>
         <head>
-          <title>SpendTrack Financial Audit Report - ${profile?.name || 'User'}</title>
+          <title>SpendTrack Financial Audit Report - ${escapeHtml(profile?.name || 'User')}</title>
           <style>
             body { font-family: 'Helvetica Neue', Arial, sans-serif; margin: 40px; color: #1e293b; background: #fff; }
             .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #6366f1; padding-bottom: 20px; margin-bottom: 30px; }
@@ -187,11 +194,11 @@ export const PdfExportModal: React.FC<PdfExportModalProps> = ({
           <div class="header">
             <div>
               <div class="logo">SpendTrack Financial Audit</div>
-              <div class="title">Statement Period: ${timeframeLabel}</div>
+              <div class="title">Statement Period: ${escapeHtml(timeframeLabel)}</div>
             </div>
             <div style="text-align: right; font-size: 12px; color: #64748b;">
-              <div>Prepared for: <strong>${profile?.name || 'Valued User'}</strong></div>
-              <div>Generated on: ${today.toLocaleDateString('en-IN')}</div>
+              <div>Prepared for: <strong>${escapeHtml(profile?.name || 'Valued User')}</strong></div>
+              <div>Generated on: ${escapeHtml(today.toLocaleDateString('en-IN'))}</div>
               <div>Total Records: ${filteredTxs.length}</div>
             </div>
           </div>
@@ -218,17 +225,17 @@ export const PdfExportModal: React.FC<PdfExportModalProps> = ({
                 <th>Date</th>
                 <th>Description</th>
                 <th>Category</th>
-                <th style="text-align: right;">Amount (${currency})</th>
+                <th style="text-align: right;">Amount (${escapeHtml(currency)})</th>
               </tr>
             </thead>
             <tbody>
               ${filteredTxs.map(t => `
                 <tr>
-                  <td>${t.date}</td>
-                  <td><strong>${t.title}</strong></td>
-                  <td>${t.category}</td>
-                  <td style="text-align: right;" class="amount ${t.amount < 0 ? 'negative' : 'positive'}">
-                    ${t.amount < 0 ? '-' : '+'}${formatCurrency(Math.abs(t.amount), currency)}
+                  <td>${escapeHtml(t.date)}</td>
+                  <td><strong>${escapeHtml(t.title || 'Untitled')}</strong></td>
+                  <td>${escapeHtml(t.category || 'Other')}</td>
+                  <td style="text-align: right;" class="amount ${Number(t.amount) < 0 ? 'negative' : 'positive'}">
+                    ${Number(t.amount) < 0 ? '-' : '+'}${formatCurrency(Math.abs(Number(t.amount) || 0), currency)}
                   </td>
                 </tr>
               `).join('')}

@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Sector, RadialBarChart, RadialBar, PolarAngleAxis, AreaChart, Area, XAxis } from 'recharts';
 import { Transaction, UserProfile, BudgetConfig, Subscription } from '../types';
 import { formatCurrency as formatCustomCurrency, getCurrencySymbol, getCurrencyLocale, isSubscriptionDoubleCounted, parseRawAmount } from '../utils/currency';
-import { getLocalDateString } from '../utils/dateUtils';
+import { getLocalDateString, formatLocalDate } from '../utils/dateUtils';
 import { COLOR_PRESETS } from '../theme';
 import { triggerHaptic } from '../utils/haptics';
 import { ThreeDDonutCanvas, ThreeDCardCanvas, TiltCard3D, FlipCard3D, Card3D, RollingNumber } from './animated';
@@ -2049,7 +2049,7 @@ export default function DashboardTab({
                         </h4>
                         {goal.targetDate && (
                           <p className="text-[10px] text-on-surface-variant/85 flex items-center gap-1 mt-0.5">
-                            <Calendar className="w-3 h-3 text-primary" /> Target: {new Date(goal.targetDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                            <Calendar className="w-3 h-3 text-primary" /> Target: {formatLocalDate(goal.targetDate)}
                           </p>
                         )}
                         <div className="flex items-baseline gap-1.5 mt-1">

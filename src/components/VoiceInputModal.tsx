@@ -39,7 +39,7 @@ export const VoiceInputModal: React.FC<VoiceInputModalProps> = ({
     const recognition = new SpeechRecognition();
     recognition.continuous = false;
     recognition.interimResults = true;
-    recognition.lang = 'en-US';
+    recognition.lang = typeof navigator !== 'undefined' && navigator.language ? navigator.language : 'en-US';
 
     recognition.onstart = () => {
       setIsListening(true);

@@ -73,3 +73,22 @@ export function getLocalTimeString(d: Date = new Date()): string {
     hour12: true
   });
 }
+
+/**
+ * Formats a YYYY-MM-DD date string nicely (e.g., "15 Oct 2026") in local time
+ * without UTC midnight offset bugs.
+ */
+export function formatLocalDate(
+  raw: string,
+  options: Intl.DateTimeFormatOptions = { day: 'numeric', month: 'short', year: 'numeric' },
+  locale: string = 'en-IN'
+): string {
+  if (!raw || typeof raw !== 'string') return '';
+  const parts = raw.split('-').map(Number);
+  if (parts.length >= 3 && !isNaN(parts[0]) && !isNaN(parts[1]) && !isNaN(parts[2])) {
+    const d = new Date(parts[0], parts[1] - 1, parts[2]);
+    return d.toLocaleDateString(locale, options);
+  }
+  const d = new Date(raw);
+  return !isNaN(d.getTime()) ? d.toLocaleDateString(locale, options) : raw;
+}
