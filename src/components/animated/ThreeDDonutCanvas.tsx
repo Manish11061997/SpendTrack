@@ -62,11 +62,17 @@ export const ThreeDDonutCanvas: React.FC<ThreeDDonutCanvasProps> = ({
     camera.lookAt(0, 0, 0);
 
     // 2. High-performance alpha WebGL Renderer
-    const renderer = new THREE.WebGLRenderer({
-      alpha: true,
-      antialias: true,
-      powerPreference: 'high-performance',
-    });
+    let renderer: THREE.WebGLRenderer;
+    try {
+      renderer = new THREE.WebGLRenderer({
+        alpha: true,
+        antialias: true,
+        powerPreference: 'high-performance',
+      });
+    } catch (e) {
+      console.warn('WebGL not available for ThreeDDonutCanvas:', e);
+      return;
+    }
     renderer.setSize(width, height);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.25));
     renderer.shadowMap.enabled = true;

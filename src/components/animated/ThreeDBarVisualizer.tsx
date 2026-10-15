@@ -54,11 +54,17 @@ export const ThreeDBarVisualizer: React.FC<ThreeDBarVisualizerProps> = ({
     camera.lookAt(0, 0.8, 0);
 
     // 2. High-performance WebGL Renderer
-    const renderer = new THREE.WebGLRenderer({
-      alpha: true,
-      antialias: true,
-      powerPreference: 'high-performance',
-    });
+    let renderer: THREE.WebGLRenderer;
+    try {
+      renderer = new THREE.WebGLRenderer({
+        alpha: true,
+        antialias: true,
+        powerPreference: 'high-performance',
+      });
+    } catch (e) {
+      console.warn('WebGL not available for ThreeDBarVisualizer:', e);
+      return;
+    }
     renderer.setSize(width, height);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.25));
     renderer.shadowMap.enabled = true;

@@ -31,11 +31,17 @@ export const ThreeDCoinCanvas: React.FC<ThreeDCoinCanvasProps> = ({
     camera.position.set(0, 0, 4.8);
 
     // 2. WebGL Renderer
-    const renderer = new THREE.WebGLRenderer({
-      alpha: true,
-      antialias: true,
-      powerPreference: 'high-performance',
-    });
+    let renderer: THREE.WebGLRenderer;
+    try {
+      renderer = new THREE.WebGLRenderer({
+        alpha: true,
+        antialias: true,
+        powerPreference: 'high-performance',
+      });
+    } catch (e) {
+      console.warn('WebGL not available for ThreeDCoinCanvas:', e);
+      return;
+    }
     renderer.setSize(width, height);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.25));
     renderer.shadowMap.enabled = true;

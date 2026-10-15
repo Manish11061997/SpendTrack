@@ -23,11 +23,17 @@ export const ThreeDAtmosphere: React.FC<ThreeDAtmosphereProps> = ({ className = 
     camera.position.z = 25;
 
     // 2. High-performance alpha WebGL Renderer
-    const renderer = new THREE.WebGLRenderer({
-      alpha: true,
-      antialias: false,
-      powerPreference: 'high-performance',
-    });
+    let renderer: THREE.WebGLRenderer;
+    try {
+      renderer = new THREE.WebGLRenderer({
+        alpha: true,
+        antialias: false,
+        powerPreference: 'high-performance',
+      });
+    } catch (e) {
+      console.warn('WebGL not available for ThreeDAtmosphere:', e);
+      return;
+    }
     renderer.setSize(width, height);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.25));
     renderer.domElement.style.position = 'absolute';

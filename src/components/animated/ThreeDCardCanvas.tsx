@@ -36,11 +36,17 @@ export const ThreeDCardCanvas: React.FC<ThreeDCardCanvasProps> = ({
     camera.position.z = compact ? 5.5 : 4.8;
 
     // 2. Renderer with antialiasing and alpha
-    const renderer = new THREE.WebGLRenderer({
-      alpha: true,
-      antialias: true,
-      powerPreference: 'high-performance',
-    });
+    let renderer: THREE.WebGLRenderer;
+    try {
+      renderer = new THREE.WebGLRenderer({
+        alpha: true,
+        antialias: true,
+        powerPreference: 'high-performance',
+      });
+    } catch (e) {
+      console.warn('WebGL not available for ThreeDCardCanvas:', e);
+      return;
+    }
     renderer.setSize(width, height);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.25));
     renderer.shadowMap.enabled = true;

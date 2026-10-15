@@ -416,7 +416,9 @@ export default function App() {
       }
     } else {
       try {
-        const guestSubs = JSON.parse(localStorage.getItem('spendtrack_guest_subscriptions') || '[]');
+        const raw = localStorage.getItem('spendtrack_guest_subscriptions');
+        const parsed = raw ? JSON.parse(raw) : [];
+        const guestSubs = Array.isArray(parsed) ? parsed : [];
         localStorage.setItem('spendtrack_guest_subscriptions', JSON.stringify([...guestSubs, newSub]));
       } catch (e) {}
     }
@@ -437,7 +439,9 @@ export default function App() {
       }
     } else {
       try {
-        const guestSubs = JSON.parse(localStorage.getItem('spendtrack_guest_subscriptions') || '[]');
+        const raw = localStorage.getItem('spendtrack_guest_subscriptions');
+        const parsed = raw ? JSON.parse(raw) : [];
+        const guestSubs = Array.isArray(parsed) ? parsed : [];
         localStorage.setItem('spendtrack_guest_subscriptions', JSON.stringify(guestSubs.map((s: any) => s.id === id ? { ...s, ...updatedSub } : s)));
       } catch (e) {}
     }
@@ -454,7 +458,9 @@ export default function App() {
       }
     } else {
       try {
-        const guestSubs = JSON.parse(localStorage.getItem('spendtrack_guest_subscriptions') || '[]');
+        const raw = localStorage.getItem('spendtrack_guest_subscriptions');
+        const parsed = raw ? JSON.parse(raw) : [];
+        const guestSubs = Array.isArray(parsed) ? parsed : [];
         localStorage.setItem('spendtrack_guest_subscriptions', JSON.stringify(guestSubs.filter((s: any) => s.id !== id)));
       } catch (e) {}
     }
@@ -989,7 +995,9 @@ export default function App() {
       setDoc(doc(db, 'users', currentUser, 'transactions', txId), cleanData).catch((err: any) => {
         console.error('Firestore transaction write error:', err);
         try {
-          const existingQueue = JSON.parse(localStorage.getItem(OFFLINE_QUEUE_KEY) || '[]');
+          const rawQueue = localStorage.getItem(OFFLINE_QUEUE_KEY);
+          const parsedQueue = rawQueue ? JSON.parse(rawQueue) : [];
+          const existingQueue = Array.isArray(parsedQueue) ? parsedQueue : [];
           existingQueue.push({ txId, userId: currentUser, data: cleanData, timestamp: Date.now() });
           localStorage.setItem(OFFLINE_QUEUE_KEY, JSON.stringify(existingQueue));
           showToast('Saved offline — will sync when online.', 'warning');
@@ -1001,7 +1009,9 @@ export default function App() {
     } else {
       // Guest mode storage
       try {
-        const guestTxs = JSON.parse(localStorage.getItem('spendtrack_guest_transactions') || '[]');
+        const raw = localStorage.getItem('spendtrack_guest_transactions');
+        const parsed = raw ? JSON.parse(raw) : [];
+        const guestTxs = Array.isArray(parsed) ? parsed : [];
         localStorage.setItem('spendtrack_guest_transactions', JSON.stringify([createdTx, ...guestTxs]));
       } catch (err) {
         console.error('Guest tx save error:', err);
@@ -1019,7 +1029,9 @@ export default function App() {
       } catch (err) { console.error('Firestore transaction delete error:', err); }
     } else {
       try {
-        const guestTxs = JSON.parse(localStorage.getItem('spendtrack_guest_transactions') || '[]');
+        const raw = localStorage.getItem('spendtrack_guest_transactions');
+        const parsed = raw ? JSON.parse(raw) : [];
+        const guestTxs = Array.isArray(parsed) ? parsed : [];
         localStorage.setItem('spendtrack_guest_transactions', JSON.stringify(guestTxs.filter((t: any) => t && t.id !== id)));
       } catch (e) {}
     }
@@ -1074,7 +1086,9 @@ export default function App() {
       } catch (err) { console.error('Firestore transaction update error:', err); }
     } else {
       try {
-        const guestTxs = JSON.parse(localStorage.getItem('spendtrack_guest_transactions') || '[]');
+        const raw = localStorage.getItem('spendtrack_guest_transactions');
+        const parsed = raw ? JSON.parse(raw) : [];
+        const guestTxs = Array.isArray(parsed) ? parsed : [];
         localStorage.setItem('spendtrack_guest_transactions', JSON.stringify(guestTxs.map((t: any) => t && t.id === id ? { ...t, ...updatedTx } : t)));
       } catch (e) {}
     }
@@ -1101,7 +1115,9 @@ export default function App() {
       }
     } else {
       try {
-        const guestTxs = JSON.parse(localStorage.getItem('spendtrack_guest_transactions') || '[]');
+        const raw = localStorage.getItem('spendtrack_guest_transactions');
+        const parsed = raw ? JSON.parse(raw) : [];
+        const guestTxs = Array.isArray(parsed) ? parsed : [];
         localStorage.setItem('spendtrack_guest_transactions', JSON.stringify([...newTxs, ...guestTxs]));
       } catch (e) {}
     }
