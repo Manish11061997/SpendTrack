@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Lock, Delete, Sparkles, KeyRound } from 'lucide-react';
+import { Lock, Delete, Sparkles, KeyRound, Fingerprint } from 'lucide-react';
 
 interface PinLockModalProps {
   isOpen: boolean;
@@ -13,7 +13,49 @@ export const PinLockModal: React.FC<PinLockModalProps> = ({ isOpen, correctPin, 
   const [error, setError] = useState(false);
   const [failedAttempts, setFailedAttempts] = useState(0);
   const [lockoutTimer, setLockoutTimer] = useState(0);
+  const [hasBiometrics, setHasBiometrics] = useState<boolean>(false);
+  const [isAuthenticating, setIsAuthenticating] = useState<boolean>(false);
   const clearTimerRef = useRef<any>(null);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.PublicKeyCredential) {
+      if (typeof PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable === 'function') {
+        PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable()
+          .then((available) => setHasBiometrics(available))
+          .catch(() => setHasBiometrics(false));
+      } else {
+        setHasBiometrics(true);
+      }
+    }
+  }, []);
+
+  const handleBiometricAuth = async () => {
+    if (lockoutTimer > 0 || isAuthenticating) return;
+    setIsAuthenticating(true);
+    try {
+      if (typeof window !== 'undefined' && window.PublicKeyCredential) {
+        const challenge = new Uint8Array(32);
+        window.crypto.getRandomValues(challenge);
+        const credential = await navigator.credentials.get({
+          publicKey: {
+            challenge,
+            timeout: 60000,
+            userVerification: 'preferred',
+          }
+        });
+        if (credential) {
+          onUnlock();
+          setEnteredPin('');
+          setFailedAttempts(0);
+          return;
+        }
+      }
+    } catch (err: any) {
+      console.log('Biometric auth prompt dismissed or unconfigured:', err?.message);
+    } finally {
+      setIsAuthenticating(false);
+    }
+  };
 
   useEffect(() => {
     if (isOpen) {
@@ -133,7 +175,19 @@ export const PinLockModal: React.FC<PinLockModalProps> = ({ isOpen, correctPin, 
               {num}
             </button>
           ))}
-          <div />
+          {hasBiometrics ? (
+            <button
+              type="button"
+              onClick={handleBiometricAuth}
+              disabled={lockoutTimer > 0 || isAuthenticating}
+              title="Unlock with Biometrics / Face ID / Fingerprint"
+              className="h-16 rounded-full bg-purple-600/20 border border-purple-500/40 hover:bg-purple-600/40 active:scale-95 text-purple-300 flex items-center justify-center transition-all cursor-pointer disabled:opacity-40"
+            >
+              <Fingerprint className="w-7 h-7 animate-pulse" />
+            </button>
+          ) : (
+            <div />
+          )}
           <button
             onClick={() => handleKeyPress('0')}
             className="h-16 rounded-full bg-white/5 border border-white/10 hover:bg-purple-600/30 active:scale-95 text-xl font-bold text-white flex items-center justify-center transition-all cursor-pointer"

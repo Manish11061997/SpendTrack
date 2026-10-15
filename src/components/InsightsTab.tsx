@@ -31,7 +31,8 @@ import {
   Wallet,
   Sliders,
   Target,
-  FileText
+  FileText,
+  RotateCcw
 } from 'lucide-react';
 import { Transaction, BudgetConfig, Subscription, SavingsGoal } from '../types';
 import { COLOR_PRESETS } from '../theme';
@@ -528,6 +529,192 @@ export default function InsightsTab({
       </section>
 
 
+
+      {/* Interactive What-If Budget & Runway Simulator */}
+      <section className="bg-surface-container-low rounded-3xl p-5 md:p-6 border border-outline-variant/30 space-y-5 shadow-sm">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-outline-variant/20 pb-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-primary/10 text-primary border border-primary/20 flex items-center justify-center shrink-0 shadow-xs">
+              <Sliders className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="font-outfit font-black text-base text-on-surface flex items-center gap-2">
+                What-If Budget & Runway Simulator
+                <span className="text-[10px] font-mono font-bold bg-primary/15 text-primary px-2 py-0.5 rounded-full uppercase">
+                  Real-time
+                </span>
+              </h3>
+              <p className="text-xs text-on-surface-variant">
+                Adjust category spend targets to simulate monthly & annual compounding savings
+              </p>
+            </div>
+          </div>
+
+          {/* Quick Presets & Reset */}
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={() => {
+                setSimFood(Math.round(currentFood * 0.85));
+                setSimTransport(Math.round(currentTransport * 0.85));
+                setSimShopping(Math.round(currentShopping * 0.80));
+                setSimOther(Math.round(currentOther * 0.85));
+              }}
+              className="px-2.5 py-1 text-[11px] font-bold bg-surface-container hover:bg-surface-container-high border border-outline-variant/40 rounded-xl text-on-surface transition-all cursor-pointer"
+            >
+              Cut Wants 15%
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setSimFood(Math.round(currentFood * 0.75));
+                setSimTransport(Math.round(currentTransport * 0.75));
+                setSimShopping(Math.round(currentShopping * 0.65));
+                setSimOther(Math.round(currentOther * 0.75));
+              }}
+              className="px-2.5 py-1 text-[11px] font-bold bg-purple-500/15 hover:bg-purple-500/25 border border-purple-500/30 text-purple-400 rounded-xl transition-all cursor-pointer"
+            >
+              Aggressive Save
+            </button>
+            {(simFood !== -1 || simTransport !== -1 || simRent !== -1 || simShopping !== -1 || simOther !== -1) && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSimFood(-1);
+                  setSimTransport(-1);
+                  setSimRent(-1);
+                  setSimShopping(-1);
+                  setSimOther(-1);
+                }}
+                className="p-1.5 rounded-xl text-on-surface-variant hover:text-error hover:bg-error/10 transition-colors cursor-pointer"
+                title="Reset simulation to actuals"
+              >
+                <RotateCcw className="w-4 h-4" />
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Projection KPI Summary */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="p-4 rounded-2xl bg-surface-container/60 border border-outline-variant/20 space-y-1">
+            <span className="text-[10px] uppercase font-bold text-on-surface-variant tracking-wider">Simulated Monthly Spend</span>
+            <div className="text-lg font-black text-on-surface font-outfit">
+              {formatCurrency(simTotal)}
+            </div>
+            <span className="text-[11px] text-on-surface-variant">Baseline: {formatCurrency(currentTotal)}</span>
+          </div>
+
+          <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/25 space-y-1">
+            <span className="text-[10px] uppercase font-bold text-emerald-400 tracking-wider">Monthly Potential Savings</span>
+            <div className={`text-lg font-black font-outfit ${savingsDiff >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+              {savingsDiff >= 0 ? `+${formatCurrency(savingsDiff)}` : `-${formatCurrency(Math.abs(savingsDiff))}`}
+            </div>
+            <span className="text-[11px] text-emerald-400/80 font-medium">
+              {savingsDiff > 0 ? `+${formatCurrency(savingsDiff * 12)} / year saved` : 'Spending increases over baseline'}
+            </span>
+          </div>
+
+          <div className="p-4 rounded-2xl bg-primary/10 border border-primary/25 space-y-1">
+            <span className="text-[10px] uppercase font-bold text-primary tracking-wider">Runway Extension</span>
+            <div className="text-lg font-black text-primary font-outfit">
+              {simRunway.toFixed(1)} months
+            </div>
+            <span className="text-[11px] text-primary/80 font-medium">
+              {runwayExtension > 0.05 ? `+${runwayExtension.toFixed(1)} mo added security` : 'Current savings cushion'}
+            </span>
+          </div>
+        </div>
+
+        {goalImpactText && (
+          <div className="p-3 bg-purple-500/15 border border-purple-500/30 rounded-2xl text-xs font-semibold text-purple-300 flex items-center gap-2">
+            <Sparkles className="w-4 h-4 text-purple-400 shrink-0" />
+            <span>{goalImpactText}</span>
+          </div>
+        )}
+
+        {/* Category Sliders */}
+        <div className="space-y-4 pt-1">
+          {[
+            {
+              name: 'Food',
+              icon: Utensils,
+              current: currentFood,
+              simVal: valFood,
+              setter: setSimFood,
+              max: Math.max(Math.round(currentFood * 1.6), 10000),
+            },
+            {
+              name: 'Transport',
+              icon: Car,
+              current: currentTransport,
+              simVal: valTransport,
+              setter: setSimTransport,
+              max: Math.max(Math.round(currentTransport * 1.6), 8000),
+            },
+            {
+              name: 'Rent',
+              icon: HomeIcon,
+              current: currentRent,
+              simVal: valRent,
+              setter: setSimRent,
+              max: Math.max(Math.round(currentRent * 1.6), 25000),
+            },
+            {
+              name: 'Shopping',
+              icon: ShoppingBag,
+              current: currentShopping,
+              simVal: valShopping,
+              setter: setSimShopping,
+              max: Math.max(Math.round(currentShopping * 1.6), 15000),
+            },
+            {
+              name: 'Other',
+              icon: MoreHorizontal,
+              current: currentOther,
+              simVal: valOther,
+              setter: setSimOther,
+              max: Math.max(Math.round(currentOther * 1.6), 10000),
+            },
+          ].map((cat) => {
+            const Icon = cat.icon;
+            const diff = cat.simVal - cat.current;
+            return (
+              <div key={cat.name} className="space-y-1.5 p-3 rounded-2xl bg-surface-container/40 border border-outline-variant/15">
+                <div className="flex items-center justify-between text-xs">
+                  <div className="flex items-center gap-2 font-bold text-on-surface">
+                    <Icon className="w-3.5 h-3.5 text-primary" />
+                    <span>{cat.name}</span>
+                    <span className="text-[10px] text-on-surface-variant font-normal">
+                      (Actual: {formatCurrency(cat.current)})
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {diff !== 0 && (
+                      <span className={`text-[10px] font-bold ${diff < 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                        {diff < 0 ? `-${formatCurrency(Math.abs(diff))}` : `+${formatCurrency(diff)}`}
+                      </span>
+                    )}
+                    <span className="font-mono font-bold text-on-surface text-xs">
+                      {formatCurrency(cat.simVal)}
+                    </span>
+                  </div>
+                </div>
+
+                <input
+                  type="range"
+                  min="0"
+                  max={cat.max}
+                  step="50"
+                  value={cat.simVal}
+                  onChange={(e) => cat.setter(parseInt(e.target.value, 10))}
+                  className="w-full accent-primary h-1.5 bg-surface-container-highest rounded-lg cursor-pointer"
+                />
+              </div>
+            );
+          })}
+        </div>
+      </section>
 
       {/* No-Spend Heatmap & Discipline Streaks */}
       <section className="space-y-3">

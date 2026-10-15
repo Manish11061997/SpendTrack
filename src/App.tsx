@@ -57,6 +57,7 @@ import { fetchLiveExchangeRates } from './utils/currencyConverter';
 import { checkAlertRulesOnSave } from './utils/alertRulesEngine';
 
 import { VoiceInputModal } from './components/VoiceInputModal';
+import { saveReceiptToDb, deleteReceiptFromDb, clearAllReceiptsFromDb } from './utils/indexedDbStorage';
 
 // Modals (Static imports to ensure zero dynamic chunk loading failures on Android)
 import { CalendarViewModal } from './components/CalendarViewModal';
@@ -1009,10 +1010,15 @@ export default function App() {
     } else {
       // Guest mode storage
       try {
+        let storageTx = { ...createdTx };
+        if (createdTx.receiptUrl && createdTx.receiptUrl.startsWith('data:image/')) {
+          saveReceiptToDb(createdTx.id, createdTx.receiptUrl);
+          storageTx.receiptUrl = `idb:${createdTx.id}`;
+        }
         const raw = localStorage.getItem('spendtrack_guest_transactions');
         const parsed = raw ? JSON.parse(raw) : [];
         const guestTxs = Array.isArray(parsed) ? parsed : [];
-        localStorage.setItem('spendtrack_guest_transactions', JSON.stringify([createdTx, ...guestTxs]));
+        localStorage.setItem('spendtrack_guest_transactions', JSON.stringify([storageTx, ...guestTxs]));
       } catch (err) {
         console.error('Guest tx save error:', err);
       }
@@ -1023,6 +1029,7 @@ export default function App() {
   const handleDeleteTransaction = async (id: string) => {
     const deletedTx = transactions.find(t => t.id === id);
     setTransactions(prev => prev.filter(t => t.id !== id));
+    deleteReceiptFromDb(id);
     if (currentUser) {
       try {
         await deleteDoc(doc(db, 'users', currentUser, 'transactions', id));
@@ -1187,6 +1194,7 @@ export default function App() {
         localStorage.removeItem('spendtrack_guest_subscriptions');
         localStorage.removeItem('spendtrack_guest_savings_goals');
         localStorage.removeItem('spendtrack_guest_budget');
+        clearAllReceiptsFromDb();
       } catch (e) {}
     }
     

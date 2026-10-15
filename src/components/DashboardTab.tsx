@@ -1,9 +1,10 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Sector, RadialBarChart, RadialBar, PolarAngleAxis, AreaChart, Area, XAxis } from 'recharts';
 import { Transaction, UserProfile, BudgetConfig, Subscription } from '../types';
 import { formatCurrency as formatCustomCurrency, getCurrencySymbol, getCurrencyLocale, isSubscriptionDoubleCounted, parseRawAmount } from '../utils/currency';
 import { getLocalDateString, formatLocalDate } from '../utils/dateUtils';
+import { getReceiptFromDb } from '../utils/indexedDbStorage';
 import { COLOR_PRESETS } from '../theme';
 import { triggerHaptic } from '../utils/haptics';
 import { ThreeDDonutCanvas, ThreeDCardCanvas, TiltCard3D, FlipCard3D, Card3D, RollingNumber } from './animated';
@@ -151,6 +152,21 @@ export default function DashboardTab({
   const themeError = activeIsDark ? '#EC9A97' : '#A3483B';
 
   const [selectedTx, setSelectedTx] = useState<Transaction | null>(null);
+  const [resolvedReceiptUrl, setResolvedReceiptUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!selectedTx?.receiptUrl) {
+      setResolvedReceiptUrl(null);
+      return;
+    }
+    if (selectedTx.receiptUrl.startsWith('idb:')) {
+      const id = selectedTx.receiptUrl.replace('idb:', '');
+      getReceiptFromDb(id).then(url => setResolvedReceiptUrl(url));
+    } else {
+      setResolvedReceiptUrl(selectedTx.receiptUrl);
+    }
+  }, [selectedTx]);
+
   const [showCalcTooltip, setShowCalcTooltip] = useState<boolean>(false);
   const [activeCategoryFilter, setActiveCategoryFilter] = useState<string | null>(null);
   const [hoveredCategory, setHoveredCategory] = useState<string | null>(null);
@@ -3220,12 +3236,12 @@ export default function DashboardTab({
               )}
 
               {/* Receipt Preview if attached */}
-              {selectedTx.receiptUrl && (
+              {resolvedReceiptUrl && (
                 <div className="border-t border-outline-variant/20 pt-3 space-y-1.5">
                   <span className="font-semibold text-on-surface text-xs block">Attached Receipt:</span>
                   <div className="relative rounded-xl overflow-hidden border border-outline-variant max-h-40 bg-surface-container">
                     <img 
-                      src={selectedTx.receiptUrl} 
+                      src={resolvedReceiptUrl} 
                       alt="Receipt detail" 
                       className="w-full h-full object-contain max-h-40"
                     />
